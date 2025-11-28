@@ -841,7 +841,7 @@ const LawyerProfilePage: React.FC = () => {
                 <View style={tw`flex-row flex-wrap items-center`}>
                   {lawyerContactInfo.specializations && lawyerContactInfo.specializations.trim() ? (
                     <Text style={tw`text-sm text-gray-600`}>
-                      {lawyerContactInfo.specializations.split(",")[0].trim()}
+                      {lawyerContactInfo.specializations.split(",")[0].replace(/[\[\]"]/g, '').trim()}
                     </Text>
                   ) : (
                     <Text style={tw`text-sm text-gray-400 italic`}>
@@ -872,11 +872,16 @@ const LawyerProfilePage: React.FC = () => {
                   </Text>
                   {lawyerContactInfo.specializations
                     .split(",")
-                    .map((spec, index) => (
-                      <Text key={index} style={tw`text-xs text-gray-700`}>
-                        • {spec.trim()}
-                      </Text>
-                    ))}
+                    .map((spec, index) => {
+                      // Clean up any remaining brackets, quotes, and extra whitespace
+                      const cleanSpec = spec.replace(/[\[\]"]/g, '').trim();
+                      return cleanSpec ? (
+                        <Text key={index} style={tw`text-xs text-gray-700`}>
+                          • {cleanSpec}
+                        </Text>
+                      ) : null;
+                    })
+                    .filter(Boolean)}
                 </View>
               )}
 

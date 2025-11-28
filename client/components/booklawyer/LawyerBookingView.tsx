@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Alert, useWindowDimensions, TouchableOpacity, TextInput, ActivityIndicator, View } from "react-native";
+import { Alert, useWindowDimensions, TouchableOpacity, TextInput, ActivityIndicator, View, Image } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Calendar, Clock, Mail, Phone, MessageSquare, Video, MapPin, User, Check, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2 } from "lucide-react-native";
 import Colors from "../../constants/Colors";
@@ -52,6 +52,7 @@ interface LawyerData {
   hours: string;
   days: string;
   bio: string;
+  avatar?: string; // Profile photo URL
   hours_available: DayAvailability[] | Record<string, string[]>; // Legacy or JSONB format
 }
 
@@ -404,6 +405,7 @@ export default function LawyerBookingView() {
         days: params.lawyerDays as string,
         hours_available: hours_available,
         bio: params.lawyerBio as string,
+        avatar: params.lawyerAvatar as string || params.lawyerProfilePhoto as string,
       };
 
       setLawyerData(lawyerInfo);
@@ -419,6 +421,7 @@ export default function LawyerBookingView() {
         days: params.lawyerDays as string,
         hours_available: [],
         bio: (params.lawyerBio as string) || "",
+        avatar: params.lawyerAvatar as string || params.lawyerProfilePhoto as string,
       });
     }
   };
@@ -755,8 +758,13 @@ export default function LawyerBookingView() {
     );
   }
 
-  const primarySpecialization = lawyerData.specialization[0];
-  const additionalCount = lawyerData.specialization.length - 1;
+  // Clean specialization data and get primary specialization
+  const cleanedSpecializations = lawyerData.specialization
+    .map(spec => typeof spec === 'string' ? spec.replace(/[\[\]"]/g, '').trim() : spec)
+    .filter(spec => spec && spec.length > 0);
+  
+  const primarySpecialization = cleanedSpecializations[0] || '';
+  const additionalCount = cleanedSpecializations.length - 1;
   const bioMaxLength = isSmallScreen ? 100 : isMediumScreen ? 100 : 200;
   const shouldShowReadMore =
     lawyerData.bio && lawyerData.bio.length > bioMaxLength;
@@ -774,14 +782,26 @@ export default function LawyerBookingView() {
         {/* Lawyer Profile Card - Modern Design */}
         <VStack className={`${isSmallScreen ? 'mx-3 p-5' : 'mx-4 p-6'} mt-2 mb-3 bg-white rounded-2xl`} style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 }}>
           <HStack className="items-start mb-5">
-            <Box
-              className={`${
-                isSmallScreen ? "w-20 h-20" : "w-24 h-24"
-              } rounded-2xl items-center justify-center mr-4`}
-              style={{ backgroundColor: Colors.primary.blue, shadowColor: Colors.primary.blue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}
-            >
-              <User size={isSmallScreen ? 36 : 44} color="white" strokeWidth={2.5} />
-            </Box>
+            {lawyerData.avatar && !lawyerData.avatar.includes('unsplash') ? (
+              <View style={{ shadowColor: Colors.primary.blue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}>
+                <Image
+                  source={{ uri: lawyerData.avatar }}
+                  className={`${
+                    isSmallScreen ? "w-20 h-20" : "w-24 h-24"
+                  } rounded-2xl mr-4`}
+                  resizeMode="cover"
+                />
+              </View>
+            ) : (
+              <Box
+                className={`${
+                  isSmallScreen ? "w-20 h-20" : "w-24 h-24"
+                } rounded-2xl items-center justify-center mr-4`}
+                style={{ backgroundColor: Colors.primary.blue, shadowColor: Colors.primary.blue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}
+              >
+                <User size={isSmallScreen ? 36 : 44} color="white" strokeWidth={2.5} />
+              </Box>
+            )}
             <VStack className="flex-1">
               <Text
                 className={`${
@@ -792,8 +812,14 @@ export default function LawyerBookingView() {
                 {lawyerData.name}
               </Text>
               <HStack className="items-center mb-2">
-                <Box className="px-2 py-1 rounded-md" style={{ backgroundColor: '#ECFDF5' }}>
-                  <Text className="text-xs font-semibold" style={{ color: '#059669' }}>
+                <Box 
+                  className={`${isSmallScreen ? 'px-2 py-1' : 'px-3 py-1'} rounded-md`} 
+                  style={{ backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', borderWidth: 1 }}
+                >
+                  <Text 
+                    className={`${isSmallScreen ? 'text-xs' : 'text-sm'} font-semibold`} 
+                    style={{ color: '#059669' }}
+                  >
                     Available
                   </Text>
                 </Box>
@@ -845,7 +871,7 @@ export default function LawyerBookingView() {
                 All Specializations
               </Text>
               <VStack className="gap-2">
-                {lawyerData.specialization.map((spec, index) => (
+                {cleanedSpecializations.map((spec, index) => (
                   <HStack key={index} className="items-center">
                     <Box className="w-1.5 h-1.5 rounded-full mr-3" style={{ backgroundColor: Colors.primary.blue }} />
                     <Text
@@ -1437,21 +1463,21 @@ export default function LawyerBookingView() {
             <HStack className="w-full gap-2">
               <Button 
                 variant="outline" 
-                className="flex-1 py-3 bg-transparent border-gray-300 rounded-lg"
+                className="flex-1 py-2 min-h-[44px] bg-transparent border-gray-300 rounded-lg"
                 onPress={() => setShowConfirmationModal(false)}
                 isDisabled={isSubmitting}
               >
-                <ButtonText className="text-sm font-medium text-gray-700">
+                <ButtonText className="text-xs sm:text-sm font-medium text-gray-700 leading-tight">
                   Cancel
                 </ButtonText>
               </Button>
               <Button 
                 variant="solid"
-                className="flex-1 py-3 rounded-lg bg-[#023D7B] hover:bg-[#012B5A]"
+                className="flex-1 py-2 min-h-[44px] rounded-lg bg-[#023D7B] hover:bg-[#012B5A]"
                 onPress={proceedWithBooking}
                 isDisabled={isSubmitting}
               >
-                <ButtonText className="text-sm font-semibold text-white">
+                <ButtonText className="text-xs sm:text-sm font-semibold text-white leading-tight">
                   {isSubmitting ? "Confirming..." : "Confirm"}
                 </ButtonText>
               </Button>
