@@ -346,8 +346,13 @@ const Post: React.FC<PostProps> = React.memo(({
   const isAnonymous = (user.username || '').toLowerCase() === 'anonymous' || (user.name || '').toLowerCase().includes('anonymous');
 
 
+  // Cap the fade-in delay so later posts appear quickly even in long lists.
+  // This prevents high indexes (e.g., 30th+ item) from waiting multiple
+  // seconds before becoming visible.
+  const effectiveDelay = Math.min(index || 0, 8) * 40; // max ~320ms
+
   return (
-    <FadeInView delay={index * 50} style={styles.fadeContainer}>
+    <FadeInView delay={effectiveDelay} style={styles.fadeContainer}>
       <TouchableOpacity 
         style={[styles.container, isLoading && styles.loadingPost]} 
         onPress={handlePostPress} 

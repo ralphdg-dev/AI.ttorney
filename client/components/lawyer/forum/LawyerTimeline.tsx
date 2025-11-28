@@ -150,24 +150,8 @@ const LawyerTimeline: React.FC = React.memo(() => {
       is_anonymous: isAnon,
       is_flagged: !!row?.is_flagged,
     };
-
-    // Cache the complete post (with or without comments) for instant ViewPost loading
-    const postWithComments = {
-      ...postData,
-      replies: mappedReplies,
-      commentsLoaded: true,
-      commentsTimestamp: Date.now()
-    };
-
-    // Use setCachedPost to cache the complete post
-    setCachedPost(postData.id, postWithComments as any);
-
-    if (__DEV__) {
-      console.log(`Cached lawyer post ${postData.id} with ${mappedReplies.length} comments from LawyerTimeline`);
-    }
-
     return postData;
-  }, [setCachedPost]);
+  }, []);
 
   // Optimized loadPosts - now fetches all posts at once with retry logic
   const loadPosts = useCallback(async (force = false, retryCount = 0) => {

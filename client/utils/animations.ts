@@ -1,4 +1,4 @@
-import { Animated, Easing } from 'react-native';
+import { Animated, Easing, Platform } from 'react-native';
 
 /**
  * Standardized animation utilities for consistent transitions across the app
@@ -11,7 +11,12 @@ import { Animated, Easing } from 'react-native';
 export const shouldUseNativeDriver = (animationType: 'opacity' | 'transform' | 'all' = 'all'): boolean => {
   // Always use JS driver to avoid native driver compatibility issues
   // JS driver supports all properties including width, height, margins, etc.
-  return false;
+  if (Platform.OS === 'web') {
+    return false;
+  }
+
+  // For native platforms, use native driver for opacity and transform-based animations
+  return animationType === 'opacity' || animationType === 'transform' || animationType === 'all';
 };
 
 export const AnimationDurations = {

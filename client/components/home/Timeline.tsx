@@ -164,24 +164,8 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       is_flagged: !!row?.is_flagged,
       users: userData,
     };
-
-    // Cache the complete post (with or without comments) for instant ViewPost loading
-    const postWithComments = {
-      ...postData,
-      replies: mappedReplies,
-      commentsLoaded: true,
-      commentsTimestamp: Date.now()
-    };
-
-    // Use setCachedPost to cache the complete post
-    setCachedPost(postData.id, postWithComments as any);
-
-    if (__DEV__) {
-      console.log(`Cached post ${postData.id} with ${mappedReplies.length} comments from Timeline`);
-    }
-
     return postData;
-  }, [setCachedPost]);
+  }, []);
 
   // Remove complex batching - bookmark status now comes from API
 
@@ -328,13 +312,17 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       // Only update if component is still mounted
       if (isComponentMounted.current) {
         if (loadMore) {
-          // Append new posts to existing ones and update cache directly
-          const newPosts = [...posts, ...mapped];
+          const newPagePosts = mapped.map((post, index) => ({
+            ...post,
+            isNewlyLoaded: true,
+            loadedIndex: index,
+          }));
+
+          const newPosts = [...posts, ...newPagePosts];
           setPosts(newPosts);
           setCachedPosts(newPosts);
           updateCurrentPage(pageToFetch);
         } else {
-          // Replace posts for fresh load and update cache directly
           setPosts(mapped);
           setCachedPosts(mapped);
           updateCurrentPage(pageToFetch);
@@ -361,7 +349,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         // Retry on timeout
         if (retryCount < MAX_RETRIES && isComponentMounted.current) {
           if (__DEV__) console.log(`Timeline: Retrying... (${retryCount + 1}/${MAX_RETRIES})`);
-          setTimeout(() => loadPosts(force, retryCount + 1), 1000 * (retryCount + 1));
+          setTimeout(() => loadPosts(force, retryCount + 1, loadMore), 1000 * (retryCount + 1));
         }
         return;
       }
@@ -378,7 +366,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         // Retry on network errors
         if (retryCount < MAX_RETRIES && posts.length === 0) {
           if (__DEV__) console.log(`Timeline: Retrying after error... (${retryCount + 1}/${MAX_RETRIES})`);
-          setTimeout(() => loadPosts(force, retryCount + 1), 2000 * (retryCount + 1));
+          setTimeout(() => loadPosts(force, retryCount + 1, loadMore), 2000 * (retryCount + 1));
           return;
         }
       }
@@ -473,7 +461,9 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       fetchTimeoutRef.current = setTimeout(() => {
         if (isComponentMounted.current && isAuthenticated) {
           // Only poll if the component is still mounted and user is on the page
-          loadPosts();
+          if (!refreshingRef.current && !loadingMoreRef.current) {
+            loadPosts();
+          }
           scheduleNextFetch(); // Schedule next fetch
         }
       }, 120000); // 2 minutes - much less aggressive
@@ -497,9 +487,6 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       isComponentMounted.current = false;
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
-      }
-      if (loadMoreTimeoutRef.current) {
-        clearTimeout(loadMoreTimeoutRef.current);
       }
     };
   }, []);
@@ -554,35 +541,26 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     loadPosts(true); // Force refresh
   }, [loadPosts]);
 
-  // Load more handler for infinite scrolling with debouncing
-  const loadMoreTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Load more handler for infinite scrolling with ref-based guards
   const handleLoadMore = useCallback(() => {
-    // Clear any pending load more calls
-    if (loadMoreTimeoutRef.current) {
-      clearTimeout(loadMoreTimeoutRef.current);
+    // Use refs to check current state and prevent stale closures
+    if (loadingMoreRef.current) {
+      if (__DEV__) console.log('Timeline: Already loading more, skipping');
+      return;
     }
 
-    // Debounce the load more call to prevent rapid firing
-    loadMoreTimeoutRef.current = setTimeout(() => {
-      // Use refs to check current state and prevent stale closures
-      if (loadingMoreRef.current) {
-        if (__DEV__) console.log('Timeline: Already loading more, skipping');
-        return;
-      }
+    if (refreshingRef.current) {
+      if (__DEV__) console.log('Timeline: Currently refreshing, skipping load more');
+      return;
+    }
 
-      if (refreshingRef.current) {
-        if (__DEV__) console.log('Timeline: Currently refreshing, skipping load more');
-        return;
-      }
+    if (!hasMoreRef.current) {
+      if (__DEV__) console.log('Timeline: No more posts to load');
+      return;
+    }
 
-      if (!hasMoreRef.current) {
-        if (__DEV__) console.log('Timeline: No more posts to load');
-        return;
-      }
-
-      if (__DEV__) console.log('Timeline: Loading more posts...', { currentPage: currentPageRef.current, hasMore: hasMoreRef.current });
-      loadPosts(false, 0, true); // loadMore = true
-    }, 300); // 300ms debounce
+    if (__DEV__) console.log('Timeline: Loading more posts...', { currentPage: currentPageRef.current, hasMore: hasMoreRef.current });
+    loadPosts(false, 0, true); // loadMore = true
   }, [loadPosts]);
 
   const handleCreatePost = useCallback(() => {
@@ -871,18 +849,27 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
           style={styles.timeline}
           onScroll={(event) => {
             // Track scroll position as user scrolls
-            scrollPositionRef.current = event.nativeEvent.contentOffset.y;
+            const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+            scrollPositionRef.current = contentOffset.y;
             // Close any open menus when scrolling
             setOpenMenuPostId(null);
+
+            // Proactively trigger load more when the user is near the bottom
+            const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+            if (distanceFromBottom < 300) {
+              handleLoadMore();
+            }
           }}
           contentContainerStyle={allPosts.length === 0 ? styles.emptyContent : [styles.timelineContent, { paddingBottom: 56 + (insets.bottom || 0) + 20 }]}
           showsVerticalScrollIndicator={false}
           refreshControl={refreshControl}
           ListHeaderComponent={null}
           ListFooterComponent={renderFooter}
-          scrollEventThrottle={400}
+          scrollEventThrottle={64}
           onEndReached={allPosts.length > 0 ? handleLoadMore : undefined}
-          onEndReachedThreshold={0.3}
+          // Start fetching the next page when the user is a bit further
+          // from the end so new posts arrive more seamlessly.
+          onEndReachedThreshold={0.6}
           scrollEnabled={allPosts.length > 0 || initialLoading}
           removeClippedSubviews={true}
           maxToRenderPerBatch={10}
