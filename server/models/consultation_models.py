@@ -7,27 +7,51 @@ import re
 # Custom Exception Classes
 class ConsultationError(Exception):
     """Base exception for consultation-related errors"""
-    pass
+    def __init__(self, message: str, code: str = "CONSULTATION_ERROR", status_code: int = 400):
+        super().__init__(message)
+        self.message = message
+        self.code = code
+        self.status_code = status_code
 
 
 class InvalidDateError(ConsultationError):
     """Raised when consultation date is invalid"""
-    pass
+    def __init__(self):
+        super().__init__(
+            message="Consultation date must be in the future",
+            code="INVALID_DATE",
+            status_code=400
+        )
 
 
 class InvalidTimeError(ConsultationError):
     """Raised when consultation time is invalid"""
-    pass
+    def __init__(self, message: str = "Invalid consultation time format. Use HH:MM (24-hour format)"):
+        super().__init__(
+            message=message,
+            code="INVALID_TIME",
+            status_code=400
+        )
 
 
 class BookingConflictError(ConsultationError):
     """Raised when there's a scheduling conflict"""
-    pass
+    def __init__(self, lawyer_name: str, time_slot: str):
+        super().__init__(
+            message=f"{lawyer_name} is already booked for {time_slot}. Please select another time.",
+            code="BOOKING_CONFLICT",
+            status_code=409
+        )
 
 
 class DuplicatePendingError(ConsultationError):
     """Raised when user has a pending consultation with the same lawyer"""
-    pass
+    def __init__(self, lawyer_name: str):
+        super().__init__(
+            message=f"You already have a pending consultation with {lawyer_name}. Please wait for a response before requesting another.",
+            code="DUPLICATE_PENDING",
+            status_code=409
+        )
 
 
 class ConsultationRequestCreate(BaseModel):

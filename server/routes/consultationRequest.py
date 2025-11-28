@@ -263,7 +263,8 @@ async def delete_consultation_request(
 @router.get("/ban-status/{user_id}")
 async def check_consultation_ban_status(
     user_id: str,
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase)
 ):
     """
     Check if user is banned from booking consultations.
@@ -281,7 +282,7 @@ async def check_consultation_ban_status(
             logger.warning(f"⚠️  Unauthorized ban status check: {current_user.id[:8]}... tried to check {user_id[:8]}...")
             raise HTTPException(status_code=403, detail="Access denied")
         
-        ban_service = get_consultation_ban_service()
+        ban_service = get_consultation_ban_service(supabase)
         eligibility = await ban_service.check_booking_eligibility(user_id)
         
         logger.info(f"✅ Ban status: can_book={eligibility['can_book']}, status={eligibility['ban_status']}")
