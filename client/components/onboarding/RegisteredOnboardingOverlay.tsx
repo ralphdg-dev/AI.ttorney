@@ -15,6 +15,7 @@ import Svg, { Rect, Defs, Mask } from 'react-native-svg';
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../config/supabase';
+import { LAYOUT } from '../../constants/LayoutConstants';
 
 interface TutorialStep {
   id: string;
@@ -140,47 +141,60 @@ const RegisteredOnboardingOverlay: React.FC = () => {
     let spotlight;
 
     switch (step.position) {
-      case 'bottom':
-        const baseNavHeight = 120; // generous base height to cover thick Android nav bars
-        const navBarHeight = baseNavHeight + insets.bottom;
-        const navTop = screenHeight - navBarHeight;
+      case 'bottom': {
+        // Align spotlight with the actual bottom navbar used in Navbar.tsx.
+        // Navbar height comes from LAYOUT.NAVBAR_HEIGHT and the container adds
+        // bottom safe-area padding. The visible icon row sits just above the
+        // safe area.
+        const navRowHeight = LAYOUT.NAVBAR_HEIGHT;
+        const navRowTop = screenHeight - insets.bottom - navRowHeight;
+        const navRowBottom = screenHeight - insets.bottom;
 
         if (step.id === 'chat') {
-          // Focus spotlight ONLY on the floating Ask AI nav button (tight circle)
-          const size = 46;
-          const x = (screenWidth - size) / 2;
-          const bottomOverlap = 24; // allow overlap beyond screen bottom for tighter focus
-          const y = screenHeight - size + bottomOverlap;
+          // Focus spotlight on the Ask AI tab (center tab in a 5-tab navbar).
+          const tabCount = 5;
+          const askTabIndex = 2; // 0=Home,1=Learn,2=Ask AI,3=Legal Help,4=Profile
+          const tabWidth = screenWidth / tabCount;
+
+          const targetWidth = tabWidth * 0.9;
+          const x = tabWidth * askTabIndex + (tabWidth - targetWidth) / 2;
+          const targetHeight = navRowHeight * 0.9;
+          const y = navRowTop + (navRowHeight - targetHeight) / 2;
+
           spotlight = {
             x,
             y,
-            width: size,
-            height: size,
+            width: targetWidth,
+            height: targetHeight,
           };
         } else if (step.id === 'nav') {
-          // First slide: highlight only the nav icon row with a shorter, lower spotlight
-          const navHighlightHeight = 44;
-          const horizontalInset = 14;
-          const bottomOffset = -34; // deeper overlap to eliminate visible gap
-          const y = screenHeight - navHighlightHeight - bottomOffset;
+          // First slide: highlight the full navbar icon row, not the OS home bar.
+          const horizontalInset = 8;
+          const paddingVertical = 4;
+          const y = navRowTop - paddingVertical;
+          const height = navRowHeight + paddingVertical * 2;
+
           spotlight = {
             x: horizontalInset,
             y,
             width: screenWidth - horizontalInset * 2,
-            height: navHighlightHeight,
+            height,
           };
         } else {
-          // Default: bottom navigation bar - highlight entire bar area down to the screen edge
-          const horizontalInset = 12;
-          const y = navTop;
+          // Default: cover the entire navbar area including safe-area padding.
+          const horizontalInset = 8;
+          const y = navRowTop;
+          const height = navRowBottom - navRowTop + insets.bottom;
+
           spotlight = {
             x: horizontalInset,
             y,
             width: screenWidth - horizontalInset * 2,
-            height: navBarHeight,
+            height,
           };
         }
         break;
+      }
       case 'top':
         // Header tools (menu, logo, search, notifications) with rounded corners
         spotlight = {
