@@ -861,7 +861,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     <View style={styles.container}>
       {/* Show skeleton loading for initial load */}
       {initialLoading && allPosts.length === 0 ? (
-        <View style={[styles.skeletonContainer, { paddingBottom: Math.max(32, insets.bottom + 16) }]}>
+        <View style={[styles.timeline, styles.skeletonContainer, { paddingBottom: 56 + (insets.bottom || 0) + 20 }]}>
           <SkeletonList itemCount={8} itemHeight={200} spacing={12} />
         </View>
       ) : (
@@ -938,9 +938,9 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   skeletonContainer: {
-    flex: 1,
     backgroundColor: Colors.background.primary,
     paddingHorizontal: 16,
+    paddingTop: 10,
   },
   bottomSpacer: {
     height: 80, // Add a spacer at the bottom to prevent content from being hidden

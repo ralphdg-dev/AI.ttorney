@@ -628,7 +628,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
     <View style={{ flex: 1, backgroundColor: 'white' }}>
       {/* Show skeleton loading for initial load */}
       {initialLoading && allPosts.length === 0 ? (
-        <View style={styles.skeletonContainer}>
+        <View style={[styles.timeline, styles.skeletonContainer]}>
           <SkeletonList itemCount={8} itemHeight={200} spacing={12} />
         </View>
       ) : (
@@ -708,9 +708,9 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   skeletonContainer: {
-    flex: 1,
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
+    paddingTop: 10,
   },
 });
 

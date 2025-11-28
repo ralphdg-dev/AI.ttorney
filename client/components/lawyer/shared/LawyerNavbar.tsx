@@ -176,7 +176,10 @@ const LawyerNavbar: React.FC<LawyerNavbarProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    position: 'relative', // Changed from absolute
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: '#FFFFFF',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E5E7EB',
