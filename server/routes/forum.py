@@ -512,7 +512,9 @@ async def list_recent_posts(
             supabase = SupabaseService()
             async with httpx.AsyncClient(timeout=15.0) as client:
                 posts_headers = supabase._get_headers(use_service_key=True).copy()
-                posts_headers["Prefer"] = "count=exact"
+                # We don't need an exact total count anymore; avoiding count=exact
+                # keeps the query lighter and reduces chances of Supabase errors
+                # for large offsets.
                 # Include posts that are either explicitly not flagged OR have no flag set (NULL),
                 # so that older posts created before the flag was introduced are still visible.
                 posts_url = (
@@ -524,23 +526,28 @@ async def list_recent_posts(
                 )
                 posts_response = await client.get(posts_url, headers=posts_headers)
 
-            # Supabase returns 206 Partial Content when using range/limit with count=exact.
-            # Treat both 200 and 206 as success; anything else is a real error.
-            if posts_response.status_code not in (200, 206):
+            # Treat 2xx as success; for anything else, log the problem and fall back
+            # to an empty page instead of surfacing a hard 5xx to the client.
+            if not (200 <= posts_response.status_code < 300):
                 error_text = posts_response.text if posts_response.content else "No error text"
-                logger.error(f"Posts query failed: {posts_response.status_code} - {error_text}")
-                raise HTTPException(status_code=502, detail="Failed to fetch forum posts from database")
+                logger.error(
+                    f"Posts query failed for URL {posts_url}: "
+                    f"status={posts_response.status_code} - {error_text}"
+                )
+                base_posts = []
+                if total_count is None:
+                    total_count = 0
+            else:
+                base_posts = posts_response.json() if posts_response.content else []
 
-            base_posts = posts_response.json() if posts_response.content else []
-
-            # Extract total count from Content-Range header if available
-            content_range = posts_response.headers.get("content-range") or posts_response.headers.get("Content-Range")
-            if content_range and "/" in content_range:
-                try:
-                    total_part = content_range.split("/")[-1]
-                    total_count = int(total_part)
-                except (ValueError, TypeError):
-                    total_count = None
+                # Extract total count from Content-Range header if available (best-effort only)
+                content_range = posts_response.headers.get("content-range") or posts_response.headers.get("Content-Range")
+                if content_range and "/" in content_range:
+                    try:
+                        total_part = content_range.split("/")[-1]
+                        total_count = int(total_part)
+                    except (ValueError, TypeError):
+                        total_count = None
             
                                                    
             if base_posts:
