@@ -639,11 +639,13 @@ async def list_recent_posts(
             
             final_posts.append(post_copy)
         
-        # Check if there are more posts available
-        if total_count is not None:
-            has_more = (offset + len(base_posts)) < total_count
-        else:
-            has_more = len(base_posts) == limit
+        # Check if there are more posts available.
+        # We rely only on the current page size to decide if more pages exist:
+        # - If we received a full batch (len == limit), we assume there may be more.
+        # - If we received fewer than limit, we've reached the end.
+        # This avoids depending on Supabase's total count which can sometimes
+        # be misleading when using range/limit with count.
+        has_more = len(base_posts) == limit
 
         return ListPostsResponse(
             success=True, 
