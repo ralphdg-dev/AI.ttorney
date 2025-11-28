@@ -560,7 +560,7 @@ const LawyerProfilePage: React.FC = () => {
         const userProfileData: ProfileData = {
           name: user.full_name || "Attorney",
           email: user.email || "",
-          avatar: profileData.avatar,
+          avatar: user.profile_photo || (user as any).photo_url || profileData.avatar,
           experience: profileData.experience,
           verificationStatus:
             user.role === "verified_lawyer"
@@ -582,6 +582,18 @@ const LawyerProfilePage: React.FC = () => {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isInitialLoad]);
+
+  // Update profile data when user data changes (e.g., after photo upload)
+  useEffect(() => {
+    if (user) {
+      setProfileData(prev => ({
+        ...prev,
+        avatar: user.profile_photo || (user as any).photo_url || prev.avatar,
+        name: user.full_name || prev.name,
+        email: user.email || prev.email,
+      }));
+    }
+  }, [user?.profile_photo, user?.full_name, user?.email, (user as any)?.photo_url]);
 
   const refreshProfileData = useCallback(async () => {
     if (!user) return;
