@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ScrollView, View, Text, Alert, Image, StyleSheet } from 'react-native';
+import { ScrollView, View, Text, Alert, Image, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
 import { Mail, Phone, Calendar, Clock, MessageSquare, Settings, AlertTriangle } from 'lucide-react-native';
@@ -428,7 +428,19 @@ const ConsultationDetailPage: React.FC = () => {
           })}
         />
         <View style={styles.loadingContainer}>
-          <Text>Loading consultation details...</Text>
+          <ActivityIndicator 
+            size="large" 
+            color={Colors.primary.blue} 
+            style={{ marginBottom: 16 }}
+          />
+          <Text style={{
+            fontSize: 16,
+            color: '#6B7280',
+            textAlign: 'center',
+            fontWeight: '500'
+          }}>
+            Loading consultation details...
+          </Text>
         </View>
       </SafeAreaView>
     );

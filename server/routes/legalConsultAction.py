@@ -81,28 +81,37 @@ def transform_consultation_data(consultation: Dict[str, Any]) -> Dict[str, Any]:
     """
     Transform raw consultation data with user information
     """
-    user_data = consultation.get('users', {})
-    return {
-        "id": consultation.get("id"),
-        "user_id": consultation.get("user_id"),
-        "lawyer_id": consultation.get("lawyer_id"),
-        "message": consultation.get("message"),
-        "email": consultation.get("email"),
-        "mobile_number": consultation.get("mobile_number"),
-        "status": consultation.get("status"),
-        "consultation_date": consultation.get("consultation_date"),
-        "consultation_time": consultation.get("consultation_time"),
-        "consultation_mode": consultation.get("consultation_mode"),
-        "requested_at": consultation.get("requested_at"),
-        "responded_at": consultation.get("responded_at"),
-        "created_at": consultation.get("created_at"),
-        "updated_at": consultation.get("updated_at"),
-        "client_name": user_data.get("full_name", "Unknown Client"),
-        "client_email": user_data.get("email", consultation.get("email")),
-        "client_username": user_data.get("username"),
-        "client_profile_photo": user_data.get("profile_photo"),
-        "client_photo_url": user_data.get("photo_url")
-    }
+    try:
+        user_data = consultation.get('users', {})
+        if not isinstance(user_data, dict):
+            logger.warning(f"⚠️ Invalid user_data type: {type(user_data)}, setting to empty dict")
+            user_data = {}
+            
+        return {
+            "id": consultation.get("id"),
+            "user_id": consultation.get("user_id"),
+            "lawyer_id": consultation.get("lawyer_id"),
+            "message": consultation.get("message"),
+            "email": consultation.get("email"),
+            "mobile_number": consultation.get("mobile_number"),
+            "status": consultation.get("status"),
+            "consultation_date": consultation.get("consultation_date"),
+            "consultation_time": consultation.get("consultation_time"),
+            "consultation_mode": consultation.get("consultation_mode"),
+            "requested_at": consultation.get("requested_at"),
+            "responded_at": consultation.get("responded_at"),
+            "created_at": consultation.get("created_at"),
+            "updated_at": consultation.get("updated_at"),
+            "client_name": user_data.get("full_name", "Unknown Client"),
+            "client_email": user_data.get("email", consultation.get("email")),
+            "client_username": user_data.get("username"),
+            "client_profile_photo": user_data.get("profile_photo"),
+            "client_photo_url": user_data.get("photo_url")
+        }
+    except Exception as e:
+        logger.error(f"❌ Error in transform_consultation_data: {e}", exc_info=True)
+        logger.error(f"❌ Consultation data: {consultation}")
+        raise
 
 async def fetch_user_data_fallback(supabase: Client, user_id: str) -> Dict[str, Any]:
     """
@@ -123,7 +132,7 @@ async def fetch_user_data_fallback(supabase: Client, user_id: str) -> Dict[str, 
 
                               
 USER_JOIN_QUERY = """*,
-    users(
+    users!consultation_requests_user_id_fkey(
         full_name,
         email,
         username,
@@ -187,6 +196,7 @@ async def get_my_consultations(
         # ALWAYS use fallback to ensure we get user data
         enhanced_consultations = []
         
+        # Process consultations with proper async handling
         for idx, consultation in enumerate(consultations):
             logger.info(f"  [{idx+1}] Processing consultation: {consultation.get('id', 'unknown')[:8]}...")
             logger.info(f"  [{idx+1}] Keys: {list(consultation.keys())}")
@@ -249,7 +259,9 @@ async def get_my_consultations(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error fetching consultations: {str(e)}")
+        logger.error(f"❌ CRITICAL ERROR in get_my_consultations: {str(e)}", exc_info=True)
+        logger.error(f"❌ Error type: {type(e).__name__}")
+        logger.error(f"❌ User ID: {current_user.get('id', 'unknown')[:8]}...")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/stats", response_model=ConsultationStats)
