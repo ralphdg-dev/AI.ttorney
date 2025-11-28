@@ -20,6 +20,8 @@ export interface ProfileData {
   bio: string;
   days?: string;
   hours_available?: string | Record<string, string[]>; // JSONB or legacy string
+  rollNumber?: string;
+  rollSigningDate?: string;
 }
 interface LawyerProfileResponse {
   success: boolean;
