@@ -338,8 +338,13 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
           updateCurrentPage(pageToFetch);
         }
         
-        // Update hasMore based on API response
-        const hasMorePosts = data?.hasMore === true;
+        // Update hasMore based primarily on API response, but fall back to page size.
+        // If the backend explicitly reports hasMore = true, trust it.
+        // Otherwise, treat any full batch (mapped.length === 15) as "has more" to keep
+        // infinite scrolling working even if the flag is missing or incorrect.
+        const backendHasMore = data?.hasMore === true;
+        const inferredHasMore = mapped.length === 15; // 15 is the hard-coded limit in this request
+        const hasMorePosts = backendHasMore || inferredHasMore;
         setHasMore(hasMorePosts);
         hasMoreRef.current = hasMorePosts;
         setError(null);

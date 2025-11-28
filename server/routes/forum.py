@@ -513,10 +513,16 @@ async def list_recent_posts(
             async with httpx.AsyncClient(timeout=15.0) as client:
                 posts_headers = supabase._get_headers(use_service_key=True).copy()
                 posts_headers["Prefer"] = "count=exact"
-                posts_response = await client.get(
-                    f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&order=created_at.desc&is_flagged=eq.false&limit={limit}&offset={offset}",
-                    headers=posts_headers
+                # Include posts that are either explicitly not flagged OR have no flag set (NULL),
+                # so that older posts created before the flag was introduced are still visible.
+                posts_url = (
+                    f"{supabase.rest_url}/forum_posts"
+                    f"?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)"
+                    f"&order=created_at.desc"
+                    f"&or=(is_flagged.is.null,is_flagged.eq.false)"
+                    f"&limit={limit}&offset={offset}"
                 )
+                posts_response = await client.get(posts_url, headers=posts_headers)
 
             # Supabase returns 206 Partial Content when using range/limit with count=exact.
             # Treat both 200 and 206 as success; anything else is a real error.

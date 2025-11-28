@@ -602,9 +602,13 @@ export default function LawyerBookingView() {
       // Normalize consultation mode to lowercase for backend
       const normalizedMode = communicationMode.toLowerCase().replace('in-person', 'onsite');
       
+      // CRITICAL: lawyer_id must be lawyer_info.id (NOT users.id)
+      // lawyerData.id = lawyer_info.id (primary key)
+      // lawyerData.lawyer_id = users.id (foreign key to users table)
+      // consultation_requests.lawyer_id references lawyer_info.id
       const consultationRequestData = {
         user_id: user?.id || "anonymous",
-        lawyer_id: lawyerData?.id, // Use lawyer_info.id (backend validates against lawyer_info table)
+        lawyer_id: lawyerData?.id, // CORRECT: lawyer_info.id (primary key)
         message: concern.trim(),
         email: email.trim(),
         mobile_number: mobileNumber.trim(),
@@ -615,14 +619,17 @@ export default function LawyerBookingView() {
 
       console.log("📤 Sending consultation request:", consultationRequestData);
       console.log("👨‍⚖️ Lawyer Data:", {
-        id: lawyerData?.id,
-        lawyer_id: lawyerData?.lawyer_id,
-        name: lawyerData?.name
+        'lawyer_info.id (PRIMARY KEY)': lawyerData?.id,
+        'users.id (FOREIGN KEY)': lawyerData?.lawyer_id,
+        'name': lawyerData?.name
       });
       
-      // Validate lawyer_id exists
-      if (!lawyerData?.lawyer_id) {
-        throw new Error('Lawyer ID is missing. Please try selecting the lawyer again.');
+      // Validate required IDs exist
+      if (!lawyerData?.id) {
+        throw new Error('Lawyer profile ID is missing. Please try selecting the lawyer again.');
+      }
+      if (!user?.id) {
+        throw new Error('User authentication required. Please log in again.');
       }
 
       const { NetworkConfig } = await import('@/utils/networkConfig');

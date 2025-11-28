@@ -18,6 +18,21 @@ logging.basicConfig(level=logging.INFO)
                
 router = APIRouter(prefix="/api/consult-actions", tags=["consultation-actions"])
 
+# ============================================================================
+# CRITICAL ID RELATIONSHIPS DOCUMENTATION
+# ============================================================================
+# consultation_requests.lawyer_id → lawyer_info.id (PRIMARY KEY, NOT users.id)
+# lawyer_info.lawyer_id → users.id (Foreign key to user account)
+# 
+# When querying consultations for a lawyer:
+# 1. Get lawyer_info.id using: lawyer_info WHERE lawyer_id = auth.uid()
+# 2. Query consultations using: consultation_requests WHERE lawyer_id = lawyer_info.id
+#
+# When sending notifications:
+# 1. Get lawyer_info.lawyer_id (users.id) from lawyer_info table
+# 2. Send notification to lawyer_info.lawyer_id (the user account)
+# ============================================================================
+
                  
 class ConsultationRequest(BaseModel):
     id: str
@@ -108,16 +123,20 @@ async def get_my_consultations(
     try:
         user_id = current_user["id"]
         
-                                          
+        # STEP 1: Get lawyer_info.id from users.id
+        # consultation_requests.lawyer_id references lawyer_info.id (NOT users.id)
         try:
-            lawyer_info_response = supabase.table("lawyer_info").select("id").eq("lawyer_id", user_id).execute()
+            logger.info(f"🔍 Looking up lawyer_info for user_id: {user_id[:8]}...")
+            lawyer_info_response = supabase.table("lawyer_info").select("id, name").eq("lawyer_id", user_id).execute()
             
             if not lawyer_info_response.data or len(lawyer_info_response.data) == 0:
-                logger.warning(f"  No lawyer_info found for user: {user_id}")
+                logger.warning(f"⚠️  No lawyer_info found for user: {user_id[:8]}...")
                 return []
             
             lawyer_info_id = lawyer_info_response.data[0]["id"]
-            logger.info(f" Fetching consultations for lawyer_info.id: {lawyer_info_id} (user_id: {user_id}), filter: {status_filter}")
+            lawyer_name = lawyer_info_response.data[0].get("name", "Unknown")
+            logger.info(f"✅ Found lawyer_info.id: {lawyer_info_id[:8]}... for {lawyer_name}")
+            logger.info(f"📋 Fetching consultations WHERE lawyer_id = {lawyer_info_id[:8]}... (filter: {status_filter or 'all'})")
         except Exception as e:
             logger.error(f" Error fetching lawyer_info: {e}")
             return []
@@ -144,19 +163,19 @@ async def get_my_consultations(
         
         consultations = response.data if hasattr(response, 'data') else []
         
-                             
-        logger.info(f" Raw response: {len(consultations)} rows")
+        # STEP 3: Log results and debug if empty
+        logger.info(f"📊 Found {len(consultations)} consultation(s) for lawyer_info.id: {lawyer_info_id[:8]}...")
         if consultations:
-            logger.info(f" First consultation: {consultations[0]}")
+            logger.info(f"✅ Sample consultation: id={consultations[0].get('id', 'N/A')[:8]}... status={consultations[0].get('status', 'N/A')}")
         else:
-            logger.warning(f"  No consultations found for lawyer_info.id: {lawyer_info_id}")
-                                                           
+            logger.warning(f"⚠️  No consultations found for lawyer_info.id: {lawyer_info_id[:8]}...")
+            # Debug: Check if consultations exist in DB at all
             all_response = supabase.table("consultation_requests").select("id, lawyer_id, user_id, status, created_at").order("created_at", desc=True).limit(10).execute()
             if all_response.data:
-                logger.info(f" Total consultations in DB: {len(all_response.data)}")
+                logger.info(f"🔍 DEBUG: Total consultations in DB: {len(all_response.data)}")
                 for idx, c in enumerate(all_response.data):
-                    logger.info(f"  [{idx+1}] id={c.get('id')[:8]}... lawyer_id={c.get('lawyer_id')[:8] if c.get('lawyer_id') else 'NULL'}... user_id={c.get('user_id')[:8]}... status={c.get('status')}")
-                logger.info(f" Looking for lawyer_info.id: {lawyer_info_id}")
+                    logger.info(f"  [{idx+1}] lawyer_id={c.get('lawyer_id', 'NULL')[:8] if c.get('lawyer_id') else 'NULL'}... status={c.get('status')}")
+                logger.info(f"🎯 Looking for lawyer_info.id: {lawyer_info_id[:8]}...")
             else:
                 logger.warning(f"🚨 NO CONSULTATIONS EXIST IN DATABASE AT ALL")
         
@@ -183,12 +202,13 @@ async def get_consultation_stats(
     try:
         user_id = current_user["id"]
         
-                                          
+        # STEP 1: Get lawyer_info.id from users.id
         try:
-            lawyer_info_response = supabase.table("lawyer_info").select("id").eq("lawyer_id", user_id).execute()
+            logger.info(f"📊 Fetching stats for user_id: {user_id[:8]}...")
+            lawyer_info_response = supabase.table("lawyer_info").select("id, name").eq("lawyer_id", user_id).execute()
             
             if not lawyer_info_response.data or len(lawyer_info_response.data) == 0:
-                logger.warning(f"  No lawyer_info found for user: {user_id}")
+                logger.warning(f"⚠️  No lawyer_info found for user: {user_id[:8]}...")
                 return ConsultationStats(
                     total_requests=0,
                     pending_requests=0,
@@ -488,18 +508,29 @@ async def cancel_consultation(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 async def _send_consultation_notification(supabase: Client, consultation: Dict[str, Any], status: str):
-    """Send notification based on consultation status change"""
+    """
+    Send notification based on consultation status change.
+    
+    CRITICAL: consultation["lawyer_id"] = lawyer_info.id (PRIMARY KEY)
+    We need to get lawyer_info.lawyer_id (users.id) to send notification to user account.
+    """
     try:
         notification_service = NotificationService(supabase)
         
+        # Get lawyer_info.lawyer_id (users.id) for notification
+        # consultation["lawyer_id"] is lawyer_info.id, not users.id
+        logger.info(f"📬 Preparing notification for status: {status}")
         lawyer_result = supabase.table("lawyer_info").select("name, lawyer_id").eq("id", consultation["lawyer_id"]).execute()
         if not lawyer_result.data:
+            logger.warning(f"⚠️  Lawyer not found for lawyer_info.id: {consultation['lawyer_id'][:8]}...")
             return
         
         lawyer_name = lawyer_result.data[0]["name"]
-        lawyer_user_id = lawyer_result.data[0]["lawyer_id"]
+        lawyer_user_id = lawyer_result.data[0]["lawyer_id"]  # This is users.id for notifications
         user_id = consultation["user_id"]
         consultation_id = consultation["id"]
+        
+        logger.info(f"📧 Sending {status} notification: lawyer={lawyer_name}, user_id={user_id[:8]}...")
         
         if status == "accepted":
             await notification_service.notify_consultation_accepted(
