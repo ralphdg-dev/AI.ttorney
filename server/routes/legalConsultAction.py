@@ -104,6 +104,18 @@ def transform_consultation_data(consultation: Dict[str, Any]) -> Dict[str, Any]:
         "client_photo_url": user_data.get("photo_url")
     }
 
+async def fetch_user_data_fallback(supabase: Client, user_id: str) -> Dict[str, Any]:
+    """
+    Fallback function to fetch user data when JOIN fails
+    """
+    try:
+        user_response = supabase.table("users").select("full_name, email, username, profile_photo, photo_url").eq("id", user_id).execute()
+        if user_response.data and len(user_response.data) > 0:
+            return user_response.data[0]
+    except Exception as e:
+        logger.error(f"Failed to fetch user data fallback: {e}")
+    return {}
+
                               
 USER_JOIN_QUERY = """*,
     users!consultation_requests_user_id_fkey(
@@ -166,6 +178,36 @@ async def get_my_consultations(
             raise HTTPException(status_code=500, detail="Database error")
         
         consultations = response.data if hasattr(response, 'data') else []
+        
+        # DEBUG: Log raw consultation data to check if users object is present
+        logger.info(f"🔍 DEBUG: Raw consultation data from database:")
+        enhanced_consultations = []
+        
+        for idx, consultation in enumerate(consultations):
+            logger.info(f"  [{idx+1}] Keys: {list(consultation.keys())}")
+            logger.info(f"  [{idx+1}] Has 'users': {'users' in consultation}")
+            
+            if 'users' in consultation and consultation['users']:
+                logger.info(f"  [{idx+1}] ✅ Users data found in JOIN")
+                enhanced_consultations.append(consultation)
+            else:
+                logger.warning(f"  [{idx+1}] ❌ Missing 'users' object! Using fallback query...")
+                # Fallback: manually fetch user data
+                user_id = consultation.get('user_id')
+                if user_id:
+                    try:
+                        fallback_user_data = await fetch_user_data_fallback(supabase, user_id)
+                        if fallback_user_data:
+                            consultation['users'] = fallback_user_data
+                            logger.info(f"  [{idx+1}] ✅ Fallback user data fetched: {fallback_user_data.get('full_name')}")
+                        else:
+                            logger.warning(f"  [{idx+1}] ❌ Fallback fetch returned no data")
+                    except Exception as e:
+                        logger.error(f"  [{idx+1}] ❌ Fallback fetch failed: {e}")
+                enhanced_consultations.append(consultation)
+        
+        # Replace original consultations with enhanced ones
+        consultations = enhanced_consultations
         
         # STEP 3: Log results and debug if empty
         logger.info(f"📊 Found {len(consultations)} consultation(s) for lawyer_info.id: {lawyer_info_id[:8]}...")
@@ -318,7 +360,28 @@ async def get_consultation_detail(
         
         consultation = consultations[0]
         
-                                                  
+        # DEBUG: Log raw consultation data to check if users object is present
+        logger.info(f"🔍 DEBUG: Single consultation raw data:")
+        logger.info(f"  Keys: {list(consultation.keys())}")
+        logger.info(f"  Has 'users': {'users' in consultation}")
+        
+        if 'users' in consultation and consultation['users']:
+            logger.info(f"  ✅ Users data found in JOIN: {consultation['users']}")
+        else:
+            logger.warning(f"  ❌ Missing 'users' object! Using fallback query...")
+            # Fallback: manually fetch user data
+            user_id = consultation.get('user_id')
+            if user_id:
+                try:
+                    fallback_user_data = await fetch_user_data_fallback(supabase, user_id)
+                    if fallback_user_data:
+                        consultation['users'] = fallback_user_data
+                        logger.info(f"  ✅ Fallback user data fetched: {fallback_user_data.get('full_name')}")
+                    else:
+                        logger.warning(f"  ❌ Fallback fetch returned no data")
+                except Exception as e:
+                    logger.error(f"  ❌ Fallback fetch failed: {e}")
+        
         return transform_consultation_data(consultation)
         
     except HTTPException:

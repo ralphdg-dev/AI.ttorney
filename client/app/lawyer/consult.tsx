@@ -135,6 +135,19 @@ const LawyerConsultPage: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('🔍 Consultations List API Response:', JSON.stringify(data, null, 2));
+        
+        // Log profile photo data for each consultation
+        data.forEach((consultation: any, index: number) => {
+          console.log(`📸 Consultation ${index + 1} Profile Photos:`, {
+            client_name: consultation.client_name,
+            client_profile_photo: consultation.client_profile_photo,
+            client_photo_url: consultation.client_photo_url,
+            users_profile_photo: consultation.users?.profile_photo,
+            users_photo_url: consultation.users?.photo_url
+          });
+        });
+        
         setAllConsultations(data);
         cacheRef.current = { data, timestamp: Date.now() };
         isInitialMount.current = false;
@@ -630,6 +643,13 @@ const LawyerConsultPage: React.FC = () => {
                             source={{ uri: (request.client_profile_photo || request.client_photo_url) as string }}
                             style={tw`w-12 h-12 rounded-full bg-gray-200`}
                             resizeMode="cover"
+                            onError={(error) => {
+                              console.log('❌ Image Load Error (List):', error.nativeEvent.error);
+                              console.log('❌ Failed URI (List):', request.client_profile_photo || request.client_photo_url);
+                            }}
+                            onLoad={() => {
+                              console.log('✅ Image Loaded Successfully (List):', request.client_profile_photo || request.client_photo_url);
+                            }}
                           />
                         ) : (
                           <View

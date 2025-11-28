@@ -71,12 +71,27 @@ const ConsultationDetailPage: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('🔍 Consultation API Response:', JSON.stringify(data, null, 2));
+        console.log('📸 Profile Photo Fields:', {
+          client_profile_photo: data.client_profile_photo,
+          client_photo_url: data.client_photo_url,
+          users_profile_photo: data.users?.profile_photo,
+          users_photo_url: data.users?.photo_url
+        });
+        
         const normalizedData: ConsultationRequest = {
           ...data,
           client_name: data.client_name || data.users?.full_name || 'Unknown Client',
           client_profile_photo: data.client_profile_photo ?? data.users?.profile_photo ?? null,
           client_photo_url: data.client_photo_url ?? data.users?.photo_url ?? null,
         };
+        
+        console.log('✅ Final Normalized Data:', {
+          client_name: normalizedData.client_name,
+          client_profile_photo: normalizedData.client_profile_photo,
+          client_photo_url: normalizedData.client_photo_url
+        });
+        
         setConsultation(normalizedData);
       } else {
         Alert.alert('Error', 'Failed to load consultation details');
@@ -279,6 +294,13 @@ const ConsultationDetailPage: React.FC = () => {
                     source={{ uri: (consultation.client_profile_photo || consultation.client_photo_url) as string }}
                     style={tw`w-16 h-16 rounded-full bg-gray-200 mr-4`}
                     resizeMode="cover"
+                    onError={(error) => {
+                      console.log('❌ Image Load Error:', error.nativeEvent.error);
+                      console.log('❌ Failed URI:', consultation.client_profile_photo || consultation.client_photo_url);
+                    }}
+                    onLoad={() => {
+                      console.log('✅ Image Loaded Successfully:', consultation.client_profile_photo || consultation.client_photo_url);
+                    }}
                   />
                 ) : (
                   <View style={tw`w-16 h-16 rounded-full bg-gray-200 items-center justify-center mr-4`}>
