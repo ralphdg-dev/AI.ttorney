@@ -123,9 +123,13 @@ const ConsultationCalendar: React.FC<ConsultationCalendarProps> = ({
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'pending':
-        return { bg: '#FEF3C7', text: '#92400E', border: '#F59E0B' };
+        return { bg: '#FEF3C7', text: '#78350F', border: '#F59E0B' }; // Light yellow bg, dark yellow text
       case 'accepted':
-        return { bg: '#E8F4FD', text: Colors.primary.blue, border: Colors.primary.blue };
+        return { bg: '#D1FAE5', text: '#064E3B', border: '#10B981' }; // Light green bg, dark green text
+      case 'rejected':
+        return { bg: '#FEE2E2', text: '#7F1D1D', border: '#EF4444' }; // Light red bg, dark red text
+      case 'completed':
+        return { bg: '#D1FAE5', text: '#064E3B', border: '#10B981' }; // Light green bg, dark green text
       default:
         return { bg: '#F3F4F6', text: '#374151', border: '#9CA3AF' };
     }

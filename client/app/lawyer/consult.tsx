@@ -203,13 +203,13 @@ const LawyerConsultPage: React.FC = () => {
   const getStatusColor = useCallback((status: string) => {
     switch (status) {
       case "pending":
-        return { bg: "#FEF3C7", text: "#92400E" };
+        return { bg: "#FEF3C7", text: "#78350F" }; // Light yellow bg, dark yellow text
       case "accepted":
-        return { bg: "#E8F4FD", text: Colors.primary.blue };
+        return { bg: "#D1FAE5", text: "#064E3B" }; // Light green bg, dark green text
       case "rejected":
-        return { bg: "#FEE2E2", text: "#991B1B" };
+        return { bg: "#FEE2E2", text: "#7F1D1D" }; // Light red bg, dark red text
       case "completed":
-        return { bg: "#D1FAE5", text: "#065F46" };
+        return { bg: "#D1FAE5", text: "#064E3B" }; // Light green bg, dark green text
       default:
         return { bg: "#F3F4F6", text: "#374151" };
     }

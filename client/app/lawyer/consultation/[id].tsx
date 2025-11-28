@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ScrollView, View, Text, Alert, Image } from 'react-native';
+import { ScrollView, View, Text, Alert, Image, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
 import { Mail, Phone, Calendar, Clock, MessageSquare, Settings, AlertTriangle } from 'lucide-react-native';
@@ -11,9 +11,182 @@ import { createSafeAreaToastRenderer } from '../../../components/ui/SafeAreaToas
 import ConfirmationModal from '../../../components/lawyer/consultation/ConfirmationModal';
 import { formatConsultationTime } from '../../../utils/consultationUtils';
 import { NetworkConfig } from '../../../utils/networkConfig';
+import { safeGoBack } from '../../../utils/navigationHelper';
 import Header from '../../../components/Header';
 import { LawyerNavbar } from '../../../components/lawyer/shared';
 import Colors from '../../../constants/Colors';
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    padding: 16,
+  },
+  alertContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  clientInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#E5E7EB',
+    marginRight: 16,
+  },
+  avatarPlaceholder: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  avatarText: {
+    color: '#4B5563',
+    fontWeight: '600',
+    fontSize: 18,
+  },
+  clientDetails: {
+    flex: 1,
+  },
+  clientName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusTime: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginLeft: 8,
+    flexShrink: 1,
+  },
+  divider: {
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    paddingTop: 16,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  contactText: {
+    color: '#374151',
+    marginLeft: 12,
+    flex: 1,
+  },
+  messageTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginLeft: 8,
+  },
+  messageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  messageText: {
+    fontSize: 16,
+    color: '#374151',
+    lineHeight: 24,
+  },
+  detailsContainer: {
+    gap: 16,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  detailLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  detailLabelText: {
+    fontWeight: '500',
+    color: '#6B7280',
+    marginLeft: 8,
+  },
+  detailValue: {
+    color: '#374151',
+    fontWeight: '500',
+  },
+  modeBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 9999,
+    borderWidth: 1,
+  },
+  modeText: {
+    fontSize: 12,
+    fontWeight: '500',
+    textTransform: 'capitalize',
+  },
+  footer: {
+    paddingBottom: 16,
+  },
+  successText: {
+    fontWeight: '600',
+    textAlign: 'center',
+    color: '#059669',
+    paddingVertical: 8,
+  },
+  errorText: {
+    fontWeight: '600',
+    textAlign: 'center',
+    color: '#DC2626',
+    paddingVertical: 8,
+  },
+});
 
 interface ConsultationRequest {
   id: string;
@@ -254,7 +427,7 @@ const ConsultationDetailPage: React.FC = () => {
             currentPath: pathname,
           })}
         />
-        <View style={tw`flex-1 justify-center items-center`}>
+        <View style={styles.loadingContainer}>
           <Text>Loading consultation details...</Text>
         </View>
       </SafeAreaView>
@@ -276,8 +449,8 @@ const ConsultationDetailPage: React.FC = () => {
         })}
       />
 
-      <ScrollView style={tw`flex-1`} showsVerticalScrollIndicator={false}>
-        <View style={tw`p-4`}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.content}>
           {/* Disclaimer */}
           {consultation.status === 'pending' && (
             <View style={{
@@ -288,7 +461,7 @@ const ConsultationDetailPage: React.FC = () => {
               borderWidth: 1,
               borderColor: '#93C5FD'
             }}>
-              <View style={tw`flex-row items-center mb-2`}>
+              <View style={styles.alertContainer}>
                 <AlertTriangle size={16} color="#F59E0B" />
                 <Text style={{
                   fontSize: 14,
@@ -308,13 +481,13 @@ const ConsultationDetailPage: React.FC = () => {
           )}
 
           {/* Client Information Card */}
-          <View style={tw`bg-white rounded-2xl p-6 mb-4 shadow-sm border border-gray-100`}>
-            <View style={tw`flex-row justify-between items-start mb-4`}>
-              <View style={tw`flex-row items-center flex-1`}>
+          <View style={styles.card}>
+            <View style={styles.headerRow}>
+              <View style={styles.clientInfo}>
                 {(consultation.client_profile_photo || consultation.client_photo_url) ? (
                   <Image
                     source={{ uri: (consultation.client_profile_photo || consultation.client_photo_url) as string }}
-                    style={tw`w-16 h-16 rounded-full bg-gray-200 mr-4`}
+                    style={styles.avatar}
                     resizeMode="cover"
                     onError={(error) => {
                       console.log('❌ Image Load Error:', error.nativeEvent.error);
@@ -325,15 +498,15 @@ const ConsultationDetailPage: React.FC = () => {
                     }}
                   />
                 ) : (
-                  <View style={tw`w-16 h-16 rounded-full bg-gray-200 items-center justify-center mr-4`}>
-                    <Text style={tw`text-gray-600 font-semibold text-lg`}>
+                  <View style={styles.avatarPlaceholder}>
+                    <Text style={styles.avatarText}>
                       {consultation.client_name.split(' ').map(n => n[0]).join('').toUpperCase()}
                     </Text>
                   </View>
                 )}
-                <View style={tw`flex-1`}>
+                <View style={styles.clientDetails}>
                   <Text 
-                    style={tw`text-lg font-semibold text-gray-900 mb-1`}
+                    style={styles.clientName}
                     numberOfLines={1}
                     ellipsizeMode="tail"
                     adjustsFontSizeToFit={true}
@@ -341,10 +514,10 @@ const ConsultationDetailPage: React.FC = () => {
                   >
                     {consultation.client_name}
                   </Text>
-                  <View style={tw`flex-row items-center`}>
+                  <View style={styles.statusRow}>
                     <Clock size={14} color="#6B7280" />
                     <Text 
-                      style={tw`text-xs text-gray-500 ml-2 flex-shrink`}
+                      style={styles.statusTime}
                       numberOfLines={1}
                       adjustsFontSizeToFit={true}
                       minimumFontScale={0.92}
@@ -362,56 +535,68 @@ const ConsultationDetailPage: React.FC = () => {
                   borderRadius: 999,
                   backgroundColor:
                     consultation.status === 'pending'
-                      ? '#FEF3C7'
+                      ? '#FEF3C7'  // Light yellow
                       : consultation.status === 'accepted'
-                        ? '#E8F4FD'
+                        ? '#D1FAE5'  // Light green
                         : consultation.status === 'completed'
-                          ? '#D1FAE5'
-                          : '#FEE2E2'
+                          ? '#D1FAE5'  // Light green
+                          : '#FEE2E2'  // Light red
                 }}
               >
-                <Text style={{ fontSize: 10, fontWeight: '600', textTransform: 'uppercase', color: '#92400E' }}>
+                <Text style={{ 
+                  fontSize: 10, 
+                  fontWeight: '600', 
+                  textTransform: 'uppercase', 
+                  color:
+                    consultation.status === 'pending'
+                      ? '#78350F'  // Dark yellow
+                      : consultation.status === 'accepted'
+                        ? '#064E3B'  // Dark green
+                        : consultation.status === 'completed'
+                          ? '#064E3B'  // Dark green
+                          : '#7F1D1D'  // Dark red
+                }}>
                   {consultation.status}
                 </Text>
               </View>
             </View>
 
-            <View style={tw`border-t border-gray-200 pt-4`}>
-              <Text style={tw`text-sm font-semibold text-gray-700 mb-3`}>Contact Information</Text>
-              <View style={tw`flex-row items-center mb-2`}>
+            <View style={styles.divider}>
+              <Text style={styles.sectionTitle}>Contact Information</Text>
+              <View style={styles.contactRow}>
                 <Mail size={16} color={Colors.primary.blue} />
-                <Text style={tw`text-gray-700 ml-3 flex-1`}>{consultation.client_email}</Text>
+                <Text style={styles.contactText}>{consultation.client_email}</Text>
               </View>
               {consultation.mobile_number && (
-                <View style={tw`flex-row items-center`}>
+                <View style={styles.contactRow}>
                   <Phone size={16} color={Colors.primary.blue} />
-                  <Text style={tw`text-gray-700 ml-3 flex-1`}>{consultation.mobile_number}</Text>
+                  <Text style={styles.contactText}>{consultation.mobile_number}</Text>
                 </View>
               )}
             </View>
           </View>
 
           {/* Consultation Details Card */}
-          <View style={tw`bg-white rounded-2xl p-6 mb-4 shadow-sm border border-gray-100`}>
-            <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>
+          <View style={styles.card}>
+            <Text style={styles.messageTitle}>
               Consultation Details
             </Text>
 
-            <View style={tw`gap-4`}>
+            <View style={styles.detailsContainer}>
               {consultation.consultation_mode && (
-                <View style={tw`flex-row justify-between items-center mb-3`}>
-                  <View style={tw`flex-row items-center`}>
+                <View style={styles.detailRow}>
+                  <View style={styles.detailLabel}>
                     <Settings size={16} color="#6B7280" />
-                    <Text style={tw`font-medium text-gray-600 ml-2`}>Mode</Text>
+                    <Text style={styles.detailLabelText}>Mode</Text>
                   </View>
                   <View style={[
-                    tw`px-3 py-1 rounded-full border`,
+                    styles.modeBadge,
                     consultation.consultation_mode === 'online' ? 
                       { backgroundColor: '#E8F4FD', borderColor: '#C1E4F7' } :
                       { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }
                   ]}>
                     <Text style={[
-                      tw`text-xs font-medium capitalize`,
+                      styles.modeText,
                       consultation.consultation_mode === 'online' ? 
                         { color: Colors.primary.blue } :
                         { color: '#16A34A' }
@@ -423,12 +608,12 @@ const ConsultationDetailPage: React.FC = () => {
               )}
 
               {consultation.consultation_date && (
-                <View style={tw`flex-row justify-between items-center mb-3`}>
-                  <View style={tw`flex-row items-center`}>
+                <View style={styles.detailRow}>
+                  <View style={styles.detailLabel}>
                     <Calendar size={16} color="#6B7280" />
-                    <Text style={tw`font-medium text-gray-600 ml-2`}>Preferred Date</Text>
+                    <Text style={styles.detailLabelText}>Preferred Date</Text>
                   </View>
-                  <Text style={tw`text-gray-700 font-medium`}>
+                  <Text style={styles.detailValue}>
                     {new Date(consultation.consultation_date).toLocaleDateString('en-US', {
                       weekday: 'short',
                       month: 'short',
@@ -439,12 +624,12 @@ const ConsultationDetailPage: React.FC = () => {
               )}
 
               {consultation.consultation_time && (
-                <View style={tw`flex-row justify-between items-center`}>
-                  <View style={tw`flex-row items-center`}>
+                <View style={styles.detailRow}>
+                  <View style={styles.detailLabel}>
                     <Clock size={16} color="#6B7280" />
-                    <Text style={tw`font-medium text-gray-600 ml-2`}>Preferred Time</Text>
+                    <Text style={styles.detailLabelText}>Preferred Time</Text>
                   </View>
-                  <Text style={tw`text-gray-700 font-medium`}>
+                  <Text style={styles.detailValue}>
                     {formatConsultationTime(consultation.consultation_time)}
                   </Text>
                 </View>
@@ -453,20 +638,20 @@ const ConsultationDetailPage: React.FC = () => {
           </View>
 
           {/* Message Card */}
-          <View style={tw`bg-white rounded-2xl p-6 mb-4 shadow-sm border border-gray-100`}>
-            <View style={tw`flex-row items-center mb-4`}>
-              <MessageSquare size={18} color={Colors.primary.blue} />
-              <Text style={tw`text-lg font-bold text-gray-900 ml-2`}>
+          <View style={styles.card}>
+            <View style={styles.messageHeader}>
+              <MessageSquare size={20} color={Colors.primary.blue} />
+              <Text style={styles.messageTitle}>
                 Client Message
               </Text>
             </View>
-            <Text style={tw`text-gray-700 leading-6`}>
+            <Text style={styles.messageText}>
               {consultation.message}
             </Text>
           </View>
 
           {/* Action Buttons */}
-          <View style={tw`pb-4`}>
+          <View style={styles.footer}>
             {consultation.status === 'pending' && (
               <HStack className="gap-3">
                 <Button 
@@ -512,13 +697,13 @@ const ConsultationDetailPage: React.FC = () => {
             )}
             
             {consultation.status === 'completed' && (
-              <Text style={tw`font-semibold text-center text-green-600 py-2`}>
+              <Text style={styles.successText}>
                 ✓ Consultation completed successfully
               </Text>
             )}
             
             {consultation.status === 'rejected' && (
-              <Text style={tw`font-semibold text-center text-red-600 py-2`}>
+              <Text style={styles.errorText}>
                 ✗ Request declined
               </Text>
             )}
