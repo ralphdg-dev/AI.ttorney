@@ -41,7 +41,7 @@ function getCategoryBadgeClasses(
   switch ((category || "").toLowerCase()) {
     case "family":
       return { container: "bg-rose-50 border-rose-200", text: "text-rose-700" };
-    case "work":
+    case "labor":
       return { container: "bg-blue-50 border-blue-200", text: "text-blue-700" };
     case "civil":
       return {
@@ -194,7 +194,7 @@ export const ArticleCard = ({
                 className={`rounded-md ${categoryBadge.container}`}
               >
                 <BadgeText size="sm" className={categoryBadge.text}>
-                  {item.category}
+                  {item.category === 'labor' ? 'LABOR' : item.category}
                 </BadgeText>
               </Badge>
             )}

@@ -19,7 +19,8 @@ def get_consultation_service(supabase: Client = Depends(get_supabase)) -> Consul
 async def create_consultation_request(
     request: ConsultationRequestCreate,
     current_user = Depends(get_current_user),
-    service: ConsultationService = Depends(get_consultation_service)
+    service: ConsultationService = Depends(get_consultation_service),
+    supabase: Client = Depends(get_supabase)
 ):
     """
     Create a new consultation request with comprehensive validation.
@@ -45,8 +46,11 @@ async def create_consultation_request(
         
         # STEP 2: Check consultation ban status
         try:
-            ban_service = get_consultation_ban_service()
+            logger.info(f"🔍 Initializing consultation ban service...")
+            ban_service = get_consultation_ban_service(supabase)
+            logger.info(f"✅ Ban service initialized, checking eligibility for user {req_user_id[:8]}...")
             eligibility = await ban_service.check_booking_eligibility(req_user_id)
+            logger.info(f"📊 Ban check result: can_book={eligibility.get('can_book', 'unknown')}")
             
             if not eligibility["can_book"]:
                 logger.warning(f"🚫 User {req_user_id[:8]}... is banned from booking consultations")
@@ -85,9 +89,21 @@ async def create_consultation_request(
     except Exception as e:
         # Unexpected errors - log full traceback for debugging
         logger.error(f"❌ Unexpected error creating consultation: {e}", exc_info=True)
+        logger.error(f"❌ Error type: {type(e).__name__}")
+        logger.error(f"❌ Error details: {str(e)}")
+        
+        # Provide more specific error details for debugging
+        error_detail = f"Failed to create consultation request: {str(e)}"
+        if "consultation_ban_service" in str(e).lower():
+            error_detail = "Error checking consultation eligibility. Please try again."
+        elif "lawyer_info" in str(e).lower():
+            error_detail = "Error validating lawyer information. Please try selecting another lawyer."
+        elif "supabase" in str(e).lower():
+            error_detail = "Database connection error. Please try again in a moment."
+        
         raise HTTPException(
             status_code=500, 
-            detail="Failed to create consultation request. Please try again or contact support."
+            detail=error_detail
         )
 
 @router.get("/user/{user_id}")

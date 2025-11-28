@@ -96,7 +96,6 @@ export default function LawyerBookingView() {
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedDay, setSelectedDay] = useState(currentDate);
-  const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   // Removed loading state for ultra-fast performance
   
   const months = [
@@ -485,48 +484,49 @@ export default function LawyerBookingView() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const generateCalendarDays = useCallback((month: number, year: number) => {
+  // Generate calendar days directly with useMemo to avoid infinite loops
+  const computedCalendarDays = useMemo(() => {
     const days: CalendarDay[] = [];
     const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
+    const firstDay = new Date(selectedYear, selectedMonth, 1);
+    const lastDay = new Date(selectedYear, selectedMonth + 1, 0);
 
     const daysFromPrevMonth = firstDay.getDay();
     const totalDays = daysFromPrevMonth + lastDay.getDate();
     const daysFromNextMonth = totalDays <= 35 ? 35 - totalDays : 42 - totalDays;
 
-    const prevMonthLastDay = new Date(year, month, 0).getDate();
+    const prevMonthLastDay = new Date(selectedYear, selectedMonth, 0).getDate();
 
     // Previous month days
     for (let i = daysFromPrevMonth - 1; i >= 0; i--) {
       const date = prevMonthLastDay - i;
-      const dayDate = new Date(year, month - 1, date);
+      const dayDate = new Date(selectedYear, selectedMonth - 1, date);
 
       days.push({
         date,
         day: daysOfWeek[dayDate.getDay()],
-        month: month - 1,
-        year: year,
+        month: selectedMonth - 1,
+        year: selectedYear,
         isCurrentMonth: false,
       });
     }
 
     // Current month days
     for (let i = 1; i <= lastDay.getDate(); i++) {
-      const dayDate = new Date(year, month, i);
+      const dayDate = new Date(selectedYear, selectedMonth, i);
       const isToday =
-        dayDate.getDate() === today.getDate() &&
-        dayDate.getMonth() === today.getMonth() &&
-        dayDate.getFullYear() === today.getFullYear();
+        dayDate.getDate() === currentDate &&
+        dayDate.getMonth() === currentMonth &&
+        dayDate.getFullYear() === currentYear;
       const isSelected =
-        i === selectedDay && month === selectedMonth && year === selectedYear;
+        i === selectedDay && selectedMonth === selectedMonth && selectedYear === selectedYear;
 
       days.push({
         date: i,
         day: daysOfWeek[dayDate.getDay()],
-        month,
-        year,
+        month: selectedMonth,
+        year: selectedYear,
         isToday,
         isSelected,
         isCurrentMonth: true,
@@ -535,28 +535,19 @@ export default function LawyerBookingView() {
 
     // Next month days
     for (let i = 1; i <= daysFromNextMonth; i++) {
-      const dayDate = new Date(year, month + 1, i);
+      const dayDate = new Date(selectedYear, selectedMonth + 1, i);
 
       days.push({
         date: i,
         day: daysOfWeek[dayDate.getDay()],
-        month: month + 1,
-        year: year,
+        month: selectedMonth + 1,
+        year: selectedYear,
         isCurrentMonth: false,
       });
     }
 
     return days;
-  }, [today]);
-
-  // Ultra-fast calendar generation with minimal re-renders
-  const memoizedCalendarDays = useMemo(() => {
-    return generateCalendarDays(selectedMonth, selectedYear);
-  }, [generateCalendarDays, selectedMonth, selectedYear]);
-
-  useEffect(() => {
-    setCalendarDays(memoizedCalendarDays);
-  }, [memoizedCalendarDays]);
+  }, [selectedMonth, selectedYear, selectedDay, currentDate, currentMonth, currentYear]);
 
   const canNavigateToPrevious = useMemo(() => {
     if (selectedYear < currentYear) return false;
@@ -850,7 +841,7 @@ export default function LawyerBookingView() {
         {/* Lawyer Profile Card - Modern Design */}
         <VStack className={`${isSmallScreen ? 'mx-3 p-5' : 'mx-4 p-6'} mt-2 mb-3 bg-white rounded-2xl`} style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 }}>
           <HStack className="items-start mb-5">
-            {lawyerData.avatar && !lawyerData.avatar.includes('unsplash') ? (
+            {lawyerData.avatar ? (
               <View style={{ shadowColor: Colors.primary.blue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}>
                 <Image
                   source={{ uri: lawyerData.avatar }}
@@ -1076,7 +1067,7 @@ export default function LawyerBookingView() {
 
             {/* Calendar Days Grid - Optimized */}
             <HStack className="flex-wrap" style={{ width: '100%' }}>
-              {calendarDays.map((day) => {
+              {computedCalendarDays.map((day) => {
                 // Ultra-fast date comparison - no object creation
                 const dayTime = new Date(day.year, day.month, day.date).getTime();
                 const isPastDay = dayTime < todayStart.getTime();
