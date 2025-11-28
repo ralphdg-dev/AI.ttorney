@@ -18,44 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 
-class BookingConflictError(ConsultationError):
-    """Raised when attempting to book an already-taken time slot"""
-    def __init__(self, lawyer_name: str, time_slot: str):
-        super().__init__(
-            message=f"{lawyer_name} is already booked for {time_slot}. Please select another time.",
-            code="BOOKING_CONFLICT",
-            status_code=409
-        )
-
-
-class InvalidDateError(ConsultationError):
-    """Raised when consultation date is in the past"""
-    def __init__(self):
-        super().__init__(
-            message="Consultation date must be in the future",
-            code="INVALID_DATE",
-            status_code=400
-        )
-
-
-class InvalidTimeError(ConsultationError):
-    """Raised when consultation time is invalid"""
-    def __init__(self, message: str = "Invalid consultation time format. Use HH:MM (24-hour format)"):
-        super().__init__(
-            message=message,
-            code="INVALID_TIME",
-            status_code=400
-        )
-
-
-class DuplicatePendingError(ConsultationError):
-    """Raised when user already has pending consultation with same lawyer"""
-    def __init__(self, lawyer_name: str):
-        super().__init__(
-            message=f"You already have a pending consultation with {lawyer_name}. Please wait for a response before requesting another.",
-            code="DUPLICATE_PENDING",
-            status_code=409
-        )
+# Exception classes are now imported from models.consultation_models
 
 
 class ConsultationService:

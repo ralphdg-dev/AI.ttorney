@@ -34,7 +34,7 @@ const CategoryScroller = React.memo(({ activeCategory, onCategoryChange, include
   const categoryIcons = useMemo(() => ({
     all: Library,
     family: Users,
-    work: HardHat,
+    labor: HardHat,
     civil: ScrollText,
     criminal: Gavel,
     consumer: ShoppingCart,

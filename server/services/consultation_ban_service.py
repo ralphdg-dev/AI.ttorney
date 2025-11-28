@@ -1,8 +1,7 @@
 import logging
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta, timezone
-import httpx
-from services.supabase_service import SupabaseService
+from supabase import Client
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +24,10 @@ class ConsultationBanService:
     THIRD_BAN_DAYS = 7              
     CANCELLATION_TRACKING_DAYS = 30                                          
     
-    def __init__(self):
+    def __init__(self, supabase: Client):
         """Initialize the consultation ban service."""
-        self.supabase = SupabaseService()
-        logger.info(" Consultation ban service initialized")
+        self.supabase = supabase
+        logger.info("✅ Consultation ban service initialized")
     
     async def apply_cancellation_ban(
         self,
@@ -193,26 +192,19 @@ class ConsultationBanService:
         try:
             cutoff_date = datetime.now(timezone.utc) - timedelta(days=self.CANCELLATION_TRACKING_DAYS)
             
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(
-                    f"{self.supabase.rest_url}/consultation_requests",
-                    params={
-                        "user_id": f"eq.{user_id}",
-                        "status": "eq.cancelled",
-                        "responded_at": f"gte.{cutoff_date.isoformat()}",
-                        "select": "id,status,responded_at"
-                    },
-                    headers=self.supabase._get_headers(use_service_key=True)
-                )
-                
-                if response.status_code == 200:
-                    cancellations = response.json()
-                                                                                        
-                                                                                               
-                    return len([c for c in cancellations if c.get("responded_at")])
-                return 0
+            result = self.supabase.table("consultation_requests")\
+                .select("id,status,responded_at")\
+                .eq("user_id", user_id)\
+                .eq("status", "cancelled")\
+                .gte("responded_at", cutoff_date.isoformat())\
+                .execute()
+            
+            if result.data:
+                # Count only cancellations that have responded_at (were accepted before cancellation)
+                return len([c for c in result.data if c.get("responded_at")])
+            return 0
         except Exception as e:
-            logger.error(f" Failed to count recent cancellations: {str(e)}")
+            logger.error(f"❌ Failed to count recent cancellations: {str(e)}")
             return 0
     
     def _calculate_ban_duration(self, recent_cancellations: int) -> int:
@@ -232,24 +224,16 @@ class ConsultationBanService:
             return self.THIRD_BAN_DAYS            
     
     async def _get_user_ban_status(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get user's current consultation ban status."""
+        """Get user's current ban status from database."""
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(
-                    f"{self.supabase.rest_url}/users",
-                    params={
-                        "id": f"eq.{user_id}",
-                        "select": "id,consultation_ban_end"
-                    },
-                    headers=self.supabase._get_headers(use_service_key=True)
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    return data[0] if data else None
-                return None
+            result = self.supabase.table("users")\
+                .select("id,consultation_ban_end")\
+                .eq("id", user_id)\
+                .execute()
+            
+            return result.data[0] if result.data else None
         except Exception as e:
-            logger.error(f" Failed to get user ban status: {str(e)}")
+            logger.error(f"❌ Failed to get user ban status: {str(e)}")
             return None
     
     async def _update_user_ban_status(self, user_id: str, ban_end: Optional[datetime]) -> bool:
@@ -259,17 +243,14 @@ class ConsultationBanService:
                 "consultation_ban_end": (ban_end.astimezone(timezone.utc).isoformat() if ban_end else None)
             }
             
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.patch(
-                    f"{self.supabase.rest_url}/users",
-                    params={"id": f"eq.{user_id}"},
-                    json=update_data,
-                    headers=self.supabase._get_headers(use_service_key=True)
-                )
-                
-                return response.status_code in [200, 204]
+            result = self.supabase.table("users")\
+                .update(update_data)\
+                .eq("id", user_id)\
+                .execute()
+            
+            return bool(result.data)
         except Exception as e:
-            logger.error(f" Failed to update user ban status: {str(e)}")
+            logger.error(f"❌ Failed to update user ban status: {str(e)}")
             return False
     
     async def _record_consultation_cancellation(
@@ -342,14 +323,6 @@ class ConsultationBanService:
             )
 
 
-                    
-_consultation_ban_service_instance: Optional[ConsultationBanService] = None
-
-def get_consultation_ban_service() -> ConsultationBanService:
-    """Get or create the singleton consultation ban service instance."""
-    global _consultation_ban_service_instance
-    
-    if _consultation_ban_service_instance is None:
-        _consultation_ban_service_instance = ConsultationBanService()
-    
-    return _consultation_ban_service_instance
+def get_consultation_ban_service(supabase: Client) -> ConsultationBanService:
+    """Get consultation ban service instance with supabase client."""
+    return ConsultationBanService(supabase)

@@ -42,7 +42,7 @@ const getStorageUrl = (path: string | null | undefined): string | undefined => {
 const normalizeCategory = (value: string | null | undefined): string | undefined => {
   if (!value) return undefined;
   const v = value.toLowerCase();
-  if (v === 'labor') return 'work';
+  // Keep labor as labor instead of converting to work
   return v;
 };
 
@@ -171,7 +171,7 @@ export const useLegalArticles = () => {
 
   useEffect(() => {
     fetchArticles();
-  }, [fetchArticles]);
+  }, []); // Empty dependency array since fetchArticles should only run once on mount
 
   const getArticleById = async (id: string): Promise<ArticleItem | null> => {
     try {
@@ -226,13 +226,13 @@ export const useLegalArticles = () => {
   };
 
   // Client-side category filtering
-  const getArticlesByCategory = (category: string): ArticleItem[] => {
+  const getArticlesByCategory = useCallback((category: string): ArticleItem[] => {
     if (category === 'all') return articles;
     return articles.filter(article => article.category === category);
-  };
+  }, [articles]);
 
   // Client-side search filtering
-  const searchArticles = (query: string, category?: string): ArticleItem[] => {
+  const searchArticles = useCallback((query: string, category?: string): ArticleItem[] => {
     const searchLower = query.toLowerCase().trim();
     let filtered = articles;
 
@@ -252,7 +252,7 @@ export const useLegalArticles = () => {
     }
 
     return filtered;
-  };
+  }, [articles]);
 
   return {
     articles,

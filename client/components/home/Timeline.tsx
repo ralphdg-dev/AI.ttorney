@@ -328,8 +328,12 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       // Only update if component is still mounted
       if (isComponentMounted.current) {
         if (loadMore) {
-          // Append new posts to existing ones
-          setPosts(prevPosts => [...prevPosts, ...mapped]);
+          // Append new posts to existing ones and update cache with the full list
+          setPosts(prevPosts => {
+            const newPosts = [...prevPosts, ...mapped];
+            setCachedPosts(newPosts);
+            return newPosts;
+          });
           updateCurrentPage(pageToFetch);
         } else {
           // Replace posts for fresh load
@@ -433,6 +437,19 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         if (cachedPosts && cachedPosts.length > 0) {
           setPosts(cachedPosts);
           setInitialLoading(false);
+
+          // Reconstruct pagination state from cached posts so that
+          // currentPageRef and hasMoreRef stay in sync with what is shown.
+          const totalPosts = cachedPosts.length;
+          const approxPage = Math.max(1, Math.ceil(totalPosts / 15));
+          updateCurrentPage(approxPage);
+
+          // If the cached list length is an exact multiple of page size,
+          // there might be more posts available; otherwise we've likely
+          // reached the end.
+          const inferredHasMore = totalPosts % 15 === 0;
+          setHasMore(inferredHasMore);
+          hasMoreRef.current = inferredHasMore;
         }
       } else {
         if (__DEV__) console.log('📱 Timeline: Screen focused, cache invalid - refreshing');
