@@ -48,3 +48,11 @@ async def get_current_user(
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+async def get_current_user_dict(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    supabase = Depends(get_supabase)
+):
+    """Same as get_current_user but returns dict format for compatibility"""
+    return await get_current_user(credentials, supabase)

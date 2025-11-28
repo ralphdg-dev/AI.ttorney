@@ -169,9 +169,15 @@ test_lawyer_view_consultations() {
         print_success "Retrieved $count consultation(s)"
         
         if [ "$count" -gt 0 ]; then
-            first_id=$(echo $response | jq -r '.[0].id')
+            # Get first pending consultation
+            CONSULTATION_ID=$(echo $response | jq -r '[.[] | select(.status == "pending")][0].id // empty')
             first_status=$(echo $response | jq -r '.[0].status')
-            print_info "First consultation: $first_id (status: $first_status)"
+            
+            if [ -n "$CONSULTATION_ID" ]; then
+                print_info "Found pending consultation: ${CONSULTATION_ID:0:8}... (status: pending)"
+            else
+                print_info "First consultation: ${first_id:0:8}... (status: $first_status)"
+            fi
         fi
         return 0
     else
