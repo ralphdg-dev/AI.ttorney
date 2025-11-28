@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, useWindowDimensions } from 'react-native';
+import { View, Text } from 'react-native';
 import { Shield } from 'lucide-react-native';
 
 interface VerifiedLawyerBadgeProps {
@@ -13,12 +13,7 @@ const sizeMap = {
 } as const;
 
 export const VerifiedLawyerBadge: React.FC<VerifiedLawyerBadgeProps> = ({ size = 'sm' }) => {
-  const { width: screenWidth } = useWindowDimensions();
   const s = sizeMap[size];
-  
-  // Calculate responsive font size based on screen width
-  const responsiveFontSize = Math.max(s.text, screenWidth * 0.025);
-  const responsiveIconSize = Math.max(s.icon, screenWidth * 0.03);
   
   return (
     <View
@@ -31,12 +26,10 @@ export const VerifiedLawyerBadge: React.FC<VerifiedLawyerBadgeProps> = ({ size =
         paddingVertical: s.paddingV,
         paddingHorizontal: s.paddingH,
         borderRadius: s.radius,
-        maxWidth: screenWidth * 0.4, // Prevent overflow on small screens
-        minWidth: screenWidth * 0.25, // Ensure minimum width
       }}
     >
       <Shield 
-        size={responsiveIconSize} 
+        size={s.icon} 
         color="#10B981" 
         fill="#10B981" 
         stroke="none" 
@@ -45,14 +38,11 @@ export const VerifiedLawyerBadge: React.FC<VerifiedLawyerBadgeProps> = ({ size =
       <Text
         style={{
           marginLeft: 4,
-          fontSize: responsiveFontSize,
+          fontSize: s.text,
           fontWeight: '600',
           color: '#047857', // green-700
-          flexShrink: 1, // Allow text to shrink if needed
         }}
         numberOfLines={1}
-        adjustsFontSizeToFit={true}
-        minimumFontScale={0.7}
       >
         Verified Lawyer
       </Text>
