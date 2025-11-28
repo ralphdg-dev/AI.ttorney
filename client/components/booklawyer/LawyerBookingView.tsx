@@ -684,24 +684,41 @@ export default function LawyerBookingView() {
         throw new Error('User authentication required. Please log in again.');
       }
 
+      console.log('🚀 Starting consultation request submission...');
+      console.log('📋 Request data:', JSON.stringify(consultationRequestData, null, 2));
+      
       const { NetworkConfig } = await import('@/utils/networkConfig');
       const apiUrl = await NetworkConfig.getBestApiUrl();
-      const headers = await getAuthHeaders();
-      const response = await fetch(
-        `${apiUrl}/consultation-requests/`,
-        {
-          method: "POST",
-          headers: {
-            ...headers,
-          },
-          body: JSON.stringify(consultationRequestData),
-        }
-      );
-
-      const result = await response.json();
+      console.log('🌐 API URL:', apiUrl);
       
-      console.log("Response status:", response.status);
-      console.log("Response data:", result);
+      const headers = await getAuthHeaders();
+      console.log('🔑 Request headers:', headers);
+      
+      const requestUrl = `${apiUrl}/consultation-requests/`;
+      console.log('📡 Full request URL:', requestUrl);
+      
+      const response = await fetch(requestUrl, {
+        method: "POST",
+        headers: {
+          ...headers,
+        },
+        body: JSON.stringify(consultationRequestData),
+      });
+
+      console.log('📊 Response status:', response.status);
+      console.log('📊 Response ok:', response.ok);
+      console.log('📊 Response headers:', Object.fromEntries(response.headers.entries()));
+
+      let result;
+      try {
+        result = await response.json();
+        console.log('📋 Response data:', JSON.stringify(result, null, 2));
+      } catch (parseError) {
+        console.error('❌ Failed to parse response as JSON:', parseError);
+        const textResponse = await response.text();
+        console.log('📄 Raw response text:', textResponse);
+        throw new Error(`Server returned invalid JSON. Status: ${response.status}, Response: ${textResponse}`);
+      }
       
       if (!response.ok) {
         if (response.status === 403) {

@@ -2,6 +2,9 @@ from pydantic import BaseModel, EmailStr, validator, Field
 from typing import Optional
 from datetime import date
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # Custom Exception Classes
@@ -75,14 +78,30 @@ class ConsultationRequestCreate(BaseModel):
     @validator('mobile_number')
     def validate_mobile_number(cls, v):
         """Validate mobile number format"""
-                                            
-        cleaned = re.sub(r'[\s\-\(\)]', '', v)
-        
-                                                                        
-        if not re.match(r'^\+?[\d]{10,15}$', cleaned):
-            raise ValueError('Invalid mobile number format. Must be 10-15 digits.')
-        
-        return v
+        try:
+            import re as regex_module  # Explicit import to avoid namespace issues
+            logger.info(f"🔍 Validating mobile number: {v}")
+            
+            # Clean the mobile number
+            cleaned = regex_module.sub(r'[\s\-\(\)]', '', v)
+            logger.info(f"📱 Cleaned mobile number: {cleaned}")
+            
+            # Validate format - must be 10-15 digits, optionally starting with +
+            if not regex_module.match(r'^\+?[\d]{10,15}$', cleaned):
+                logger.error(f"❌ Invalid mobile number format: {cleaned}")
+                raise ValueError('Invalid mobile number format. Must be 10-15 digits.')
+            
+            logger.info(f"✅ Mobile number validation passed: {cleaned}")
+            return v
+        except ImportError as ie:
+            logger.error(f"❌ Failed to import re module: {ie}")
+            # Fallback validation without regex
+            if not v or len(v.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')) < 10:
+                raise ValueError('Invalid mobile number format. Must be at least 10 digits.')
+            return v
+        except Exception as e:
+            logger.error(f"❌ Mobile number validation error: {e}")
+            raise
     
     @validator('consultation_mode')
     def validate_mode(cls, v):

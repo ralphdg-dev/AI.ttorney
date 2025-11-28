@@ -43,6 +43,7 @@ async def create_consultation_request(
             )
 
         logger.info(f"📝 Creating consultation: user={req_user_id[:8]}..., lawyer_info.id={request.lawyer_id[:8]}..., mode={request.consultation_mode}")
+        logger.info(f"📋 Full request data: {request.dict()}")
         
         # STEP 2: Check consultation ban status
         try:
@@ -86,20 +87,32 @@ async def create_consultation_request(
     except HTTPException:
         # Re-raise HTTP exceptions (auth, ban, etc.)
         raise
+    except ValueError as ve:
+        # Pydantic validation errors
+        logger.error(f"❌ Validation error: {ve}", exc_info=True)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Validation error: {str(ve)}"
+        )
     except Exception as e:
         # Unexpected errors - log full traceback for debugging
         logger.error(f"❌ Unexpected error creating consultation: {e}", exc_info=True)
         logger.error(f"❌ Error type: {type(e).__name__}")
         logger.error(f"❌ Error details: {str(e)}")
+        logger.error(f"❌ Error args: {getattr(e, 'args', 'No args')}")
         
-        # Provide more specific error details for debugging
-        error_detail = f"Failed to create consultation request: {str(e)}"
-        if "consultation_ban_service" in str(e).lower():
+        # Check for specific error patterns
+        error_str = str(e).lower()
+        if "name 're' is not defined" in error_str:
+            error_detail = "Internal server error: Regular expression module not available"
+        elif "consultation_ban_service" in error_str:
             error_detail = "Error checking consultation eligibility. Please try again."
-        elif "lawyer_info" in str(e).lower():
+        elif "lawyer_info" in error_str:
             error_detail = "Error validating lawyer information. Please try selecting another lawyer."
-        elif "supabase" in str(e).lower():
+        elif "supabase" in error_str:
             error_detail = "Database connection error. Please try again in a moment."
+        else:
+            error_detail = f"Internal server error: {str(e)}"
         
         raise HTTPException(
             status_code=500, 
