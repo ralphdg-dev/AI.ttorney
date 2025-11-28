@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ScrollView, View, Text, Alert } from 'react-native';
+import { ScrollView, View, Text, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
 import { Mail, Phone, Calendar, Clock, MessageSquare, Settings, AlertTriangle } from 'lucide-react-native';
@@ -33,6 +33,13 @@ interface ConsultationRequest {
   client_name: string;
   client_email: string;
   client_username: string | null;
+  client_profile_photo: string | null;
+  client_photo_url: string | null;
+  users?: {
+    full_name?: string | null;
+    profile_photo?: string | null;
+    photo_url?: string | null;
+  };
 }
 
 const ConsultationDetailPage: React.FC = () => {
@@ -64,7 +71,13 @@ const ConsultationDetailPage: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setConsultation(data);
+        const normalizedData: ConsultationRequest = {
+          ...data,
+          client_name: data.client_name || data.users?.full_name || 'Unknown Client',
+          client_profile_photo: data.client_profile_photo ?? data.users?.profile_photo ?? null,
+          client_photo_url: data.client_photo_url ?? data.users?.photo_url ?? null,
+        };
+        setConsultation(normalizedData);
       } else {
         Alert.alert('Error', 'Failed to load consultation details');
         safeGoBack(router, {
@@ -95,17 +108,49 @@ const ConsultationDetailPage: React.FC = () => {
   }, [id, session?.access_token, fetchConsultationDetails]);
 
   const formatTimeAgo = (timestamp: string) => {
-    const now = new Date();
-    const requestedAt = new Date(timestamp);
-    const diffInHours = Math.floor((now.getTime() - requestedAt.getTime()) / (1000 * 60 * 60));
+    if (!timestamp) return 'Unknown time';
     
-    if (diffInHours < 1) {
-      return 'Just now';
-    } else if (diffInHours < 24) {
-      return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
-    } else {
-      const diffInDays = Math.floor(diffInHours / 24);
-      return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+    try {
+      const now = new Date();
+      // Handle different timestamp formats and ensure proper parsing
+      let requestedAt: Date;
+      
+      // If timestamp doesn't have timezone info, treat as UTC
+      if (!/Z|[+-]\d{2}:?\d{2}$/.test(timestamp)) {
+        requestedAt = new Date(timestamp + 'Z');
+      } else {
+        requestedAt = new Date(timestamp);
+      }
+      
+      // Validate the parsed date
+      if (isNaN(requestedAt.getTime())) {
+        return 'Invalid date';
+      }
+      
+      const diffInMs = now.getTime() - requestedAt.getTime();
+      const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+      const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+      const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+      
+      if (diffInMinutes < 1) {
+        return 'Just now';
+      } else if (diffInMinutes < 60) {
+        return `${diffInMinutes} minute${diffInMinutes > 1 ? 's' : ''} ago`;
+      } else if (diffInHours < 24) {
+        return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+      } else if (diffInDays < 30) {
+        return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+      } else {
+        // For very old dates, show the actual date
+        return requestedAt.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: requestedAt.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+        });
+      }
+    } catch (error) {
+      console.error('Error formatting time:', error);
+      return 'Unknown time';
     }
   };
 
@@ -179,10 +224,12 @@ const ConsultationDetailPage: React.FC = () => {
     );
   }
 
+  const requestTimestamp = consultation.requested_at || consultation.created_at || consultation.updated_at;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <Header 
-        title={`Request #${consultation.status.toUpperCase()}-${consultation.id.slice(-4)}`}
+        title="Request"
         showBackButton={true}
         onBackPress={() => safeGoBack(router, {
           isGuestMode: false,
@@ -227,37 +274,59 @@ const ConsultationDetailPage: React.FC = () => {
           <View style={tw`bg-white rounded-2xl p-6 mb-4 shadow-sm border border-gray-100`}>
             <View style={tw`flex-row justify-between items-start mb-4`}>
               <View style={tw`flex-row items-center flex-1`}>
-                <View style={tw`w-16 h-16 rounded-full bg-gray-200 items-center justify-center mr-4`}>
-                  <Text style={tw`text-gray-600 font-semibold text-lg`}>
-                    {consultation.client_name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                  </Text>
-                </View>
+                {(consultation.client_profile_photo || consultation.client_photo_url) ? (
+                  <Image
+                    source={{ uri: (consultation.client_profile_photo || consultation.client_photo_url) as string }}
+                    style={tw`w-16 h-16 rounded-full bg-gray-200 mr-4`}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={tw`w-16 h-16 rounded-full bg-gray-200 items-center justify-center mr-4`}>
+                    <Text style={tw`text-gray-600 font-semibold text-lg`}>
+                      {consultation.client_name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                    </Text>
+                  </View>
+                )}
                 <View style={tw`flex-1`}>
-                  <Text style={tw`text-xl font-bold text-gray-900 mb-1`}>
+                  <Text 
+                    style={tw`text-lg font-semibold text-gray-900 mb-1`}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    adjustsFontSizeToFit={true}
+                    minimumFontScale={0.8}
+                  >
                     {consultation.client_name}
                   </Text>
                   <View style={tw`flex-row items-center`}>
                     <Clock size={14} color="#6B7280" />
-                    <Text style={tw`text-sm text-gray-600 ml-2`}>
-                      Requested {formatTimeAgo(consultation.requested_at)}
+                    <Text 
+                      style={tw`text-xs text-gray-500 ml-2 flex-shrink`}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit={true}
+                      minimumFontScale={0.92}
+                      ellipsizeMode="clip"
+                    >
+                      Requested {formatTimeAgo(requestTimestamp)}
                     </Text>
                   </View>
                 </View>
               </View>
-              <View style={[
-                tw`px-3 py-1 rounded-full`,
-                consultation.status === 'pending' ? { backgroundColor: '#FEF3C7' } :
-                consultation.status === 'accepted' ? { backgroundColor: '#E8F4FD' } :
-                consultation.status === 'completed' ? { backgroundColor: '#D1FAE5' } :
-                { backgroundColor: '#FEE2E2' }
-              ]}>
-                <Text style={[
-                  tw`text-xs font-semibold uppercase`,
-                  consultation.status === 'pending' ? { color: '#92400E' } :
-                  consultation.status === 'accepted' ? { color: Colors.primary.blue } :
-                  consultation.status === 'completed' ? { color: '#065F46' } :
-                  { color: '#991B1B' }
-                ]}>
+              <View
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 2,
+                  borderRadius: 999,
+                  backgroundColor:
+                    consultation.status === 'pending'
+                      ? '#FEF3C7'
+                      : consultation.status === 'accepted'
+                        ? '#E8F4FD'
+                        : consultation.status === 'completed'
+                          ? '#D1FAE5'
+                          : '#FEE2E2'
+                }}
+              >
+                <Text style={{ fontSize: 10, fontWeight: '600', textTransform: 'uppercase', color: '#92400E' }}>
                   {consultation.status}
                 </Text>
               </View>
@@ -357,29 +426,41 @@ const ConsultationDetailPage: React.FC = () => {
             {consultation.status === 'pending' && (
               <HStack className="gap-3">
                 <Button 
-                  className="flex-1 py-3 rounded-lg"
+                  className="flex-1 rounded-lg min-h-[52px]"
                   style={{ backgroundColor: '#EF4444' }}
                   onPress={() => handleActionClick('reject')}
                 >
-                  <ButtonText className="font-semibold text-base text-white">Decline</ButtonText>
+                  <ButtonText 
+                    className="font-semibold text-white text-center text-lg leading-[22px]"
+                  >
+                    Decline
+                  </ButtonText>
                 </Button>
                 <Button 
-                  className="flex-1 py-3 rounded-lg"
+                  className="flex-1 rounded-lg min-h-[52px]"
                   style={{ backgroundColor: Colors.primary.blue }}
                   onPress={() => handleActionClick('accept')}
                 >
-                  <ButtonText className="font-semibold text-base text-white">Accept</ButtonText>
+                  <ButtonText 
+                    className="font-semibold text-white text-center text-lg leading-[22px]"
+                  >
+                    Accept
+                  </ButtonText>
                 </Button>
               </HStack>
             )}
 
             {consultation.status === 'accepted' && (
               <Button 
-                className="py-3 rounded-lg"
+                className="rounded-lg min-h-[52px]"
                 action="positive"
                 onPress={() => handleActionClick('complete')}
               >
-                <ButtonText className="font-semibold text-base">Mark as Completed</ButtonText>
+                <ButtonText 
+                  className="font-semibold text-center text-lg leading-[22px]"
+                >
+                  Mark as Completed
+                </ButtonText>
               </Button>
             )}
             

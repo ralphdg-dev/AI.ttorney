@@ -86,6 +86,7 @@ export default function LawyerBookingView() {
     {}
   );
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isCheckingBanStatus, setIsCheckingBanStatus] = useState(false);
 
   const today = new Date();
@@ -736,23 +737,8 @@ export default function LawyerBookingView() {
       
       console.log('✅ Consultation request submitted successfully:', result.data);
       
-      // Show success toast
-      toast.show({
-        placement: 'top',
-        duration: 4000,
-        render: createSafeAreaToastRenderer(
-          'top',
-          'success',
-          'solid',
-          'Request Sent!',
-          'Your consultation request has been submitted. The lawyer will review it shortly.'
-        ),
-      });
-      
-      // Navigate back to directory after a short delay
-      setTimeout(() => {
-        router.push('/directory');
-      }, 500);
+      // Show success modal immediately
+      setShowSuccessModal(true);
     } catch (error: any) {
       console.error(' Error submitting consultation request:', error);
       
@@ -784,8 +770,13 @@ export default function LawyerBookingView() {
       }
     } else if (!value.trim() && validationErrors.email) {
       // Keep showing error if field is empty
-      setValidationErrors((prev) => ({ ...prev, email: "Email address is required" }));
+      setValidationErrors((prev) => ({ ...prev, email: "Email is required" }));
     }
+  };
+
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    router.push('/directory');
   };
 
   const handleMobileChange = (value: string) => {
@@ -1541,6 +1532,59 @@ export default function LawyerBookingView() {
                 </ButtonText>
               </Button>
             </HStack>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Success Modal */}
+      <Modal isOpen={showSuccessModal} onClose={handleSuccessModalClose} size="md">
+        <ModalBackdrop className="bg-black/50" />
+        <ModalContent className="max-w-md mx-4 bg-white border-0 shadow-2xl rounded-2xl">
+          <ModalHeader className="px-4 pt-6 pb-0">
+            <VStack className="items-center w-full gap-3">
+              <Box className="flex items-center justify-center w-16 h-16 rounded-full" style={{ backgroundColor: '#E8F5E8' }}>
+                <Icon 
+                  as={CheckCircle2} 
+                  size="xl" 
+                  className="w-8 h-8"
+                  style={{ color: '#22C55E' }}
+                />
+              </Box>
+              <Heading size="xl" className="font-bold text-center text-gray-900">
+                Success!
+              </Heading>
+            </VStack>
+          </ModalHeader>
+          
+          <ModalBody className="px-4 py-3">
+            <VStack className="gap-4">
+              <Text className="text-base text-center text-gray-700 leading-relaxed">
+                You have booked a consultation at{' '}
+                <Text className="font-semibold text-gray-900">{getSelectedTimeSlotText()}</Text>
+                {' '}on{' '}
+                <Text className="font-semibold text-gray-900">{getFormattedDate()}</Text>
+                {' '}with{' '}
+                <Text className="font-semibold text-gray-900">{lawyerData?.name}</Text>.
+              </Text>
+              
+              <Box className="p-4 bg-blue-50 rounded-xl">
+                <Text className="text-sm text-center text-blue-800">
+                  The lawyer will review your request and contact you shortly via your preferred communication method.
+                </Text>
+              </Box>
+            </VStack>
+          </ModalBody>
+          
+          <ModalFooter className="p-4 pt-2">
+            <Button 
+              variant="solid"
+              className="w-full py-3 min-h-[48px] rounded-lg bg-[#023D7B] hover:bg-[#012B5A]"
+              onPress={handleSuccessModalClose}
+            >
+              <ButtonText className="text-sm font-semibold text-white">
+                Go Back
+              </ButtonText>
+            </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

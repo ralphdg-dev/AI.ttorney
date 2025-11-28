@@ -99,7 +99,9 @@ def transform_consultation_data(consultation: Dict[str, Any]) -> Dict[str, Any]:
         "updated_at": consultation.get("updated_at"),
         "client_name": user_data.get("full_name", "Unknown Client"),
         "client_email": user_data.get("email", consultation.get("email")),
-        "client_username": user_data.get("username")
+        "client_username": user_data.get("username"),
+        "client_profile_photo": user_data.get("profile_photo"),
+        "client_photo_url": user_data.get("photo_url")
     }
 
                               
@@ -107,7 +109,9 @@ USER_JOIN_QUERY = """*,
     users!consultation_requests_user_id_fkey(
         full_name,
         email,
-        username
+        username,
+        profile_photo,
+        photo_url
     )
 """
 

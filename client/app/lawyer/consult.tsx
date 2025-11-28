@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Alert,
   StatusBar,
+  Image,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from "expo-router";
@@ -48,6 +49,8 @@ interface ConsultationRequest {
   client_name: string;
   client_email: string;
   client_username: string | null;
+  client_profile_photo: string | null;
+  client_photo_url: string | null;
 }
 
 const LawyerConsultPage: React.FC = () => {
@@ -205,47 +208,66 @@ const LawyerConsultPage: React.FC = () => {
   const formatTimeAgo = (timestamp: string, currentTime: Date = new Date()) => {
     if (!timestamp) return "Just now";
 
-    const past = new Date(timestamp);
-    const diffInSeconds = Math.floor(
-      (currentTime.getTime() - past.getTime()) / 1000
-    );
+    try {
+      // Handle different timestamp formats and ensure proper parsing
+      let past: Date;
+      
+      // If timestamp doesn't have timezone info, treat as UTC
+      if (!/Z|[+-]\d{2}:?\d{2}$/.test(timestamp)) {
+        past = new Date(timestamp + 'Z');
+      } else {
+        past = new Date(timestamp);
+      }
+      
+      // Validate the parsed date
+      if (isNaN(past.getTime())) {
+        return 'Invalid date';
+      }
 
-    // If the timestamp is in the future, return "Just now"
-    if (diffInSeconds < 0) return "Just now";
+      const diffInSeconds = Math.floor(
+        (currentTime.getTime() - past.getTime()) / 1000
+      );
 
-    if (diffInSeconds < 60) {
-      return "Just now";
+      // If the timestamp is in the future, return "Just now"
+      if (diffInSeconds < 0) return "Just now";
+
+      if (diffInSeconds < 60) {
+        return "Just now";
+      }
+
+      const diffInMinutes = Math.floor(diffInSeconds / 60);
+      if (diffInMinutes < 60) {
+        return `${diffInMinutes} minute${diffInMinutes === 1 ? "" : "s"} ago`;
+      }
+
+      const diffInHours = Math.floor(diffInMinutes / 60);
+      if (diffInHours < 24) {
+        return `${diffInHours} hour${diffInHours === 1 ? "" : "s"} ago`;
+      }
+
+      const diffInDays = Math.floor(diffInHours / 24);
+      if (diffInDays < 7) {
+        return `${diffInDays} day${diffInDays === 1 ? "" : "s"} ago`;
+      }
+
+      const diffInWeeks = Math.floor(diffInDays / 7);
+      if (diffInWeeks < 4) {
+        return `${diffInWeeks} week${diffInWeeks === 1 ? "" : "s"} ago`;
+      }
+
+      // For older dates, return the actual date
+      return past.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year:
+          past.getFullYear() !== currentTime.getFullYear()
+            ? "numeric"
+            : undefined,
+      });
+    } catch (error) {
+      console.error('Error formatting time:', error);
+      return 'Unknown time';
     }
-
-    const diffInMinutes = Math.floor(diffInSeconds / 60);
-    if (diffInMinutes < 60) {
-      return `${diffInMinutes} minute${diffInMinutes === 1 ? "" : "s"} ago`;
-    }
-
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) {
-      return `${diffInHours} hour${diffInHours === 1 ? "" : "s"} ago`;
-    }
-
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 7) {
-      return `${diffInDays} day${diffInDays === 1 ? "" : "s"} ago`;
-    }
-
-    const diffInWeeks = Math.floor(diffInDays / 7);
-    if (diffInWeeks < 4) {
-      return `${diffInWeeks} week${diffInWeeks === 1 ? "" : "s"} ago`;
-    }
-
-    // For older dates, return the actual date
-    return past.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year:
-        past.getFullYear() !== currentTime.getFullYear()
-          ? "numeric"
-          : undefined,
-    });
   };
 
   const handleRequestPress = useCallback((requestId: string) => {
@@ -603,17 +625,25 @@ const LawyerConsultPage: React.FC = () => {
                   <View style={tw`flex-row items-start justify-between mb-4`}>
                     <View style={tw`flex-row items-center flex-1 mr-3`}>
                       <View style={tw`relative`}>
-                        <View
-                          style={tw`items-center justify-center w-12 h-12 bg-gray-200 rounded-full`}
-                        >
-                          <Text style={tw`font-semibold text-gray-600`}>
-                            {request.client_name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")
-                              .toUpperCase()}
-                          </Text>
-                        </View>
+                        {(request.client_profile_photo || request.client_photo_url) ? (
+                          <Image
+                            source={{ uri: (request.client_profile_photo || request.client_photo_url) as string }}
+                            style={tw`w-12 h-12 rounded-full bg-gray-200`}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <View
+                            style={tw`items-center justify-center w-12 h-12 bg-gray-200 rounded-full`}
+                          >
+                            <Text style={tw`font-semibold text-gray-600 text-sm`}>
+                              {request.client_name
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")
+                                .toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
                         {request.status === "pending" && (
                           <View
                             style={[
@@ -627,7 +657,11 @@ const LawyerConsultPage: React.FC = () => {
                       <View style={tw`flex-1 ml-3`}>
                         <View style={tw`flex-row items-center mb-1`}>
                           <Text
-                            style={tw`mr-2 text-base font-semibold text-gray-900`}
+                            style={tw`mr-2 font-semibold text-gray-900 flex-1`}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                            adjustsFontSizeToFit={true}
+                            minimumFontScale={0.8}
                           >
                             {request.client_name}
                           </Text>
