@@ -396,8 +396,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     ) {
       errors.specialization = "At least one specialization is required";
     } else {
+      // Allow custom specializations when "Others" was selected and replaced with custom text
       const invalidSpecializations = editFormData.specialization.filter(
-        (spec) => !LAW_SPECIALIZATIONS.includes(spec)
+        (spec) => {
+          // Allow if it's in the predefined list OR if it's a custom specialization (not empty string)
+          return !LAW_SPECIALIZATIONS.includes(spec) && spec.trim() !== "";
+        }
       );
       if (invalidSpecializations.length > 0) {
         errors.specialization =
