@@ -6,14 +6,14 @@ import { Mail, Phone, Calendar, Clock, MessageSquare, Settings, AlertTriangle } 
 import { Button, ButtonText } from '../../../components/ui/button/';
 import { HStack } from '../../../components/ui/hstack';
 import { useAuth } from '../../../contexts/AuthContext';
-import Colors from '../../../constants/Colors';
-import tw from 'tailwind-react-native-classnames';
+import { useToast } from '../../../components/ui/toast';
+import { createSafeAreaToastRenderer } from '../../../components/ui/SafeAreaToast';
+import ConfirmationModal from '../../../components/lawyer/consultation/ConfirmationModal';
 import { formatConsultationTime } from '../../../utils/consultationUtils';
 import { NetworkConfig } from '../../../utils/networkConfig';
 import Header from '../../../components/Header';
 import { LawyerNavbar } from '../../../components/lawyer/shared';
-import { ConfirmationModal } from '../../../components/lawyer/consultation';
-import { safeGoBack } from '../../../utils/navigationHelper';
+import Colors from '../../../constants/Colors';
 
 interface ConsultationRequest {
   id: string;
@@ -47,6 +47,7 @@ const ConsultationDetailPage: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
   const { session, user, isAuthenticated } = useAuth();
+  const toast = useToast();
   const [consultation, setConsultation] = useState<ConsultationRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -201,7 +202,18 @@ const ConsultationDetailPage: React.FC = () => {
       if (response.ok) {
         // Refresh the consultation data
         await fetchConsultationDetails();
-        Alert.alert('Success', `Consultation ${action}ed successfully`);
+        
+        // Show success toast instead of Alert
+        toast.show({
+          placement: 'top',
+          duration: 3000,
+          render: createSafeAreaToastRenderer(
+            'top',
+            'success',
+            'solid',
+            `Consultation ${action}ed successfully`
+          ),
+        });
       } else {
         Alert.alert('Error', `Failed to ${action} consultation`);
       }
@@ -480,6 +492,9 @@ const ConsultationDetailPage: React.FC = () => {
               >
                 <ButtonText 
                   className="font-semibold text-center text-lg leading-[22px]"
+                  numberOfLines={1}
+                  adjustsFontSizeToFit={true}
+                  minimumFontScale={0.85}
                 >
                   Mark as Completed
                 </ButtonText>

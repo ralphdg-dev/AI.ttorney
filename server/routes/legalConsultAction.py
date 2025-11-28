@@ -109,11 +109,16 @@ async def fetch_user_data_fallback(supabase: Client, user_id: str) -> Dict[str, 
     Fallback function to fetch user data when JOIN fails
     """
     try:
+        logger.info(f"🔍 FALLBACK: Fetching user data for user_id: {user_id[:8]}...")
         user_response = supabase.table("users").select("full_name, email, username, profile_photo, photo_url").eq("id", user_id).execute()
         if user_response.data and len(user_response.data) > 0:
-            return user_response.data[0]
+            user_data = user_response.data[0]
+            logger.info(f"✅ FALLBACK: User data found: {user_data}")
+            return user_data
+        else:
+            logger.warning(f"❌ FALLBACK: No user found for user_id: {user_id[:8]}...")
     except Exception as e:
-        logger.error(f"Failed to fetch user data fallback: {e}")
+        logger.error(f"❌ FALLBACK: Failed to fetch user data: {e}")
     return {}
 
                               
@@ -227,6 +232,13 @@ async def get_my_consultations(
         
                                                   
         transformed_consultations = [transform_consultation_data(c) for c in consultations]
+        
+        # DEBUG: Log transformed data to verify profile photos are included
+        logger.info(f"🔍 DEBUG: Transformed consultation data:")
+        for idx, transformed in enumerate(transformed_consultations):
+            logger.info(f"  [{idx+1}] client_name: {transformed.get('client_name')}")
+            logger.info(f"  [{idx+1}] client_profile_photo: {transformed.get('client_profile_photo')}")
+            logger.info(f"  [{idx+1}] client_photo_url: {transformed.get('client_photo_url')}")
         
         logger.info(f" Returning {len(transformed_consultations)} consultations for lawyer_info.id {lawyer_info_id}")
         return transformed_consultations
@@ -382,7 +394,14 @@ async def get_consultation_detail(
                 except Exception as e:
                     logger.error(f"  ❌ Fallback fetch failed: {e}")
         
-        return transform_consultation_data(consultation)
+        # DEBUG: Log final transformed data
+        transformed_data = transform_consultation_data(consultation)
+        logger.info(f"🔍 DEBUG: Final transformed consultation:")
+        logger.info(f"  client_name: {transformed_data.get('client_name')}")
+        logger.info(f"  client_profile_photo: {transformed_data.get('client_profile_photo')}")
+        logger.info(f"  client_photo_url: {transformed_data.get('client_photo_url')}")
+        
+        return transformed_data
         
     except HTTPException:
         raise

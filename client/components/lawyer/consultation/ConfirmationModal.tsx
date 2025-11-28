@@ -34,7 +34,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           iconBg: '#E8F2FF',
           title: 'Accept Consultation',
           message: `Are you sure you want to accept the consultation request from ${clientName}? This will notify the client and allow you to schedule the session.`,
-          confirmText: 'Accept Request',
+          confirmText: 'Accept',
           confirmVariant: 'solid' as const,
           confirmClass: 'bg-[#023D7B] hover:bg-[#012B5A]',
           cancelText: 'Cancel'
@@ -46,7 +46,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           iconBg: '#FEF2F2',
           title: 'Decline Consultation',
           message: `Are you sure you want to decline the consultation request from ${clientName}? This action cannot be undone and the client will be notified.`,
-          confirmText: 'Decline Request',
+          confirmText: 'Decline',
           confirmVariant: 'solid' as const,
           confirmClass: 'bg-red-600 hover:bg-red-700',
           cancelText: 'Cancel'
@@ -58,7 +58,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           iconBg: '#F0FDF4',
           title: 'Mark as Completed',
           message: `Are you sure you want to mark the consultation with ${clientName} as completed? This will close the consultation and update your records.`,
-          confirmText: 'Mark Completed',
+          confirmText: 'Complete',
           confirmVariant: 'solid' as const,
           confirmClass: 'bg-green-600 hover:bg-green-700',
           cancelText: 'Cancel'
@@ -111,19 +111,27 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           <HStack className="gap-2 w-full">
             <Button 
               variant="outline" 
-              className="flex-1 py-3 rounded-lg border-gray-300 bg-transparent"
+              className="flex-1 py-2.5 rounded-lg border-gray-300 bg-transparent"
               onPress={onClose}
             >
-              <ButtonText className="text-gray-700 font-medium text-sm">
+              <ButtonText 
+                className="text-sm font-medium text-gray-700" 
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
                 {config.cancelText}
               </ButtonText>
             </Button>
             <Button 
               variant={config.confirmVariant}
-              className={`flex-1 py-3 rounded-lg ${config.confirmClass}`}
+              className={`flex-1 py-2.5 rounded-lg ${config.confirmClass}`}
               onPress={onConfirm}
             >
-              <ButtonText className="text-white font-semibold text-sm">
+              <ButtonText 
+                className="text-sm font-semibold text-white" 
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
                 {config.confirmText}
               </ButtonText>
             </Button>
