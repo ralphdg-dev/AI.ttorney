@@ -328,15 +328,13 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       // Only update if component is still mounted
       if (isComponentMounted.current) {
         if (loadMore) {
-          // Append new posts to existing ones and update cache with the full list
-          setPosts(prevPosts => {
-            const newPosts = [...prevPosts, ...mapped];
-            setCachedPosts(newPosts);
-            return newPosts;
-          });
+          // Append new posts to existing ones and update cache directly
+          const newPosts = [...posts, ...mapped];
+          setPosts(newPosts);
+          setCachedPosts(newPosts);
           updateCurrentPage(pageToFetch);
         } else {
-          // Replace posts for fresh load
+          // Replace posts for fresh load and update cache directly
           setPosts(mapped);
           setCachedPosts(mapped);
           updateCurrentPage(pageToFetch);
@@ -393,7 +391,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         loadingMoreRef.current = false;
       }
     }
-  }, [isAuthenticated, getAuthHeaders, mapApiToPost, isCacheValid, getCachedPosts, setCachedPosts, setLastFetchTime, posts.length, updateCurrentPage]);
+  }, [isAuthenticated, getAuthHeaders, mapApiToPost, isCacheValid, getCachedPosts, setCachedPosts, setLastFetchTime, posts, updateCurrentPage]);
 
   // Track if we've loaded before to prevent unnecessary reloads
   const hasInitialLoadRef = useRef(false);
@@ -784,7 +782,20 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       return !hasOptimisticMatch;
     });
 
-    return [...optimisticPosts, ...filteredRealPosts];
+    // Combine optimistic and real posts, then dedupe by id to avoid
+    // duplicate keys in FlatList even if the same post is appended twice.
+    const combined = [...optimisticPosts, ...filteredRealPosts];
+    const seen = new Set<string>();
+    const unique: PostData[] = [];
+
+    for (const post of combined) {
+      const id = post.id;
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      unique.push(post);
+    }
+
+    return unique;
   }, [optimisticPosts, posts]);
 
   // Use optimized list hook
