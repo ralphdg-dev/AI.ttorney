@@ -16,6 +16,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import axios from "axios";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { NetworkConfig } from "../utils/networkConfig";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../constants/Colors";
@@ -76,6 +77,7 @@ const SkeletonLoader = () => {
 
 export default function HelpAndSupport() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { isGuestMode } = useGuest();
   const [search, setSearch] = useState("");
   const [errors, setErrors] = useState({
@@ -314,8 +316,9 @@ export default function HelpAndSupport() {
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <Header
         title="Help & Support"
-        showBackButton={isGuestMode}
-        showMenu={!isGuestMode}
+        showBackButton={true}
+        showMenu={false}
+        onBackPress={() => router.push('/home')}
       />
 
       <View style={{ paddingHorizontal: 20 }}>

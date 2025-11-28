@@ -6,6 +6,8 @@ import React, {
   useMemo,
 } from "react";
 import { useFocusEffect } from "@react-navigation/native";
+import { useRouter } from "expo-router";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -323,6 +325,28 @@ interface SourceCitation {
   relevance_score: number;
 }
 
+/**
+ * Convert domain names to friendly source names
+ */
+const getFriendlySourceName = (domainOrLaw: string): string => {
+  const domainMapping: { [key: string]: string } = {
+    'officialgazette.gov.ph': 'Official Gazette',
+    'lawphil.net': 'LawPhil',
+    'sc.judiciary.gov.ph': 'Supreme Court of the Philippines',
+    'elibrary.judiciary.gov.ph': 'Supreme Court E-Library'
+  };
+  
+  // Check if the input contains any of our mapped domains
+  for (const [domain, friendlyName] of Object.entries(domainMapping)) {
+    if (domainOrLaw.toLowerCase().includes(domain)) {
+      return friendlyName;
+    }
+  }
+  
+  // Return original if no mapping found
+  return domainOrLaw;
+};
+
 interface FallbackSuggestion {
   action: string;
   description: string;
@@ -345,7 +369,7 @@ interface Message {
 
 export default function ChatbotScreen() {
   const insets = useSafeAreaInsets();
-  const { user, session, isLawyer } = useAuth();
+  const { user, session, isLawyer, initialAuthCheck } = useAuth();
   
   // Responsive sizing variables
   const navbarHeight = LAYOUT.NAVBAR_HEIGHT;
@@ -380,26 +404,49 @@ export default function ChatbotScreen() {
     'bottom-navbar': navbarRef,
   };
   
-  const handleTutorialComplete = () => {
+  const handleTutorialComplete = async () => {
+    try {
+      // Save tutorial completion status to AsyncStorage
+      await AsyncStorage.setItem('@guest_onboarding_completed', 'true');
+      console.log('✅ Tutorial completion saved to AsyncStorage');
+    } catch (error) {
+      console.error('❌ Error saving tutorial completion:', error);
+    }
     setShowTutorial(false);
     // Tutorial is complete, user stays on chatbot
   };
   
   // Show tutorial when guest user first enters chatbot page
   const hasShownTutorialRef = useRef(false);
-  
+
   useFocusEffect(
     useCallback(() => {
-      // Only show tutorial once for guest users when they first enter the page
-      if (isGuestMode && !hasShownTutorialRef.current) {
-        // Small delay to ensure page is fully rendered before showing tutorial
-        const timer = setTimeout(() => {
-          setShowTutorial(true);
-          hasShownTutorialRef.current = true;
-        }, 500);
-        
-        return () => clearTimeout(timer);
-      }
+      // Check if tutorial has been shown before using AsyncStorage
+      const checkTutorialStatus = async () => {
+        try {
+          // Only proceed if in guest mode
+          if (!isGuestMode) return;
+          
+          // Check AsyncStorage for tutorial completion
+          const tutorialCompleted = await AsyncStorage.getItem('@guest_onboarding_completed');
+          console.log('🔍 Tutorial status check:', { tutorialCompleted });
+          
+          // Only show tutorial if it hasn't been completed and hasn't been shown in this session
+          if (!tutorialCompleted && !hasShownTutorialRef.current) {
+            // Small delay to ensure page is fully rendered before showing tutorial
+            const timer = setTimeout(() => {
+              setShowTutorial(true);
+              hasShownTutorialRef.current = true;
+            }, 500);
+            
+            return () => clearTimeout(timer);
+          }
+        } catch (error) {
+          console.error('Error checking tutorial status:', error);
+        }
+      };
+      
+      checkTutorialStatus();
     }, [isGuestMode, setShowTutorial])
   );
   
@@ -1449,7 +1496,7 @@ export default function ChatbotScreen() {
                         { color: Colors.text.primary },
                       ]}
                     >
-                      {source.law.toUpperCase()}
+                      {getFriendlySourceName(source.law).toUpperCase()}
                     </Text>
                     <Text
                       style={[
@@ -1586,37 +1633,41 @@ export default function ChatbotScreen() {
     >
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       
-      {/* Sidebar - Guest or Regular */}
-      {isGuestMode ? (
-        <GuestSidebar
-          isOpen={isGuestSidebarOpen}
-          onClose={() => setIsGuestSidebarOpen(false)}
-        />
-      ) : (
-        <ChatHistorySidebar
-          ref={sidebarRef}
-          userId={user?.id}
-          sessionToken={session?.access_token}
-          currentConversationId={currentConversationId}
-          onConversationSelect={handleConversationSelect}
-          onNewChat={handleNewChat}
-        />
+      {/* Sidebar - Guest or Regular - Only show after auth is loaded */}
+      {initialAuthCheck && (
+        isGuestMode ? (
+          <GuestSidebar
+            isOpen={isGuestSidebarOpen}
+            onClose={() => setIsGuestSidebarOpen(false)}
+          />
+        ) : (
+          <ChatHistorySidebar
+            ref={sidebarRef}
+            userId={user?.id}
+            sessionToken={session?.access_token}
+            currentConversationId={currentConversationId}
+            onConversationSelect={handleConversationSelect}
+            onNewChat={handleNewChat}
+          />
+        )
       )}
 
-      {/* Header */}
-      <Header 
-        title="AI Legal Assistant" 
-        showMenu={true}
-        onMenuPress={isGuestMode ? () => setIsGuestSidebarOpen(true) : undefined}
-        showChatHistoryToggle={!isGuestMode}
-        isChatHistoryOpen={isSidebarOpen}
-        onChatHistoryToggle={() => {
-          const newIsOpen = !isSidebarOpen;
-          setIsSidebarOpen(newIsOpen);
-          sidebarRef.current?.toggleSidebar?.();
-        }}
-        menuRef={menuRef}
-      />
+      {/* Header - Only show after auth is loaded to prevent incorrect menu state */}
+      {initialAuthCheck && (
+        <Header 
+          title="AI Legal Assistant" 
+          showMenu={true}
+          onMenuPress={isGuestMode ? () => setIsGuestSidebarOpen(true) : undefined}
+          showChatHistoryToggle={!isGuestMode}
+          isChatHistoryOpen={isSidebarOpen}
+          onChatHistoryToggle={() => {
+            const newIsOpen = !isSidebarOpen;
+            setIsSidebarOpen(newIsOpen);
+            sidebarRef.current?.toggleSidebar?.();
+          }}
+          menuRef={menuRef}
+        />
+      )}
 
       {/* Guest Rate Limit Banner - Show for guest users */}
       {isGuestMode && showLimitBanner && (
@@ -1995,16 +2046,22 @@ export default function ChatbotScreen() {
           paddingBottom: Platform.OS === 'ios' ? insets.bottom : 0,
         }}
       >
-        {isGuestMode ? (
-          <GuestNavbar activeTab="ask" glossaryRef={glossaryRef} navbarRef={navbarRef} />
-        ) : user?.role === "verified_lawyer" ? (
-          <LawyerNavbar activeTab="chatbot" />
+        {/* Only render navbar after auth state is properly loaded to prevent race condition */}
+        {initialAuthCheck ? (
+          isGuestMode && !user ? (
+            <GuestNavbar activeTab="ask" glossaryRef={glossaryRef} navbarRef={navbarRef} />
+          ) : user?.role === "verified_lawyer" ? (
+            <LawyerNavbar activeTab="chatbot" />
+          ) : (
+            <Navbar activeTab="ask" />
+          )
         ) : (
-          <Navbar activeTab="ask" />
+          // Show empty placeholder while auth is loading to prevent navbar flashing
+          <View style={{ height: LAYOUT.NAVBAR_HEIGHT + (Platform.OS === 'ios' ? insets.bottom : 0) }} />
         )}
       </View>
       
-      {!isGuestMode && <SidebarWrapper />}
+      {!isGuestMode && initialAuthCheck && <SidebarWrapper />}
       
       {/* Tutorial Overlay */}
       {isGuestMode && (

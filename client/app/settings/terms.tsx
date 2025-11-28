@@ -7,8 +7,6 @@ import Header from '@/components/Header';
 import { Box } from '@/components/ui/box';
 import { VStack } from '@/components/ui/vstack';
 import { Text as GSText } from '@/components/ui/text';
-import Navbar from "@/components/Navbar";
-import { GuestNavbar } from "@/components/guest";
 import Colors from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { safeGoBack } from '@/utils/navigationHelper';
@@ -405,11 +403,6 @@ export default function TermsScreen() {
         </VStack>
       </ScrollView>
       
-      {isGuestMode ? (
-        <GuestNavbar activeTab="learn" />
-      ) : (
-        <Navbar activeTab="profile" />
-      )}
     </Box>
     </SafeAreaView>
   );

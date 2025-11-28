@@ -68,6 +68,11 @@ const GuestNavbar: React.FC<GuestNavbarProps> = ({ activeTab, glossaryRef, navba
     }, 500);
   };
 
+  // Slightly reduce bottom safe area on Android to avoid an overly tall navbar
+  const bottomInset = Platform.OS === 'android'
+    ? Math.max(insets.bottom - 8, 0)
+    : insets.bottom;
+
   const tabs = [
     {
       id: 'learn',
@@ -86,7 +91,7 @@ const GuestNavbar: React.FC<GuestNavbarProps> = ({ activeTab, glossaryRef, navba
   ];
 
   return (
-    <View ref={navbarRef} style={[styles.container, { paddingBottom: insets.bottom }]}>
+    <View ref={navbarRef} style={[styles.container, { paddingBottom: bottomInset }]}>
       <View style={styles.navbar}>
         {tabs.map((tab) => {
           const IconComponent = tab.icon;

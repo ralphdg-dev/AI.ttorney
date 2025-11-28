@@ -6,6 +6,8 @@ import { getRoleBasedRedirect } from '../config/routes';
 import { useToast } from '@/components/ui/toast';
 import { createSafeAreaToastRenderer } from '@/components/ui/SafeAreaToast';
 import { NetworkConfig } from '../utils/networkConfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GUEST_SESSION_STORAGE_KEY } from '../config/guestConfig';
 
 // Role hierarchy based on backend schema
 export type UserRole = 'guest' | 'registered_user' | 'verified_lawyer' | 'admin' | 'superadmin';
@@ -74,6 +76,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const getCurrentRoute = React.useCallback(() => {
     return '/' + segments.join('/');
   }, [segments]);
+
+  // Clear guest session when user authenticates to prevent lingering sessions
+  const clearGuestSessionOnAuth = React.useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
+      console.log('🗑️ Guest session cleared on authentication');
+    } catch (error) {
+      console.warn('❌ Error clearing guest session on auth:', error);
+    }
+  }, []);
 
 
   const checkSuspensionStatus = React.useCallback(async (): Promise<{ isSuspended: boolean; suspensionCount: number; suspensionEnd: string | null } | null> => {
@@ -239,6 +251,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         profile = profileData;
+        
+        // Clear guest session when user successfully authenticates
+        await clearGuestSessionOnAuth();
+        
         setAuthState({
           session,
           user: profile,

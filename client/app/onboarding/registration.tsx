@@ -656,21 +656,49 @@ export default function UserRegistration() {
               await AsyncStorage.setItem('temp_registration_password', password);
               
               // Step 2: Send OTP for email verification
-              const otpResult = await apiClient.sendOTP({
+              console.log('🔍 DEBUG: Sending OTP with params:', {
                 email,
                 otp_type: 'email_verification',
-                user_name: `${firstName} ${lastName}` // Add user_name parameter
+                user_name: `${firstName} ${lastName}`
               });
               
-              if (otpResult.error) {
+              try {
+                const otpResult = await apiClient.sendOTP({
+                  email,
+                  otp_type: 'email_verification',
+                  user_name: `${firstName} ${lastName}` // Add user_name parameter
+                });
+                
+                console.log('🔍 DEBUG: OTP result:', otpResult);
+                
+                if (otpResult.error) {
+                  console.log('🔍 DEBUG: OTP error:', otpResult.error);
+                  toast.show({
+                    placement: "top",
+                    render: createSafeAreaToastRenderer(
+                      'top',
+                      'error',
+                      'solid',
+                      'Verification Email Failed',
+                      otpResult.error
+                    ),
+                  });
+                  setLoading(false);
+                  return;
+                }
+                
+                // If we get here, the OTP was sent successfully
+                console.log('✅ OTP sent successfully');
+              } catch (otpError) {
+                console.error('❌ OTP sending exception:', otpError);
                 toast.show({
                   placement: "top",
                   render: createSafeAreaToastRenderer(
                     'top',
                     'error',
                     'solid',
-                    'Verification Email Failed',
-                    otpResult.error
+                    'Verification Email Error',
+                    'Failed to send verification code. The email may still arrive. Please check your inbox or try again.'
                   ),
                 });
                 setLoading(false);

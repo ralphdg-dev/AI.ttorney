@@ -32,7 +32,7 @@ import Colors from "../../constants/Colors";
 import { useAuth } from "../../contexts/AuthContext";
 import { AuthGuard } from "../../components/AuthGuard";
 import tw from "tailwind-react-native-classnames";
-import { TimeSlot } from "../../services/lawyerProfileServices";
+import { TimeSlot, lawyerProfileService } from "../../services/lawyerProfileServices";
 import { supabase } from "../../config/supabase";
 import { useRouter } from "expo-router";
 import { NetworkConfig } from "../../utils/networkConfig";
@@ -187,7 +187,7 @@ const LawyerProfilePage: React.FC = () => {
   ]);
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [, setIsLoading] = useState(true);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [showAllSpecializations, setShowAllSpecializations] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isAcceptingConsultations, setIsAcceptingConsultations] =
@@ -476,17 +476,37 @@ const LawyerProfilePage: React.FC = () => {
     if (!user?.id) return;
 
     try {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from("lawyer_info")
-        .select(
-          "phone_number, location, bio, specialization, days, hours_available, accepting_consultations"
-        )
-        .eq("lawyer_id", user.id)
-        .maybeSingle();
+      setIsProfileLoading(true);
+      
+      // Use server API instead of direct Supabase queries
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        console.error("No authentication token found");
+        return;
+      }
 
-      if (error) {
-        if (error.code === "PGRST116") {
+      const result = await lawyerProfileService.getLawyerProfile(session.access_token);
+      
+      if (result.success && result.data) {
+        const lawyerInfo = result.data.lawyer_info;
+        const professionalInfo = result.data.professional_info;
+        
+        if (lawyerInfo) {
+          setIsAcceptingConsultations(!!lawyerInfo.accepting_consultations);
+          setLawyerContactInfo({
+            phone_number: lawyerInfo.phone_number || "",
+            location: lawyerInfo.location || "",
+            bio: lawyerInfo.bio || "",
+            specializations: Array.isArray(lawyerInfo.specialization) 
+              ? lawyerInfo.specialization.join(", ")
+              : (typeof lawyerInfo.specialization === 'string' 
+                  ? lawyerInfo.specialization.replace(/[\[\]"]/g, '').replace(/,/g, ', ')
+                  : ""),
+            days: lawyerInfo.days || "",
+            hours_available: lawyerInfo.hours_available || "",
+          });
+        } else {
+          // No lawyer info found - set defaults
           console.log("No lawyer info found for user:", user.id);
           setLawyerContactInfo({
             phone_number: "",
@@ -496,67 +516,38 @@ const LawyerProfilePage: React.FC = () => {
             days: "",
             hours_available: "",
           });
-        } else {
-          console.error("Error fetching lawyer contact info:", error);
         }
-      } else if (data) {
-        setIsAcceptingConsultations(!!data.accepting_consultations);
-        setLawyerContactInfo({
-          phone_number: data.phone_number || "",
-          location: data.location || "",
-          bio: data.bio || "",
-          specializations: data.specialization || "",
-          days: data.days || "",
-          hours_available: data.hours_available || "",
-        });
+        
+        // Update professional info if available
+        if (professionalInfo) {
+          setProfessionalInfo({
+            rollNumber: professionalInfo.roll_number || "",
+            rollSigningDate: professionalInfo.roll_signing_date || "",
+          });
+        }
       }
     } catch (error) {
       console.error("Error in fetchLawyerContactInfo:", error);
+      // Fallback to empty data on error
+      setLawyerContactInfo({
+        phone_number: "",
+        location: "",
+        bio: "",
+        specializations: "",
+        days: "",
+        hours_available: "",
+      });
     } finally {
-      setIsLoading(false);
+      setIsProfileLoading(false);
     }
   }, [user?.id]);
 
   const fetchProfessionalInfo = useCallback(async () => {
-    if (!user?.id) {
-      console.log("fetchProfessionalInfo: No user ID");
-      return;
-    }
-
-    try {
-      console.log("Fetching professional info for user:", user.id);
-      const { data, error } = await supabase
-        .from("lawyer_applications")
-        .select("roll_number, roll_signing_date")
-        .eq("user_id", user.id)
-        .single();
-
-      console.log("Professional info fetch result:", { data, error });
-
-      if (error) {
-        if (error.code === "PGRST116") {
-          console.log("No professional info found for user:", user.id);
-          setProfessionalInfo({
-            rollNumber: "",
-            rollSigningDate: "",
-          });
-        } else {
-          console.error("Error fetching professional info:", error);
-        }
-      } else if (data) {
-        console.log("Setting professional info:", {
-          rollNumber: data.roll_number,
-          rollSigningDate: data.roll_signing_date,
-        });
-        setProfessionalInfo({
-          rollNumber: data.roll_number || "",
-          rollSigningDate: data.roll_signing_date || "",
-        });
-      }
-    } catch (error) {
-      console.error("Error in fetchProfessionalInfo:", error);
-    }
-  }, [user?.id]);
+    // Professional info is now fetched as part of fetchLawyerContactInfo
+    // This function is kept for backward compatibility but does nothing
+    // since the unified API call handles both lawyer_info and professional_info
+    console.log("fetchProfessionalInfo: Now handled by fetchLawyerContactInfo");
+  }, []);
 
   // saveProfessionalInfo function was removed - unused and never called
 
@@ -595,14 +586,14 @@ const LawyerProfilePage: React.FC = () => {
   const refreshProfileData = useCallback(async () => {
     if (!user) return;
 
-    setIsLoading(true);
+    setIsProfileLoading(true);
     try {
       await Promise.all([fetchLawyerContactInfo(), fetchProfessionalInfo()]);
       await refreshUserData();
     } catch (error) {
       console.error("Error refreshing profile data:", error);
     } finally {
-      setIsLoading(false);
+      setIsProfileLoading(false);
     }
   }, [user, fetchLawyerContactInfo, fetchProfessionalInfo, refreshUserData]);
 
@@ -630,7 +621,11 @@ const LawyerProfilePage: React.FC = () => {
               phone_number: data.phone_number || "",
               location: data.location || "",
               bio: data.bio || "",
-              specializations: data.specialization || "",
+              specializations: Array.isArray(data.specialization) 
+                ? data.specialization.join(", ")
+                : (typeof data.specialization === 'string' 
+                    ? data.specialization.replace(/[\[\]"]/g, '').replace(/,/g, ', ')
+                    : ""),
               days: data.days || "",
               hours_available: data.hours_available || "",
             });
@@ -674,123 +669,7 @@ const LawyerProfilePage: React.FC = () => {
     };
   }, [user?.id]);
 
-  const saveLawyerProfileToBackend = async (
-    profileData: any,
-    availabilitySlots: any,
-    contactInfo: LawyerContactInfo,
-    professionalInfo: ProfessionalInfo
-  ) => {
-    if (!user?.id) {
-      return { success: false, error: "User not authenticated" };
-    }
-
-    try {
-      console.log("Saving lawyer profile data with availability:", profileData);
-
-      // Use the same backend API as regular users to avoid RLS issues
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.access_token) {
-        return { success: false, error: "Authentication required" };
-      }
-
-      // Prepare specialization string
-      const specializationString = Array.isArray(contactInfo.specializations)
-        ? contactInfo.specializations.join(", ")
-        : contactInfo.specializations;
-
-      // Update users table via backend API (uses service role key, bypasses RLS)
-      const userUpdateBody = {
-        full_name: profileData.name,
-        email: profileData.email,
-        username: profileData.name.toLowerCase().replace(/\s+/g, '_'), // Generate username from name
-      };
-      
-      console.log("🔍 DEBUG: Sending to /api/user/profile:", userUpdateBody);
-      console.log("🔍 DEBUG: Profile data received:", profileData);
-      console.log("🔍 DEBUG: Contact info received:", contactInfo);
-      
-      const userUpdateResponse = await fetch(`${await NetworkConfig.getBestApiUrl()}/api/user/profile`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userUpdateBody),
-      });
-
-      if (!userUpdateResponse.ok) {
-        const errorData = await userUpdateResponse.json();
-        console.error("Error updating user info via API:", errorData);
-        return { success: false, error: errorData.detail || "Failed to update user profile" };
-      }
-
-      // Update lawyer_info table - ALL lawyer data goes here including hours_available
-      let lawyerInfoError;
-      // let lawyerInfoData; // Not used, can be removed
-
-      // Check if lawyer_info record exists
-      const { data: existingLawyerInfo } = await supabase
-        .from("lawyer_info")
-        .select("id, name")
-        .eq("lawyer_id", user.id)
-        .maybeSingle();
-
-      if (existingLawyerInfo) {
-        // Record exists - update it (preserve existing name field)
-        const updateData: any = {
-          phone_number: contactInfo.phone_number,
-          location: contactInfo.location,
-          bio: contactInfo.bio,
-          specialization: specializationString,
-          days: profileData.days || "",
-          hours_available: profileData.hours_available || {},
-          updated_at: new Date().toISOString(),
-        };
-
-        const result = await supabase
-          .from("lawyer_info")
-          .update(updateData)
-          .eq("lawyer_id", user.id)
-          .select()
-          .maybeSingle();
-
-        lawyerInfoError = result.error;
-        // lawyerInfoData = result.data; // Not used, can be removed
-      } else {
-        // Record doesn't exist - create it with name from users table
-        const result = await supabase
-          .from("lawyer_info")
-          .insert({
-            lawyer_id: user.id,
-            name: profileData.name, // Use name from profile data for new records
-            phone_number: contactInfo.phone_number,
-            location: contactInfo.location,
-            bio: contactInfo.bio,
-            specialization: specializationString,
-            days: profileData.days || "",
-            hours_available: profileData.hours_available || {},
-          })
-          .select()
-          .maybeSingle();
-
-        lawyerInfoError = result.error;
-        // lawyerInfoData = result.data; // Not used, can be removed
-      }
-
-      if (lawyerInfoError) {
-        console.error("❌ Error updating lawyer_info:", lawyerInfoError);
-        console.error("❌ Full error details:", JSON.stringify(lawyerInfoError, null, 2));
-        return { success: false, error: `Lawyer profile update failed: ${lawyerInfoError.message}` };
-      }
-
-      console.log("Lawyer profile updated successfully");
-      return { success: true, message: "Profile updated successfully" };
-    } catch (error: any) {
-      console.error("Error saving lawyer profile:", error);
-      return { success: false, error: error.message || "Failed to save profile" };
-    }
-  };
+  // Removed saveLawyerProfileToBackend function - now using lawyerProfileService
 
   const handleSaveProfile = async (editFormData: any) => {
     try {
@@ -814,34 +693,30 @@ const LawyerProfilePage: React.FC = () => {
         email: editFormData.email,
       }));
 
-      const profileDataForBackend = {
-        name: editFormData.name,
-        email: editFormData.email,
-        phone: editFormData.phone,
-        location: editFormData.location,
-        bio: editFormData.bio,
-        specialization: editFormData.specialization,
-        days: editFormData.days || "",
-        hours_available: editFormData.hours_available || "",
-      };
+      console.log("Starting profile save with data:", editFormData);
 
-      console.log("Sending to backend service:", profileDataForBackend);
+      // Use the enhanced lawyer profile service
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("Authentication required");
+      }
 
-      const result = await saveLawyerProfileToBackend(
-        profileDataForBackend,
-        availabilitySlots,
+      const result = await lawyerProfileService.saveLawyerProfile(
         {
-          phone_number: editFormData.phone,
+          name: editFormData.name,
+          email: editFormData.email,
+          phone: editFormData.phone,
           location: editFormData.location,
+          avatar: editFormData.avatar || profileData.avatar,
           bio: editFormData.bio,
-          specializations: specializationsString,
+          specialization: editFormData.specialization,
           days: editFormData.days || "",
-          hours_available: editFormData.hours_available || "",
-        },
-        {
+          hours_available: editFormData.hours_available || {},
           rollNumber: editFormData.rollNumber,
           rollSigningDate: editFormData.rollSigningDate,
-        }
+        },
+        availabilitySlots,
+        session.access_token
       );
 
       if (result.success) {
@@ -851,7 +726,11 @@ const LawyerProfilePage: React.FC = () => {
           rollSigningDate: editFormData.rollSigningDate || "",
         });
 
-        Alert.alert("Success", "Profile updated successfully!");
+        toast.show({
+          placement: 'top',
+          duration: 3000,
+          render: createSafeAreaToastRenderer('top', 'success', 'solid', 'Success', 'Profile updated successfully!'),
+        });
         setIsEditingProfile(false);
 
         await refreshProfileData();
@@ -948,11 +827,15 @@ const LawyerProfilePage: React.FC = () => {
                 style={tw`mb-2`}
               >
                 <View style={tw`flex-row flex-wrap items-center`}>
-                  <Text style={tw`text-sm text-gray-600`}>
-                    {lawyerContactInfo.specializations
-                      ? lawyerContactInfo.specializations.split(",")[0].trim()
-                      : "General Law"}
-                  </Text>
+                  {lawyerContactInfo.specializations && lawyerContactInfo.specializations.trim() ? (
+                    <Text style={tw`text-sm text-gray-600`}>
+                      {lawyerContactInfo.specializations.split(",")[0].trim()}
+                    </Text>
+                  ) : (
+                    <Text style={tw`text-sm text-gray-400 italic`}>
+                      No specializations set yet
+                    </Text>
+                  )}
                   {lawyerContactInfo.specializations &&
                     lawyerContactInfo.specializations.split(",").length > 1 && (
                       <Text
@@ -987,11 +870,28 @@ const LawyerProfilePage: React.FC = () => {
 
               <View
                 style={[
-                  tw`self-start px-3 py-1.5 rounded-md flex-shrink-0`,
-                  { backgroundColor: "#ECFDF5" },
+                  tw`self-start px-2 py-1 rounded-md`,
+                  { 
+                    backgroundColor: "#ECFDF5",
+                    borderColor: "#A7F3D0",
+                    borderWidth: 1,
+                    minWidth: screenWidth * 0.25, // Ensure minimum width for text
+                    maxWidth: screenWidth * 0.4,  // Prevent overflow
+                  },
                 ]}
               >
-                <Text style={tw`text-xs font-semibold text-green-700`}>
+                <Text 
+                  style={[
+                    tw`font-semibold text-green-700`,
+                    { 
+                      fontSize: Math.max(10, screenWidth * 0.028), // Responsive font size with minimum
+                      textAlign: 'center',
+                    }
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit={true}
+                  minimumFontScale={0.8}
+                >
                   {profileData.verificationStatus}
                 </Text>
               </View>

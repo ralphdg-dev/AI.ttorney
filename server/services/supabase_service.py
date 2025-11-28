@@ -666,4 +666,56 @@ class SupabaseService:
         except Exception as e:
             logger.error(f"Connection test error: {str(e)}")
             return {"success": False, "error": str(e)}
+    
+    async def execute_sql(self, sql_query: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Execute a raw SQL query with parameters
+        
+        This is used for direct database operations that can't be done through the REST API.
+        Only use for admin operations that require bypassing RLS.
+        
+        Args:
+            sql_query: SQL query string with :param placeholders
+            params: Dictionary of parameters to substitute in the query
+            
+        Returns:
+            Dictionary with success status and data or error
+        """
+        try:
+            logger.info(f"🔧 Executing SQL query: {sql_query}")
+            
+            # Ensure we have service role key for admin operations
+            if not self.service_key:
+                logger.error("❌ SERVICE ROLE KEY IS NOT SET - Cannot execute SQL!")
+                return {"success": False, "error": "Service role key not configured"}
+            
+            # Use the Supabase client's rpc method to execute SQL
+            # The rpc endpoint allows executing custom SQL through a stored procedure
+            async with httpx.AsyncClient() as client:
+                # Create payload for the rpc call
+                payload = {
+                    "query": sql_query,
+                    "params": params or {}
+                }
+                
+                # Call the execute_sql RPC function
+                response = await client.post(
+                    f"{self.rest_url}/rpc/execute_sql",
+                    json=payload,
+                    headers=self._get_headers(use_service_key=True)
+                )
+                
+                if response.status_code in [200, 201]:
+                    data = response.json()
+                    logger.info(f"✅ SQL query executed successfully")
+                    return {"success": True, "data": data}
+                else:
+                    error_data = response.json() if response.content else {}
+                    logger.error(f"❌ SQL query failed: {response.status_code}, {error_data}")
+                    return {"success": False, "error": error_data}
+                    
+        except Exception as e:
+            logger.error(f"❌ SQL execution error: {str(e)}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            return {"success": False, "error": str(e)}
 

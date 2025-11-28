@@ -8,7 +8,10 @@ import {
   TextInput,
   Modal,
   Alert,
+  Image,
+  ActivityIndicator,
 } from "react-native";
+import { supabase } from "../../../lib/supabase";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Camera,
@@ -23,6 +26,7 @@ import Colors from "../../../constants/Colors";
 import { TimeSlot } from "../../../services/lawyerProfileServices";
 import TimeUtils from "../../../utils/timeUtils";
 import { Avatar, AvatarImage, AvatarFallbackText } from "../../../components/ui/avatar";
+import * as ImagePicker from 'expo-image-picker';
 
 interface ProfileData {
   name: string;
@@ -72,47 +76,11 @@ for (let h = 0; h < 24; h++) {
 }
 
 const LAW_SPECIALIZATIONS = [
-  "Administrative Law",
-  "Admiralty and Maritime Law",
-  "Agricultural Law",
-  "Alternative Dispute Resolution",
-  "Appellate Practice",
-  "Aviation Law",
-  "Banking and Finance Law",
-  "Bankruptcy Law",
-  "Civil Law",
-  "Commercial Law",
-  "Constitutional Law",
-  "Construction Law",
-  "Corporate Law",
-  "Criminal Law",
-  "Cyberspace Law",
-  "Election Law",
-  "Energy Law",
-  "Entertainment Law",
-  "Environmental Law",
   "Family Law",
-  "General Practice",
-  "Immigration Law",
-  "Insurance Law",
-  "Intellectual Property Law",
-  "International Law",
-  "Labor and Employment Law",
-  "Legal Ethics",
-  "Medical Law",
-  "Mining Law",
-  "Notarial Practice",
-  "Patent Law",
-  "Property Law",
-  "Public Interest Law",
-  "Public International Law",
-  "Real Estate Law",
-  "Regulatory Practice",
-  "Tax Law",
-  "Tort Law",
-  "Trademark Law",
-  "Transportation Law",
-  "Wills and Succession",
+  "Civil Law", 
+  "Criminal Law",
+  "Consumer Law",
+  "Labor Law",
 ];
 
 const EditProfileModal: React.FC<EditProfileModalProps> = ({
@@ -137,6 +105,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [, setLocalAvailabilitySlots] = React.useState<TimeSlot[]>(availabilitySlots);
+  const [customSpecialization, setCustomSpecialization] = React.useState("");
+  const [showCustomSpecializationInput, setShowCustomSpecializationInput] = React.useState(false);
+  const [isImagePickerActive, setIsImagePickerActive] = React.useState(false);
+  const [selectedImageUri, setSelectedImageUri] = React.useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = React.useState(false);
+  const [imageLoadError, setImageLoadError] = React.useState(false);
 
   const [selectedDays, setSelectedDays] = React.useState<string[]>([]);
   const [dayTimeSlots, setDayTimeSlots] = React.useState<
@@ -147,8 +121,26 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   >({});
 
   React.useEffect(() => {
+    console.log("🔄 useEffect: Initializing form data from profileData, isImagePickerActive:", isImagePickerActive);
+    // Don't reset form data if image picker is active (prevents data loss during photo selection)
+    if (isImagePickerActive) {
+      console.log("⏸️ Skipping form reset - image picker is active");
+      return;
+    }
     setEditFormData(profileData);
     setValidationErrors({});
+
+    // Initialize custom specialization input visibility based on existing data
+    const currentSpecializations = profileData.specialization || [];
+    if (currentSpecializations.includes("Others")) {
+      setShowCustomSpecializationInput(true);
+    } else {
+      setShowCustomSpecializationInput(false);
+      setCustomSpecialization("");
+    }
+
+    // Initialize selected image URI
+    setSelectedImageUri(profileData.avatar || null);
 
     if (profileData.days) {
       const daysArray = profileData.days
@@ -341,16 +333,40 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
         "specialization",
         currentSpecializations.filter((s) => s !== specialization)
       );
+      // If removing "Others", also hide the custom input
+      if (specialization === "Others") {
+        setShowCustomSpecializationInput(false);
+        setCustomSpecialization("");
+      }
     } else {
       updateFormField("specialization", [
         ...currentSpecializations,
         specialization,
       ]);
+      // If selecting "Others", show the custom input
+      if (specialization === "Others") {
+        setShowCustomSpecializationInput(true);
+      }
     }
   };
 
   const isSpecializationSelected = (specialization: string) => {
     return editFormData.specialization?.includes(specialization) || false;
+  };
+
+  const addCustomSpecialization = () => {
+    if (customSpecialization.trim()) {
+      const currentSpecializations = editFormData.specialization || [];
+      
+      // Replace "Others" with the actual custom specialization
+      const updatedSpecializations = currentSpecializations
+        .filter(s => s !== "Others")
+        .concat(customSpecialization.trim());
+      
+      updateFormField("specialization", updatedSpecializations);
+      setCustomSpecialization("");
+      setShowCustomSpecializationInput(false);
+    }
   };
 
   const validateForm = (): boolean => {
@@ -389,12 +405,22 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     ) {
       errors.specialization = "At least one specialization is required";
     } else {
-      const invalidSpecializations = editFormData.specialization.filter(
-        (spec) => !LAW_SPECIALIZATIONS.includes(spec)
-      );
-      if (invalidSpecializations.length > 0) {
-        errors.specialization =
-          "Please select valid specializations from the list";
+      // Check if "Others" is selected but no custom specialization was added
+      if (editFormData.specialization.includes("Others")) {
+        errors.specialization = "Please add your custom specialization or remove 'Others'";
+      } else {
+        // Allow custom specializations when "Others" was selected and replaced with custom text
+        const invalidSpecializations = editFormData.specialization.filter(
+          (spec) => {
+            // Invalid if: not in predefined list AND is empty string
+            // Valid if: in predefined list OR is custom text (non-empty)
+            return !LAW_SPECIALIZATIONS.includes(spec) && spec.trim() === "";
+          }
+        );
+        if (invalidSpecializations.length > 0) {
+          errors.specialization =
+            "Please select valid specializations from the list";
+        }
       }
     }
 
@@ -478,16 +504,56 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const confirmSave = async () => {
     setIsSaving(true);
     try {
+      let profilePhotoUrl = profileData.avatar;
+
+      // Upload photo if a new one was selected
+      if (selectedImageUri) {
+        try {
+          const uploadedUrl = await uploadProfilePhoto(selectedImageUri);
+          if (uploadedUrl) {
+            profilePhotoUrl = uploadedUrl;
+            
+            // Update users table with new profile photo
+            const { error: userUpdateError } = await supabase
+              .from('users')
+              .update({ 
+                profile_photo: uploadedUrl,
+                photo_url: uploadedUrl // Update both fields for compatibility
+              })
+              .eq('email', profileData.email);
+
+            if (userUpdateError) {
+              console.error('Error updating user profile photo:', userUpdateError);
+              throw new Error('Failed to update profile photo');
+            }
+          }
+        } catch (photoError) {
+          console.error('Photo upload failed:', photoError);
+          Alert.alert('Error', 'Failed to upload profile photo. Please try again.');
+          setIsSaving(false);
+          return;
+        }
+      }
+
       const formattedDays = selectedDays.join(", ");
       const hoursAvailableJsonb = formatHoursAvailable();
 
+      // Don't send avatar to lawyer profile service since it's saved in users table
+      // Also filter out "Others" if it somehow remains in the specialization array
+      const cleanedSpecializations = editFormData.specialization.filter(spec => spec !== "Others");
+      
       const updatedFormData = {
         ...editFormData,
+        specialization: cleanedSpecializations,
+        avatar: '', // Clear avatar since it's handled separately
         days: formattedDays,
         hours_available: hoursAvailableJsonb, // JSONB format
       };
 
       console.log("Confirming save with JSONB:", hoursAvailableJsonb);
+      console.log("Full form data being saved:", updatedFormData);
+      console.log("Specialization type:", typeof updatedFormData.specialization);
+      console.log("Specialization value:", updatedFormData.specialization);
       await onSave(updatedFormData);
       setShowConfirmModal(false);
       onClose();
@@ -509,6 +575,18 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     setShowSpecializationDropdown(false);
     setIsEditingAvailability(false);
     setSearchQuery("");
+    
+    // Reset custom specialization input visibility based on original data
+    const originalSpecializations = profileData.specialization || [];
+    if (originalSpecializations.includes("Others")) {
+      setShowCustomSpecializationInput(true);
+    } else {
+      setShowCustomSpecializationInput(false);
+      setCustomSpecialization("");
+    }
+
+    // Reset selected image URI to original data
+    setSelectedImageUri(profileData.avatar || null);
 
     if (profileData.days) {
       const daysArray = profileData.days
@@ -541,14 +619,14 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   };
 
   const filterSpecializations = (query: string) => {
-    return LAW_SPECIALIZATIONS.filter((spec) =>
+    return [...LAW_SPECIALIZATIONS, "Others"].filter((spec) =>
       spec.toLowerCase().includes(query.toLowerCase())
     );
   };
 
   const filteredSpecializations = searchQuery
     ? filterSpecializations(searchQuery)
-    : LAW_SPECIALIZATIONS;
+    : [...LAW_SPECIALIZATIONS, "Others"];
 
   const getSelectedSpecializationsText = () => {
     const selected = editFormData.specialization || [];
@@ -564,6 +642,149 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const formatTimeLabel = (time: string) => {
     const timeOptions = TIME_OPTIONS.find((option) => option.value === time);
     return timeOptions ? timeOptions.label : time;
+  };
+
+  const getAvailableTimeOptions = (day: string) => {
+    const selectedTimes = dayTimeSlots[day] || [];
+    return TIME_OPTIONS.filter((timeOption) => 
+      !selectedTimes.includes(timeOption.value)
+    );
+  };
+
+  const requestPermissions = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Photo library permission is required to select images.');
+      return false;
+    }
+    return true;
+  };
+
+  const showImagePickerOptions = () => {
+    Alert.alert(
+      'Change Profile Photo',
+      'Choose how you want to update your profile photo',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Camera', onPress: pickImageFromCamera },
+        { text: 'Photo Library', onPress: pickImageFromLibrary },
+        { text: 'Remove Photo', onPress: removeProfilePhoto, style: 'destructive' },
+      ]
+    );
+  };
+
+  const pickImageFromCamera = async () => {
+    try {
+      console.log("📷 pickImageFromCamera: Starting image selection");
+      setIsUploadingPhoto(true);
+      setIsImagePickerActive(true);
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Camera permission is required to take photos.');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setSelectedImageUri(result.assets[0].uri);
+        setEditFormData(prev => ({ ...prev, avatar: result.assets[0].uri }));
+        setImageLoadError(false); // Reset error state when new image is selected
+      }
+    } catch (error) {
+      console.error('Error picking image from camera:', error);
+      Alert.alert('Error', 'Failed to take photo. Please try again.');
+    } finally {
+      setIsUploadingPhoto(false);
+      setIsImagePickerActive(false);
+    }
+  };
+
+  const pickImageFromLibrary = async () => {
+    try {
+      console.log("📷 pickImageFromLibrary: Starting image selection");
+      setIsUploadingPhoto(true);
+      setIsImagePickerActive(true);
+      const hasPermission = await requestPermissions();
+      if (!hasPermission) return;
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setSelectedImageUri(result.assets[0].uri);
+        setEditFormData(prev => ({ ...prev, avatar: result.assets[0].uri }));
+        setImageLoadError(false); // Reset error state when new image is selected
+      }
+    } catch (error) {
+      console.error('Error picking image from library:', error);
+      Alert.alert('Error', 'Failed to select photo. Please try again.');
+    } finally {
+      setIsUploadingPhoto(false);
+      setIsImagePickerActive(false);
+    }
+  };
+
+  const removeProfilePhoto = () => {
+    setSelectedImageUri(null);
+    setEditFormData(prev => ({ ...prev, avatar: '' }));
+  };
+
+  const uploadProfilePhoto = async (imageUri: string): Promise<string | null> => {
+    try {
+      setIsUploadingPhoto(true);
+      
+      if (!profileData?.email) {
+        throw new Error('User not authenticated');
+      }
+
+      // Create filename with photo_url folder structure
+      const fileExtension = imageUri.split('.').pop() || 'jpg';
+      const fileName = `photo_url/profile_${profileData.email}_${Date.now()}.${fileExtension}`;
+      
+      // Read the file as ArrayBuffer for React Native
+      const response = await fetch(imageUri);
+      const arrayBuffer = await response.arrayBuffer();
+      
+      // Upload to Supabase storage using ArrayBuffer
+      const { error: uploadError } = await supabase.storage
+        .from('user-profile-pics')
+        .upload(fileName, arrayBuffer, {
+          contentType: `image/${fileExtension}`,
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error('Supabase upload error:', uploadError);
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
+
+      // Get the public URL
+      const { data: urlData } = supabase.storage
+        .from('user-profile-pics')
+        .getPublicUrl(fileName);
+
+      if (!urlData?.publicUrl) {
+        throw new Error('Failed to get public URL');
+      }
+
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error('Error uploading profile photo:', error);
+      Alert.alert('Upload Error', 'Failed to upload profile photo. Please try again.');
+      return null;
+    } finally {
+      setIsUploadingPhoto(false);
+    }
   };
 
   return (
@@ -598,25 +819,83 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
         <ScrollView style={tw`flex-1 p-4`} showsVerticalScrollIndicator={false}>
           <View style={tw`bg-white rounded-lg p-4 mb-4 items-center`}>
             <View style={tw`relative mb-4`}>
-              <Avatar 
-                size="xl" 
-                style={{ 
-                  backgroundColor: '#023D7B'
-                }}
-              >
-                <AvatarFallbackText style={{ color: '#FFFFFF' }}>
-                  {editFormData.name || "User"}
-                </AvatarFallbackText>
-                <AvatarImage 
-                  source={{ uri: editFormData.avatar }} 
-                  alt="Profile"
-                />
-              </Avatar>
+              {(() => {
+                const hasImage = selectedImageUri || (editFormData.avatar && editFormData.avatar.trim());
+                const userName = editFormData.name || "User";
+                const initials = userName.split(' ').map(word => word[0]).join('').slice(0, 2) || "U";
+                
+                console.log("Avatar Debug:", {
+                  hasImage,
+                  selectedImageUri,
+                  avatar: editFormData.avatar,
+                  userName,
+                  initials,
+                  imageLoadError
+                });
+
+                if (hasImage && !imageLoadError) {
+                  return (
+                    <View style={[
+                      tw`w-24 h-24 overflow-hidden rounded-full relative`,
+                      { backgroundColor: '#F3F4F6' }
+                    ]}>
+                      <Image
+                        source={{ 
+                          uri: selectedImageUri || editFormData.avatar
+                        }}
+                        style={tw`w-full h-full`}
+                        resizeMode="cover"
+                        onError={() => {
+                          console.log("Image failed to load, showing initials fallback");
+                          setImageLoadError(true);
+                        }}
+                        onLoad={() => {
+                          setImageLoadError(false);
+                        }}
+                      />
+                      {isUploadingPhoto && (
+                        <View style={[
+                          tw`absolute inset-0 flex items-center justify-center rounded-full`,
+                          { backgroundColor: 'rgba(0,0,0,0.5)' }
+                        ]}>
+                          <ActivityIndicator size="large" color="white" />
+                        </View>
+                      )}
+                    </View>
+                  );
+                } else {
+                  return (
+                    <View style={tw`relative`}>
+                      <View style={[
+                        tw`w-24 h-24 rounded-full items-center justify-center`,
+                        { backgroundColor: '#023D7B' }
+                      ]}>
+                        <Text style={[
+                          tw`text-white text-2xl font-bold`,
+                          { textTransform: 'uppercase' }
+                        ]}>
+                          {initials}
+                        </Text>
+                      </View>
+                      {isUploadingPhoto && (
+                        <View style={[
+                          tw`absolute inset-0 flex items-center justify-center rounded-full`,
+                          { backgroundColor: 'rgba(0,0,0,0.5)' }
+                        ]}>
+                          <ActivityIndicator size="large" color="white" />
+                        </View>
+                      )}
+                    </View>
+                  );
+                }
+              })()}
               <TouchableOpacity
                 style={[
                   tw`absolute -bottom-2 -right-2 w-8 h-8 rounded-full border-2 border-white flex items-center justify-center`,
                   { backgroundColor: Colors.primary.blue },
                 ]}
+                onPress={showImagePickerOptions}
+                disabled={isSaving || isUploadingPhoto}
               >
                 <Camera size={16} color="white" />
               </TouchableOpacity>
@@ -766,6 +1045,54 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                         </Text>
                       </View>
                     )}
+
+                  {/* Custom Specialization Input */}
+                  {showCustomSpecializationInput && (
+                    <View style={tw`p-3 border-t border-gray-200 bg-gray-50`}>
+                      <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>
+                        Enter your specialization:
+                      </Text>
+                      <View style={tw`flex-row items-center`}>
+                        <TextInput
+                          style={tw`flex-1 px-3 py-2 text-base text-gray-900 border border-gray-300 rounded-lg mr-2`}
+                          placeholder="e.g., Environmental Law, Tax Law, etc."
+                          value={customSpecialization}
+                          onChangeText={setCustomSpecialization}
+                          editable={!isSaving}
+                        />
+                        <TouchableOpacity
+                          style={[
+                            tw`px-3 py-2 rounded-lg`,
+                            {
+                              backgroundColor: customSpecialization.trim() 
+                                ? Colors.primary.blue 
+                                : "#9CA3AF"
+                            }
+                          ]}
+                          onPress={addCustomSpecialization}
+                          disabled={!customSpecialization.trim() || isSaving}
+                        >
+                          <Text style={tw`text-white font-medium text-sm`}>Add</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={tw`ml-2 px-3 py-2 rounded-lg border border-gray-300`}
+                          onPress={() => {
+                            setShowCustomSpecializationInput(false);
+                            setCustomSpecialization("");
+                            // Remove "Others" from selection if cancelled
+                            const currentSpecializations = editFormData.specialization || [];
+                            updateFormField(
+                              "specialization",
+                              currentSpecializations.filter(s => s !== "Others")
+                            );
+                          }}
+                          disabled={isSaving}
+                        >
+                          <Text style={tw`text-gray-600 font-medium text-sm`}>Cancel</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
                 </View>
               )}
 
@@ -904,19 +1231,27 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                             showsVerticalScrollIndicator={true}
                             scrollEventThrottle={16}
                           >
-                            {TIME_OPTIONS.map((timeOption) => (
-                              <TouchableOpacity
-                                key={timeOption.value}
-                                style={tw`px-3 py-2 border-b border-gray-100`}
-                                onPress={() =>
-                                  addTimeSlot(day, timeOption.value)
-                                }
-                              >
-                                <Text style={tw`text-sm text-gray-900`}>
-                                  {timeOption.label}
+                            {getAvailableTimeOptions(day).length > 0 ? (
+                              getAvailableTimeOptions(day).map((timeOption) => (
+                                <TouchableOpacity
+                                  key={timeOption.value}
+                                  style={tw`px-3 py-2 border-b border-gray-100`}
+                                  onPress={() =>
+                                    addTimeSlot(day, timeOption.value)
+                                  }
+                                >
+                                  <Text style={tw`text-sm text-gray-900`}>
+                                    {timeOption.label}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))
+                            ) : (
+                              <View style={tw`px-3 py-4`}>
+                                <Text style={tw`text-sm text-gray-500 text-center`}>
+                                  All time slots have been selected
                                 </Text>
-                              </TouchableOpacity>
-                            ))}
+                              </View>
+                            )}
                           </ScrollView>
                         </View>
                       )}

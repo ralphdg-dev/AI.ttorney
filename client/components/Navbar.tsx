@@ -92,6 +92,8 @@ const Navbar: React.FC<NavbarProps> = ({
         router.push('/home');
         break;
       case 'learn':
+        // Both logged-in users and guests go to /glossary
+        // The page shows toggle for logged-in users, no toggle for guests
         console.log('[Navbar] Pushing to /glossary');
         router.push('/glossary');
         break;
@@ -115,6 +117,11 @@ const Navbar: React.FC<NavbarProps> = ({
       isNavigatingRef.current = false;
     }, 500);
   };
+
+  // Slightly reduce bottom safe area on Android to avoid an overly tall navbar
+  const bottomInset = Platform.OS === 'android'
+    ? Math.max(insets.bottom - 8, 0)
+    : insets.bottom;
 
   const tabs = [
     {
@@ -150,7 +157,7 @@ const Navbar: React.FC<NavbarProps> = ({
   ];
 
   return (
-    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
+    <View style={[styles.container, { paddingBottom: bottomInset }]}>
       <View style={styles.navbar}>
         {tabs.map((tab) => {
           const IconComponent = tab.icon;

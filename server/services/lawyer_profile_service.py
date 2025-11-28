@@ -81,6 +81,7 @@ class LawyerProfileService:
         """
         Create or update lawyer profile.
         Handles both lawyer_info and users table updates.
+        Auto-populates roll_number and roll_signing_date from lawyer_applications for new records.
         
         Args:
             user_id: Lawyer user ID
@@ -91,63 +92,104 @@ class LawyerProfileService:
             Dict with success status and data
         """
         try:
-                                      
             hours_available = profile_data.get("hours_available")
             
-                                                                              
-                                                                              
             if hours_available is None:
                 hours_available = {}
             
             logger.info(f"Saving availability for user {user_id}: {hours_available}")
             
-            lawyer_info_data = {
-                "lawyer_id": user_id,
-                "name": profile_data.get("name"),
-                "specialization": profile_data.get("specialization"),
-                "location": profile_data.get("location"),
-                "days": profile_data.get("days"),                                         
-                "hours_available": hours_available,                                
-                "phone_number": profile_data.get("phone_number"),
-                "bio": profile_data.get("bio")
-            }
+            # Ensure specialization is properly formatted as array
+            specialization = profile_data.get("specialization")
+            if isinstance(specialization, str):
+                # If it's a string, split it into an array
+                specialization = [s.strip() for s in specialization.split(",")]
+            elif not isinstance(specialization, list):
+                specialization = []
             
-                                     
+            logger.info(f"Processed specialization: {specialization}")
+            
+            # Check if lawyer_info record exists
             existing = self.supabase.table("lawyer_info")\
                 .select("*")\
                 .eq("lawyer_id", user_id)\
                 .execute()
             
             if existing.data:
-                                         
+                # Record exists - update it
                 old_name = existing.data[0].get('name', '')
                 new_name = profile_data.get("name")
+                
+                lawyer_info_data = {
+                    "name": profile_data.get("name"),
+                    "specialization": specialization,
+                    "location": profile_data.get("location"),
+                    "days": profile_data.get("days"),
+                    "hours_available": hours_available,
+                    "phone_number": profile_data.get("phone_number"),
+                    "bio": profile_data.get("bio"),
+                    "updated_at": "now()"
+                }
                 
                 result = self.supabase.table("lawyer_info")\
                     .update(lawyer_info_data)\
                     .eq("lawyer_id", user_id)\
                     .execute()
                 
-                                                    
+                # Update users table if name changed
                 if old_name != new_name:
                     self.supabase.table("users")\
                         .update({"full_name": new_name})\
                         .eq("id", user_id)\
                         .execute()
             else:
-                                    
+                # Record doesn't exist - create it with data from lawyer_applications
+                logger.info(f"Creating new lawyer_info record for user {user_id}")
+                
+                # Fetch roll_number and roll_signing_date from lawyer_applications
+                professional_result = self.supabase.table("lawyer_applications")\
+                    .select("roll_number, roll_signing_date")\
+                    .eq("user_id", user_id)\
+                    .execute()
+                
+                roll_number = None
+                roll_signing_date = None
+                
+                if professional_result.data:
+                    professional_data = professional_result.data[0]
+                    roll_number = professional_data.get("roll_number")
+                    roll_signing_date = professional_data.get("roll_signing_date")
+                    logger.info(f"Found professional data: roll_number={roll_number}, roll_signing_date={roll_signing_date}")
+                else:
+                    logger.warning(f"No lawyer_applications record found for user {user_id}")
+                
+                lawyer_info_data = {
+                    "lawyer_id": user_id,
+                    "name": profile_data.get("name"),
+                    "specialization": specialization,
+                    "location": profile_data.get("location"),
+                    "days": profile_data.get("days"),
+                    "hours_available": hours_available,
+                    "phone_number": profile_data.get("phone_number"),
+                    "bio": profile_data.get("bio"),
+                    "roll_number": roll_number,
+                    "roll_signing_date": roll_signing_date,
+                    "created_at": "now()",
+                    "updated_at": "now()"
+                }
+                
                 result = self.supabase.table("lawyer_info")\
                     .insert(lawyer_info_data)\
                     .execute()
                 
-                                              
+                # Update users table with name
                 if result.data:
                     self.supabase.table("users")\
                         .update({"full_name": profile_data.get("name")})\
                         .eq("id", user_id)\
                         .execute()
             
-                              
+            # Invalidate cache
             self.invalidate_cache(user_id)
             
             logger.info(f"Profile upserted for lawyer {user_id}")
@@ -159,8 +201,13 @@ class LawyerProfileService:
             }
         
         except Exception as e:
-            logger.error(f"Error upserting lawyer profile: {e}")
-            raise
+            logger.error(f"Error saving profile for user {user_id}: {str(e)}")
+            logger.error(f"Profile data: {profile_data}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Exception details: {repr(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return {"success": False, "error": str(e)}
     
     async def update_accepting_consultations(
         self,
@@ -185,11 +232,32 @@ class LawyerProfileService:
                 .execute()
             
             if not existing.data:
-                                                
+                # No record exists - create one with professional data from lawyer_applications
+                logger.info(f"Creating lawyer_info record for consultation status update: {lawyer_id}")
+                
+                # Fetch roll_number and roll_signing_date from lawyer_applications
+                professional_result = self.supabase.table("lawyer_applications")\
+                    .select("roll_number, roll_signing_date")\
+                    .eq("user_id", lawyer_id)\
+                    .execute()
+                
+                roll_number = None
+                roll_signing_date = None
+                
+                if professional_result.data:
+                    professional_data = professional_result.data[0]
+                    roll_number = professional_data.get("roll_number")
+                    roll_signing_date = professional_data.get("roll_signing_date")
+                    logger.info(f"Auto-populating professional data: roll_number={roll_number}")
+                
                 result = self.supabase.table("lawyer_info")\
                     .insert({
                         "lawyer_id": lawyer_id,
-                        "accepting_consultations": accepting
+                        "accepting_consultations": accepting,
+                        "roll_number": roll_number,
+                        "roll_signing_date": roll_signing_date,
+                        "created_at": "now()",
+                        "updated_at": "now()"
                     })\
                     .execute()
             else:

@@ -76,6 +76,15 @@ export default function GlossaryScreen() {
   const [isSearchingArticles] = useState<boolean>(false);
   const { isBookmarked, toggleBookmark } = useBookmarks();
   
+  // Debug: Log articles state
+  useEffect(() => {
+    console.log('[Glossary] Articles state:', {
+      count: legalArticles.length,
+      loading: articlesLoading,
+      error: articlesError
+    });
+  }, [legalArticles, articlesLoading, articlesError]);
+  
   // Animation and layout
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const flatListRef = useRef<FlatList>(null);
@@ -96,12 +105,16 @@ export default function GlossaryScreen() {
     { id: "guides", label: "Legal Guides" },
   ];
 
-  // Initialize articles display
+  // Initialize articles display - set all articles when they're loaded
   useEffect(() => {
-    if (activeTab === "guides" && legalArticles.length > 0) {
+    console.log('[Glossary] Articles loaded from hook:', legalArticles.length);
+    if (legalArticles.length > 0) {
       setDisplayArticles(legalArticles);
+      console.log('[Glossary] DisplayArticles set to:', legalArticles.length, 'articles');
+    } else {
+      console.log('[Glossary] No articles to display yet');
     }
-  }, [legalArticles, activeTab]);
+  }, [legalArticles]);
 
   // Network check
   useEffect(() => {
@@ -244,18 +257,22 @@ export default function GlossaryScreen() {
   // Articles filter with client-side filtering
   useEffect(() => {
     if (activeTab === "guides") {
+      console.log('[Glossary] Filtering guides - legalArticles count:', legalArticles.length);
       const trimmedQuery = debouncedSearch.trim();
       
       if (trimmedQuery && trimmedQuery.length >= 2) {
         // Client-side search
         const searchResults = searchArticles(trimmedQuery, activeCategory !== "all" ? activeCategory : undefined);
+        console.log('[Glossary] Search results:', searchResults.length);
         setDisplayArticles(searchResults);
       } else {
         // Client-side category filter
         if (activeCategory === "all") {
+          console.log('[Glossary] Showing all articles:', legalArticles.length);
           setDisplayArticles(legalArticles);
         } else {
           const byCat = getArticlesByCategory(activeCategory);
+          console.log('[Glossary] Category filtered articles:', byCat.length);
           setDisplayArticles(byCat);
         }
       }
@@ -320,14 +337,19 @@ export default function GlossaryScreen() {
     await toggleBookmark(item.id, item.title);
   }, [toggleBookmark]);
 
+  // Optimized page change handler with functional state update and no animation
   const handlePageChange = useCallback((page: number) => {
-    setCurrentPage(page);
-    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    // Use functional update pattern for better React performance
+    setCurrentPage(() => page);
+    // Use animated: false for better performance
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+    });
   }, []);
 
   // Render functions
   const renderListHeader = useCallback(() => (
-    <View style={{ marginBottom: isDesktop ? 28 : isTablet ? 24 : 20, paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right }}>
+    <View style={{ marginBottom: isDesktop ? 24 : isTablet ? 20 : 16 }}>
       <HStack className="items-center" style={{ marginBottom: isDesktop ? 16 : 12 }}>
         <Ionicons name="pricetags" size={16} color={Colors.text.sub} />
         <GSText size="sm" className="ml-2 font-semibold text-gray-600">
@@ -339,13 +361,79 @@ export default function GlossaryScreen() {
         onCategoryChange={handleCategoryChange}
       />
     </View>
-  ), [activeCategory, handleCategoryChange, isDesktop, isTablet, insets.top, insets.left, insets.right]);
+  ), [activeCategory, handleCategoryChange, isDesktop, isTablet]);
+
+  // Memoized pagination components for better performance
+  const PageNumber = React.memo(({ page, isActive, onPress }: { page: number, isActive: boolean, onPress: () => void }) => (
+    <TouchableOpacity
+      onPress={onPress}
+      style={{
+        width: 32,
+        height: 32,
+        marginHorizontal: 4,
+        borderRadius: 6,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: isActive ? '#3B82F6' : '#D1D5DB',
+      }}
+    >
+      <GSText
+        style={{
+          fontSize: 12,
+          fontWeight: isActive ? '700' : '400',
+          color: isActive ? '#1E40AF' : '#374151',
+        }}
+      >
+        {page}
+      </GSText>
+    </TouchableOpacity>
+  ));
+
+  const Ellipsis = React.memo(({ index }: { index: number }) => (
+    <View
+      style={{
+        width: 32,
+        height: 32,
+        marginHorizontal: 4,
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}
+    >
+      <GSText style={{ fontSize: 12, color: '#6B7280' }}>...</GSText>
+    </View>
+  ));
+
+  const PaginationButton = React.memo(({ direction, disabled, onPress }: { direction: "back" | "forward", disabled: boolean, onPress: () => void }) => (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      style={{
+        width: 32,
+        height: 32,
+        marginHorizontal: 4,
+        borderRadius: 9999,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: disabled ? 0 : 1,
+        borderColor: '#D1D5DB',
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <Ionicons
+        name={direction === "back" ? "chevron-back" : "chevron-forward"}
+        size={16}
+        color={disabled ? "#9CA3AF" : Colors.primary.blue}
+      />
+    </TouchableOpacity>
+  ));
 
   const renderPaginationControls = useCallback(() => {
     // Show pagination if there are multiple pages
     if (totalPages <= 1) return null;
 
-    const getVisiblePages = () => {
+    // Memoize the visible pages calculation
+    const visiblePages = useMemo(() => {
       if (totalPages <= 4) {
         return Array.from({ length: totalPages }, (_, i) => i + 1);
       }
@@ -359,118 +447,73 @@ export default function GlossaryScreen() {
       }
 
       return [1, "...", currentPage, "...", totalPages];
-    };
+    }, [currentPage, totalPages]);
 
-    const visiblePages = getVisiblePages();
+    // Optimized page change handlers
+    const handlePrevPage = useCallback(() => {
+      if (currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+        // Use animated: false for better performance
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      }
+    }, [currentPage]);
+
+    const handleNextPage = useCallback(() => {
+      if (currentPage < totalPages) {
+        setCurrentPage(prev => prev + 1);
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      }
+    }, [currentPage, totalPages]);
+
+    const handlePageSelect = useCallback((page: number) => {
+      setCurrentPage(page);
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+    }, []);
 
     return (
       <View style={{ 
-        paddingTop: isDesktop ? 32 : isTablet ? 24 : 20,
-        paddingBottom: isDesktop ? 24 : isTablet ? 20 : 16,
+        paddingTop: 12,
+        paddingBottom: 4, // Reduced from 16 to 4
         paddingHorizontal: horizontalPadding,
-        backgroundColor: '#f9fafb',
-        marginTop: 8,
       }}>
-        <View className="flex-col items-center">
-          <View className="flex-row flex-wrap items-center justify-center" style={{ marginBottom: isDesktop ? 16 : 12 }}>
-            <TouchableOpacity
-              onPress={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              style={{
-                width: isDesktop ? 44 : 40,
-                height: isDesktop ? 44 : 40,
-                marginHorizontal: isDesktop ? 6 : 4,
-                marginVertical: 4,
-                borderRadius: 9999,
-                justifyContent: 'center',
-                alignItems: 'center',
-                backgroundColor: currentPage === 1 ? '#E5E7EB' : 'white',
-                borderWidth: currentPage === 1 ? 0 : 1,
-                borderColor: '#D1D5DB',
-                opacity: currentPage === 1 ? 0.5 : 1,
-              }}
-            >
-              <Ionicons
-                name="chevron-back"
-                size={isDesktop ? 20 : 18}
-                color={currentPage === 1 ? "#9CA3AF" : Colors.primary.blue}
-              />
-            </TouchableOpacity>
+        <View style={{ alignItems: 'center' }}>
+          {/* Single row pagination with all elements in one line */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+            {/* Previous button */}
+            <PaginationButton 
+              direction="back" 
+              disabled={currentPage === 1} 
+              onPress={handlePrevPage} 
+            />
 
+            {/* Page numbers */}
             {visiblePages.map((page, index) =>
               page === "..." ? (
-                <View 
-                  key={`ellipsis-${index}`} 
-                  style={{
-                    width: isDesktop ? 44 : 40,
-                    height: isDesktop ? 44 : 40,
-                    marginHorizontal: isDesktop ? 6 : 4,
-                    marginVertical: 4,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}
-                >
-                  <GSText className="text-gray-500" style={{ fontSize: isDesktop ? 16 : 14 }}>...</GSText>
-                </View>
+                <Ellipsis key={`ellipsis-${index}`} index={index} />
               ) : (
-                <TouchableOpacity
-                  key={page}
-                  onPress={() => handlePageChange(page as number)}
-                  style={{
-                    width: isDesktop ? 44 : 40,
-                    height: isDesktop ? 44 : 40,
-                    marginHorizontal: isDesktop ? 6 : 4,
-                    marginVertical: 4,
-                    borderRadius: 8,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    backgroundColor: currentPage === page ? '#DBEAFE' : 'white',
-                    borderWidth: 1,
-                    borderColor: currentPage === page ? '#93C5FD' : '#D1D5DB',
-                  }}
-                >
-                  <GSText
-                    style={{
-                      fontSize: isDesktop ? 15 : 14,
-                      fontWeight: currentPage === page ? '700' : '500',
-                      color: currentPage === page ? '#1E40AF' : '#374151',
-                    }}
-                  >
-                    {page}
-                  </GSText>
-                </TouchableOpacity>
+                <PageNumber 
+                  key={`page-${page}`}
+                  page={page as number} 
+                  isActive={currentPage === page} 
+                  onPress={() => handlePageSelect(page as number)} 
+                />
               )
             )}
 
-            <TouchableOpacity
-              onPress={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              style={{
-                width: isDesktop ? 44 : 40,
-                height: isDesktop ? 44 : 40,
-                marginHorizontal: isDesktop ? 6 : 4,
-                marginVertical: 4,
-                borderRadius: 9999,
-                justifyContent: 'center',
-                alignItems: 'center',
-                backgroundColor: currentPage === totalPages ? '#E5E7EB' : 'white',
-                borderWidth: currentPage === totalPages ? 0 : 1,
-                borderColor: '#D1D5DB',
-                opacity: currentPage === totalPages ? 0.5 : 1,
-              }}
-            >
-              <Ionicons
-                name="chevron-forward"
-                size={isDesktop ? 20 : 18}
-                color={currentPage === totalPages ? "#9CA3AF" : Colors.primary.blue}
-              />
-            </TouchableOpacity>
+            {/* Next button */}
+            <PaginationButton 
+              direction="forward" 
+              disabled={currentPage === totalPages} 
+              onPress={handleNextPage} 
+            />
           </View>
 
+          {/* Results counter - reduced margin */}
           <GSText 
             style={{ 
-              fontSize: isDesktop ? 14 : 13,
+              fontSize: 12,
               color: '#6B7280',
+              marginTop: 4, // Reduced from 8 to 4
             }}
           >
             Showing {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} of {totalCount} results
@@ -478,7 +521,7 @@ export default function GlossaryScreen() {
         </View>
       </View>
     );
-  }, [totalCount, totalPages, currentPage, handlePageChange, isDesktop, isTablet, horizontalPadding]);
+  }, [currentPage, totalPages, totalCount, horizontalPadding]);
 
   const renderEmptyState = useCallback(() => {
     const isLoading = activeTab === "terms" ? termsLoading : (articlesLoading || isSearchingArticles);
@@ -624,7 +667,7 @@ export default function GlossaryScreen() {
           placeholder={`Search ${activeTab === "terms" ? "legal terms" : "articles"}...`}
           loading={termsLoading || articlesLoading}
           showFilterIcon={false}
-          containerClassName="pt-6 pb-4"
+          containerClassName="pt-4 pb-2"
         />
       </View>
 
@@ -641,7 +684,7 @@ export default function GlossaryScreen() {
           ListEmptyComponent={renderEmptyState}
           contentContainerStyle={{
               paddingHorizontal: horizontalPadding,
-              paddingBottom: getContentBottomPadding(insets.bottom, 20),
+              paddingBottom: getContentBottomPadding(insets.bottom, 6), // Reduced from 20 to 6
               paddingTop: isDesktop ? 8 : isTablet ? 6 : 4,
               flexGrow: 1,
           }}

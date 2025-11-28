@@ -261,74 +261,158 @@ async def verify_token(current_user: Dict[str, Any] = Depends(get_current_user))
                
 @router.post("/send-otp", response_model=OTPResponse)
 @rate_limit_auth("10/minute")  # Increased for mobile network variability
-async def send_otp(http_request: Request, request: SendOTPRequest):
+async def send_otp(request: Request, otp_request: SendOTPRequest):
     """Send OTP for email verification or password reset"""
+    logger.info("="*80)
+    logger.info("📨 SEND OTP ENDPOINT CALLED")
+    logger.info("="*80)
     try:
-        logger.info(f"📧 OTP Request - Type: {request.otp_type}, Email: {request.email}")
+        logger.info(f"📧 OTP Request - Type: {otp_request.otp_type}, Email: {otp_request.email}")
+        logger.info(f"📧 OTP Request user_name: '{otp_request.user_name}'")
+        logger.info(f"📧 Request object type: {type(otp_request)}")
+        logger.info(f"📧 Request dict: {otp_request.dict()}")
         
-        if request.otp_type == "email_verification":
-            result = await otp_service.send_verification_otp(request.email, request.user_name)
-        elif request.otp_type == "password_reset":
-                                                                                
+        # Validate user_name parameter for email verification
+        if otp_request.otp_type == "email_verification" and not otp_request.user_name:
+            logger.warning(f"⚠️ Missing user_name for email verification OTP: {otp_request.email}")
+            # Use a default name rather than failing
+            user_name = "User"
+        else:
+            user_name = otp_request.user_name or "User"
+        
+        logger.info(f"🔍 DEBUG: Using user_name: '{user_name}' for email: {otp_request.email}")
+        
+        if otp_request.otp_type == "email_verification":
+            # For email verification, always attempt to send OTP
+            logger.info(f"📤 Sending verification OTP to {otp_request.email} with user_name: {user_name}")
+            result = await otp_service.send_verification_otp(otp_request.email, user_name)
+            logger.info(f"✅ Verification OTP result: {result}")
+        elif otp_request.otp_type == "password_reset":
+            # For password reset, check if user exists first
             supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
-            user_check = supabase.table('users').select('id, full_name').eq('email', request.email).execute()
-            logger.info(f" Password reset OTP request for email: {request.email}")
-            logger.info(f" User check result: {user_check.data}")
+            user_check = supabase.table('users').select('id, full_name').eq('email', otp_request.email).execute()
+            logger.info(f"Password reset OTP request for email: {otp_request.email}")
+            logger.info(f"User check result: {user_check.data}")
             
             if not user_check.data or len(user_check.data) == 0:
-                                                                                  
+                # Return success without sending OTP for security - OTPResponse model
+                logger.info("✅ Returning password reset response (no user found)")
                 return OTPResponse(
                     success=True,
                     message="If the email exists, a reset code has been sent.",
                     expires_in_minutes=10
                 )
             
-                                   
-            user_name = user_check.data[0].get('full_name', request.user_name or 'User')
-            result = await otp_service.send_password_reset_otp(request.email, user_name)
+            # Use provided name or fall back to database name or default
+            user_name = user_check.data[0].get('full_name', user_name)
+            result = await otp_service.send_password_reset_otp(otp_request.email, user_name)
+            logger.info(f"🔍 DEBUG: Password reset OTP result: {result}")
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid OTP type"
             )
         
-        logger.info(f"📧 OTP Service Result - Success: {result.get('success')}, Error: {result.get('error')}")
+        logger.info("="*80)
+        logger.info("📊 OTP SERVICE RESULT PROCESSING")
+        logger.info("="*80)
+        logger.info(f"📊 Result type: {type(result)}")
+        logger.info(f"📊 Result is dict: {isinstance(result, dict)}")
+        logger.info(f"📊 Result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
+        logger.info(f"📊 Result success: {result.get('success', False)}")
+        logger.info(f"📊 Result message: {result.get('message', 'N/A')}")
+        logger.info(f"📊 Result error: {result.get('error', 'None')}")
+        logger.info(f"📊 Result expires_in_minutes: {result.get('expires_in_minutes', 'N/A')}")
         
-        if not result["success"]:
-            logger.error(f"❌ OTP sending failed: {result['error']}")
+        if not isinstance(result, dict):
+            logger.error(f"❌ CRITICAL: Result is not a dict! Type: {type(result)}")
+            logger.error(f"❌ Result content: {result}")
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=result["error"]
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Internal error processing OTP result"
             )
         
-        logger.info(f"✅ OTP sent successfully to {request.email}")
-        return OTPResponse(
-            success=True,
-            message=result["message"],
-            expires_in_minutes=result.get("expires_in_minutes")
-        )
+        if not result.get("success", False):
+            logger.error(f"❌ OTP sending failed: {result.get('error', 'Unknown error')}")
+            # Return a more user-friendly error message
+            error_message = "Failed to send verification code. Please try again."
+            if result.get('error', '') and "SMTP" in result.get('error', ''):
+                error_message = "Email service temporarily unavailable. Please try again later."
+            
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_message
+            )
         
-    except HTTPException:
+        logger.info(f"✅ OTP sent successfully to {otp_request.email}")
+        logger.info("="*80)
+        logger.info("🔧 CONSTRUCTING RESPONSE")
+        logger.info("="*80)
+        
+        # Safely construct the response with defaults if fields are missing
+        try:
+            message = result.get("message", "Verification code sent successfully")
+            expires_in_minutes = result.get("expires_in_minutes", 2)
+            
+            # Ensure expires_in_minutes is an integer
+            if expires_in_minutes is not None:
+                expires_in_minutes = int(expires_in_minutes)
+            
+            logger.info(f"📋 Constructing response - message: '{message}', expires_in_minutes: {expires_in_minutes} (type: {type(expires_in_minutes)})")
+            
+            # Return OTPResponse model for proper serialization
+            response_obj = OTPResponse(
+                success=True,
+                message=str(message),
+                expires_in_minutes=int(expires_in_minutes) if expires_in_minutes is not None else 2
+            )
+            
+            logger.info(f"✅ About to return response: success={response_obj.success}, message={response_obj.message}, expires={response_obj.expires_in_minutes}")
+            return response_obj
+            
+        except Exception as response_error:
+            logger.error(f"❌ Error constructing OTP response: {str(response_error)}")
+            logger.error(f"❌ Response construction error type: {type(response_error).__name__}")
+            import traceback
+            logger.error(f"❌ Response construction traceback: {traceback.format_exc()}")
+            logger.error(f"❌ Result that caused error: {result}")
+            
+            # Fallback to a minimal valid response - OTPResponse model
+            logger.info("✅ Using fallback response")
+            return OTPResponse(
+                success=True,
+                message="Verification code sent successfully",
+                expires_in_minutes=2
+            )
+        
+    except HTTPException as http_exc:
+        logger.error(f"🔴 HTTPException in send_otp: {http_exc.detail}")
         raise
     except Exception as e:
-        logger.error(f"❌ Send OTP error: {str(e)}")
-        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"❌❌❌ CRITICAL: Unexpected error in send_otp")
+        logger.error(f"❌ Error message: {str(e)}")
+        logger.error(f"❌ Error type: {type(e).__name__}")
         import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
+        logger.error(f"❌ Full traceback:\n{traceback.format_exc()}")
+        logger.error(f"❌ Request details - Email: {otp_request.email}, Type: {otp_request.otp_type}, User: {otp_request.user_name}")
+        
+        # Return detailed error for debugging
+        error_detail = f"Failed to process OTP request: {type(e).__name__}: {str(e)}"
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to send OTP: {str(e)}"
+            detail=error_detail
         )
 
 
 
 @router.post("/verify-reset-otp")
 @rate_limit_auth("10/minute")
-async def verify_reset_otp(http_request: Request, request: Dict[str, str] = Body(...)):
+async def verify_reset_otp(request: Request, body: Dict[str, str] = Body(...)):
     """Verify OTP for password reset and issue JWT token"""
     try:
-        email = request.get("email")
-        otp_code = request.get("otpCode")
+        email = body.get("email")
+        otp_code = body.get("otpCode")
         
         logger.info(f" DEBUG: Received OTP verification request")
         logger.info(f" DEBUG: Email: {email}")
@@ -553,39 +637,82 @@ async def reset_password_with_token(request: Dict[str, str] = Body(...)):
 
 @router.post("/verify-otp", response_model=OTPResponse)
 @rate_limit_auth("10/minute")
-async def verify_otp(http_request: Request, request: VerifyOTPRequest):
+async def verify_otp(request: Request, verify_request: VerifyOTPRequest):
     """Verify OTP code"""
     try:
-                                                                   
-        if request.otp_type == "password_reset":
+        logger.info(f"🔍 Verifying OTP - Type: {verify_request.otp_type}, Email: {verify_request.email}")
+        
+        # For password reset, verify user exists first
+        if verify_request.otp_type == "password_reset":
             supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
-            user_check = supabase.table('users').select('id').eq('email', request.email).execute()
-            logger.info(f" DEBUG: User existence check for password reset OTP - email: {request.email}")
-            logger.info(f" DEBUG: User check result: {user_check.data}")
+            user_check = supabase.table('users').select('id').eq('email', verify_request.email).execute()
+            logger.info(f"User existence check for password reset OTP - email: {verify_request.email}")
+            logger.info(f"User check result: {user_check.data}")
             
             if not user_check.data or len(user_check.data) == 0:
-                logger.warning(f" DEBUG: Password reset OTP verification attempted for non-existent user: {request.email}")
+                logger.warning(f"Password reset OTP verification attempted for non-existent user: {verify_request.email}")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Invalid email or OTP code"
                 )
         
+        # For email verification, check if the user exists in Supabase
+        if verify_request.otp_type == "email_verification":
+            try:
+                supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+                user_check = supabase.table('users').select('id, is_verified').eq('email', verify_request.email).execute()
+                logger.info(f"User existence check for email verification - email: {verify_request.email}")
+                
+                if not user_check.data or len(user_check.data) == 0:
+                    logger.warning(f"Email verification attempted for non-existent user: {verify_request.email}")
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="User not found. Please register first."
+                    )
+                
+                # Check if user is already verified
+                if user_check.data[0].get('is_verified'):
+                    logger.info(f"User already verified: {verify_request.email}")
+                    return OTPResponse(
+                        success=True,
+                        message="Email already verified"
+                    )
+            except Exception as user_check_error:
+                logger.error(f"Error checking user existence: {str(user_check_error)}")
+                # Continue with verification - don't block the flow if this check fails
+        
+        # Verify the OTP
         result = await otp_service.verify_otp(
-            request.email,
-            request.otp_code,
-            request.otp_type
+            verify_request.email,
+            verify_request.otp_code,
+            verify_request.otp_type
         )
         
         if not result["success"]:
+            error_detail = result["error"]
+            # Include additional fields if available
+            error_response = {"detail": error_detail}
+            if "locked_out" in result:
+                error_response["locked_out"] = result["locked_out"]
+            if "retry_after" in result:
+                error_response["retry_after"] = result["retry_after"]
+            if "attempts_remaining" in result:
+                error_response["attempts_remaining"] = result["attempts_remaining"]
+                
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=result["error"]
+                detail=error_response
             )
         
-                                                                      
-        if request.otp_type == "email_verification":
-                                                     
-            await auth_service.mark_user_verified(request.email)
+        # For email verification, mark the user as verified
+        if verify_request.otp_type == "email_verification":
+            try:
+                logger.info(f"Marking user as verified: {verify_request.email}")
+                await auth_service.mark_user_verified(verify_request.email)
+                logger.info(f"✅ User successfully verified: {verify_request.email}")
+            except Exception as verify_error:
+                logger.error(f"Error marking user as verified: {str(verify_error)}")
+                # Return success anyway - the client will handle auto-login
         
         return OTPResponse(
             success=True,
@@ -596,9 +723,13 @@ async def verify_otp(http_request: Request, request: VerifyOTPRequest):
         raise
     except Exception as e:
         logger.error(f"Verify OTP error: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to verify OTP"
+            detail="Failed to verify OTP. Please try again later."
         )
 
 class RoleSelectionRequest(BaseModel):
