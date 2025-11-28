@@ -11,6 +11,7 @@ import {
   Image,
   ActivityIndicator,
 } from "react-native";
+import { supabase } from "../../../lib/supabase";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Camera,
@@ -80,7 +81,6 @@ const LAW_SPECIALIZATIONS = [
   "Criminal Law",
   "Consumer Law",
   "Labor Law",
-  "Others",
 ];
 
 const EditProfileModal: React.FC<EditProfileModalProps> = ({
@@ -107,8 +107,10 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [, setLocalAvailabilitySlots] = React.useState<TimeSlot[]>(availabilitySlots);
   const [customSpecialization, setCustomSpecialization] = React.useState("");
   const [showCustomSpecializationInput, setShowCustomSpecializationInput] = React.useState(false);
+  const [isImagePickerActive, setIsImagePickerActive] = React.useState(false);
   const [selectedImageUri, setSelectedImageUri] = React.useState<string | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = React.useState(false);
+  const [imageLoadError, setImageLoadError] = React.useState(false);
 
   const [selectedDays, setSelectedDays] = React.useState<string[]>([]);
   const [dayTimeSlots, setDayTimeSlots] = React.useState<
@@ -119,6 +121,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   >({});
 
   React.useEffect(() => {
+    console.log("🔄 useEffect: Initializing form data from profileData, isImagePickerActive:", isImagePickerActive);
+    // Don't reset form data if image picker is active (prevents data loss during photo selection)
+    if (isImagePickerActive) {
+      console.log("⏸️ Skipping form reset - image picker is active");
+      return;
+    }
     setEditFormData(profileData);
     setValidationErrors({});
 
@@ -349,6 +357,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const addCustomSpecialization = () => {
     if (customSpecialization.trim()) {
       const currentSpecializations = editFormData.specialization || [];
+      
       // Replace "Others" with the actual custom specialization
       const updatedSpecializations = currentSpecializations
         .filter(s => s !== "Others")
@@ -399,8 +408,13 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
       // Allow custom specializations when "Others" was selected and replaced with custom text
       const invalidSpecializations = editFormData.specialization.filter(
         (spec) => {
-          // Allow if it's in the predefined list OR if it's a custom specialization (not empty string)
-          return !LAW_SPECIALIZATIONS.includes(spec) && spec.trim() !== "";
+          // Valid if: in predefined list OR is custom text (non-empty) OR is "Others" (temporarily allowed)
+          const isValid = LAW_SPECIALIZATIONS.includes(spec) || 
+                          (spec.trim() !== "") || 
+                          spec === "Others";
+          
+          // Return true for invalid specializations (only empty strings that aren't "Others")
+          return !isValid;
         }
       );
       if (invalidSpecializations.length > 0) {
@@ -489,11 +503,44 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const confirmSave = async () => {
     setIsSaving(true);
     try {
+      let profilePhotoUrl = profileData.avatar;
+
+      // Upload photo if a new one was selected
+      if (selectedImageUri) {
+        try {
+          const uploadedUrl = await uploadProfilePhoto(selectedImageUri);
+          if (uploadedUrl) {
+            profilePhotoUrl = uploadedUrl;
+            
+            // Update users table with new profile photo
+            const { error: userUpdateError } = await supabase
+              .from('users')
+              .update({ 
+                profile_photo: uploadedUrl,
+                photo_url: uploadedUrl // Update both fields for compatibility
+              })
+              .eq('email', profileData.email);
+
+            if (userUpdateError) {
+              console.error('Error updating user profile photo:', userUpdateError);
+              throw new Error('Failed to update profile photo');
+            }
+          }
+        } catch (photoError) {
+          console.error('Photo upload failed:', photoError);
+          Alert.alert('Error', 'Failed to upload profile photo. Please try again.');
+          setIsSaving(false);
+          return;
+        }
+      }
+
       const formattedDays = selectedDays.join(", ");
       const hoursAvailableJsonb = formatHoursAvailable();
 
+      // Don't send avatar to lawyer profile service since it's saved in users table
       const updatedFormData = {
         ...editFormData,
+        avatar: '', // Clear avatar since it's handled separately
         days: formattedDays,
         hours_available: hoursAvailableJsonb, // JSONB format
       };
@@ -567,14 +614,14 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   };
 
   const filterSpecializations = (query: string) => {
-    return LAW_SPECIALIZATIONS.filter((spec) =>
+    return [...LAW_SPECIALIZATIONS, "Others"].filter((spec) =>
       spec.toLowerCase().includes(query.toLowerCase())
     );
   };
 
   const filteredSpecializations = searchQuery
     ? filterSpecializations(searchQuery)
-    : LAW_SPECIALIZATIONS;
+    : [...LAW_SPECIALIZATIONS, "Others"];
 
   const getSelectedSpecializationsText = () => {
     const selected = editFormData.specialization || [];
@@ -623,7 +670,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
   const pickImageFromCamera = async () => {
     try {
+      console.log("📷 pickImageFromCamera: Starting image selection");
       setIsUploadingPhoto(true);
+      setIsImagePickerActive(true);
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission Required', 'Camera permission is required to take photos.');
@@ -640,18 +689,22 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
       if (!result.canceled && result.assets[0]) {
         setSelectedImageUri(result.assets[0].uri);
         setEditFormData(prev => ({ ...prev, avatar: result.assets[0].uri }));
+        setImageLoadError(false); // Reset error state when new image is selected
       }
     } catch (error) {
       console.error('Error picking image from camera:', error);
       Alert.alert('Error', 'Failed to take photo. Please try again.');
     } finally {
       setIsUploadingPhoto(false);
+      setIsImagePickerActive(false);
     }
   };
 
   const pickImageFromLibrary = async () => {
     try {
+      console.log("📷 pickImageFromLibrary: Starting image selection");
       setIsUploadingPhoto(true);
+      setIsImagePickerActive(true);
       const hasPermission = await requestPermissions();
       if (!hasPermission) return;
 
@@ -665,18 +718,68 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
       if (!result.canceled && result.assets[0]) {
         setSelectedImageUri(result.assets[0].uri);
         setEditFormData(prev => ({ ...prev, avatar: result.assets[0].uri }));
+        setImageLoadError(false); // Reset error state when new image is selected
       }
     } catch (error) {
       console.error('Error picking image from library:', error);
       Alert.alert('Error', 'Failed to select photo. Please try again.');
     } finally {
       setIsUploadingPhoto(false);
+      setIsImagePickerActive(false);
     }
   };
 
   const removeProfilePhoto = () => {
     setSelectedImageUri(null);
     setEditFormData(prev => ({ ...prev, avatar: '' }));
+  };
+
+  const uploadProfilePhoto = async (imageUri: string): Promise<string | null> => {
+    try {
+      setIsUploadingPhoto(true);
+      
+      if (!profileData?.email) {
+        throw new Error('User not authenticated');
+      }
+
+      // Create filename with photo_url folder structure
+      const fileExtension = imageUri.split('.').pop() || 'jpg';
+      const fileName = `photo_url/profile_${profileData.email}_${Date.now()}.${fileExtension}`;
+      
+      // Read the file as ArrayBuffer for React Native
+      const response = await fetch(imageUri);
+      const arrayBuffer = await response.arrayBuffer();
+      
+      // Upload to Supabase storage using ArrayBuffer
+      const { error: uploadError } = await supabase.storage
+        .from('user-profile-pics')
+        .upload(fileName, arrayBuffer, {
+          contentType: `image/${fileExtension}`,
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error('Supabase upload error:', uploadError);
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
+
+      // Get the public URL
+      const { data: urlData } = supabase.storage
+        .from('user-profile-pics')
+        .getPublicUrl(fileName);
+
+      if (!urlData?.publicUrl) {
+        throw new Error('Failed to get public URL');
+      }
+
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error('Error uploading profile photo:', error);
+      Alert.alert('Upload Error', 'Failed to upload profile photo. Please try again.');
+      return null;
+    } finally {
+      setIsUploadingPhoto(false);
+    }
   };
 
   return (
@@ -711,49 +814,76 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
         <ScrollView style={tw`flex-1 p-4`} showsVerticalScrollIndicator={false}>
           <View style={tw`bg-white rounded-lg p-4 mb-4 items-center`}>
             <View style={tw`relative mb-4`}>
-              {(selectedImageUri || editFormData.avatar) ? (
-                <View style={[
-                  tw`w-24 h-24 overflow-hidden rounded-full relative`,
-                  { backgroundColor: '#F3F4F6' }
-                ]}>
-                  <Image
-                    source={{ 
-                      uri: selectedImageUri || editFormData.avatar
-                    }}
-                    style={tw`w-full h-full`}
-                    resizeMode="cover"
-                  />
-                  {isUploadingPhoto && (
+              {(() => {
+                const hasImage = selectedImageUri || (editFormData.avatar && editFormData.avatar.trim());
+                const userName = editFormData.name || "User";
+                const initials = userName.split(' ').map(word => word[0]).join('').slice(0, 2) || "U";
+                
+                console.log("Avatar Debug:", {
+                  hasImage,
+                  selectedImageUri,
+                  avatar: editFormData.avatar,
+                  userName,
+                  initials,
+                  imageLoadError
+                });
+
+                if (hasImage && !imageLoadError) {
+                  return (
                     <View style={[
-                      tw`absolute inset-0 flex items-center justify-center rounded-full`,
-                      { backgroundColor: 'rgba(0,0,0,0.5)' }
+                      tw`w-24 h-24 overflow-hidden rounded-full relative`,
+                      { backgroundColor: '#F3F4F6' }
                     ]}>
-                      <ActivityIndicator size="large" color="white" />
+                      <Image
+                        source={{ 
+                          uri: selectedImageUri || editFormData.avatar
+                        }}
+                        style={tw`w-full h-full`}
+                        resizeMode="cover"
+                        onError={() => {
+                          console.log("Image failed to load, showing initials fallback");
+                          setImageLoadError(true);
+                        }}
+                        onLoad={() => {
+                          setImageLoadError(false);
+                        }}
+                      />
+                      {isUploadingPhoto && (
+                        <View style={[
+                          tw`absolute inset-0 flex items-center justify-center rounded-full`,
+                          { backgroundColor: 'rgba(0,0,0,0.5)' }
+                        ]}>
+                          <ActivityIndicator size="large" color="white" />
+                        </View>
+                      )}
                     </View>
-                  )}
-                </View>
-              ) : (
-                <View style={tw`relative`}>
-                  <Avatar 
-                    size="xl" 
-                    style={{ 
-                      backgroundColor: '#023D7B'
-                    }}
-                  >
-                    <AvatarFallbackText style={{ color: '#FFFFFF' }}>
-                      {editFormData.name || "User"}
-                    </AvatarFallbackText>
-                  </Avatar>
-                  {isUploadingPhoto && (
-                    <View style={[
-                      tw`absolute inset-0 flex items-center justify-center rounded-full`,
-                      { backgroundColor: 'rgba(0,0,0,0.5)' }
-                    ]}>
-                      <ActivityIndicator size="large" color="white" />
+                  );
+                } else {
+                  return (
+                    <View style={tw`relative`}>
+                      <View style={[
+                        tw`w-24 h-24 rounded-full items-center justify-center`,
+                        { backgroundColor: '#023D7B' }
+                      ]}>
+                        <Text style={[
+                          tw`text-white text-2xl font-bold`,
+                          { textTransform: 'uppercase' }
+                        ]}>
+                          {initials}
+                        </Text>
+                      </View>
+                      {isUploadingPhoto && (
+                        <View style={[
+                          tw`absolute inset-0 flex items-center justify-center rounded-full`,
+                          { backgroundColor: 'rgba(0,0,0,0.5)' }
+                        ]}>
+                          <ActivityIndicator size="large" color="white" />
+                        </View>
+                      )}
                     </View>
-                  )}
-                </View>
-              )}
+                  );
+                }
+              })()}
               <TouchableOpacity
                 style={[
                   tw`absolute -bottom-2 -right-2 w-8 h-8 rounded-full border-2 border-white flex items-center justify-center`,

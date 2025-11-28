@@ -128,7 +128,6 @@ class LawyerProfileService:
                     "hours_available": hours_available,
                     "phone_number": profile_data.get("phone_number"),
                     "bio": profile_data.get("bio"),
-                    "avatar": profile_data.get("avatar"),
                     "updated_at": "now()"
                 }
                 
@@ -173,7 +172,6 @@ class LawyerProfileService:
                     "hours_available": hours_available,
                     "phone_number": profile_data.get("phone_number"),
                     "bio": profile_data.get("bio"),
-                    "avatar": profile_data.get("avatar"),
                     "roll_number": roll_number,
                     "roll_signing_date": roll_signing_date,
                     "created_at": "now()",
@@ -203,11 +201,13 @@ class LawyerProfileService:
             }
         
         except Exception as e:
-            logger.error(f"Error upserting lawyer profile: {e}")
-            logger.error(f"Profile data received: {profile_data}")
-            logger.error(f"Exception type: {type(e)}")
-            logger.error(f"Exception details: {str(e)}")
-            raise
+            logger.error(f"Error saving profile for user {user_id}: {str(e)}")
+            logger.error(f"Profile data: {profile_data}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Exception details: {repr(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return {"success": False, "error": str(e)}
     
     async def update_accepting_consultations(
         self,
