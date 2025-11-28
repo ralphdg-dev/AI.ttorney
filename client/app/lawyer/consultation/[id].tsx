@@ -53,15 +53,25 @@ const ConsultationDetailPage: React.FC = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [actionType, setActionType] = useState<'accept' | 'reject' | 'complete' | null>(null);
 
+  // Extract consultation ID safely
+  const consultationId = Array.isArray(id) ? id[0] : id;
+
+  // Redirect if no consultation ID
+  if (!consultationId) {
+    console.error('❌ No consultation ID provided');
+    router.back();
+    return null;
+  }
+
   // Fetch consultation details
   const fetchConsultationDetails = useCallback(async () => {
-    if (!id || !session?.access_token) return;
+    if (!consultationId || !session?.access_token) return;
 
     try {
       setLoading(true);
       const apiUrl = await NetworkConfig.getBestApiUrl();
       const response = await fetch(
-        `${apiUrl}/api/consult-actions/${id}`,
+        `${apiUrl}/api/consult-actions/${consultationId}`,
         {
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
@@ -115,13 +125,13 @@ const ConsultationDetailPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [id, session?.access_token, router, pathname, isAuthenticated, user?.role]);
+  }, [consultationId, session?.access_token, router, pathname, isAuthenticated, user?.role]);
 
   useEffect(() => {
-    if (id && session?.access_token) {
+    if (consultationId && session?.access_token) {
       fetchConsultationDetails();
     }
-  }, [id, session?.access_token, fetchConsultationDetails]);
+  }, [consultationId, session?.access_token, fetchConsultationDetails]);
 
   const formatTimeAgo = (timestamp: string) => {
     if (!timestamp) return 'Unknown time';
