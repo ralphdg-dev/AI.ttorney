@@ -137,90 +137,118 @@ const RegisteredOnboardingOverlay: React.FC = () => {
   useEffect(() => {
     if (!visible) return;
 
-    const step = steps[currentStep];
-    let spotlight;
+    let cancelled = false;
 
-    switch (step.position) {
-      case 'bottom': {
-        // Align spotlight with the actual bottom navbar used in Navbar.tsx.
-        // Navbar height comes from LAYOUT.NAVBAR_HEIGHT and the container adds
-        // bottom safe-area padding. The visible icon row sits just above the
-        // safe area.
-        const navRowHeight = LAYOUT.NAVBAR_HEIGHT;
-        const navRowTop = screenHeight - insets.bottom - navRowHeight;
-        const navRowBottom = screenHeight - insets.bottom;
+    const computeSpotlight = () => {
+      if (cancelled) return;
 
-        if (step.id === 'chat') {
-          // Focus spotlight on the Ask AI tab (center tab in a 5-tab navbar).
-          const tabCount = 5;
-          const askTabIndex = 2; // 0=Home,1=Learn,2=Ask AI,3=Legal Help,4=Profile
-          const tabWidth = screenWidth / tabCount;
+      const layout = (global as any).registeredOnboardingLayout || {};
+      const navRowLayout = layout.navRow;
+      const askTabLayout = layout.askTab;
 
-          const targetWidth = tabWidth * 0.9;
-          const x = tabWidth * askTabIndex + (tabWidth - targetWidth) / 2;
-          const targetHeight = navRowHeight * 0.9;
-          const y = navRowTop + (navRowHeight - targetHeight) / 2;
+      const step = steps[currentStep];
+      let spotlight;
 
-          spotlight = {
-            x,
-            y,
-            width: targetWidth,
-            height: targetHeight,
-          };
-        } else if (step.id === 'nav') {
-          // First slide: highlight the full navbar icon row, not the OS home bar.
-          const horizontalInset = 8;
-          const paddingVertical = 4;
-          const y = navRowTop - paddingVertical;
-          const height = navRowHeight + paddingVertical * 2;
+      switch (step.position) {
+        case 'bottom': {
+          // Prefer real measured layouts from Navbar when available
+          if (step.id === 'chat' && askTabLayout) {
+            const padding = 6;
+            spotlight = {
+              x: askTabLayout.x - padding,
+              y: askTabLayout.y - padding,
+              width: askTabLayout.width + padding * 2,
+              height: askTabLayout.height + padding * 2,
+            };
+          } else if (step.id === 'nav' && navRowLayout) {
+            const paddingX = 8;
+            const paddingY = 4;
+            spotlight = {
+              x: navRowLayout.x + paddingX,
+              y: navRowLayout.y - paddingY,
+              width: navRowLayout.width - paddingX * 2,
+              height: navRowLayout.height + paddingY * 2,
+            };
+          } else {
+            // Fallback to layout-constant math based on safe area
+            const navRowHeight = LAYOUT.NAVBAR_HEIGHT;
+            const navRowTop = screenHeight - insets.bottom - navRowHeight;
+            const navRowBottom = screenHeight - insets.bottom;
 
-          spotlight = {
-            x: horizontalInset,
-            y,
-            width: screenWidth - horizontalInset * 2,
-            height,
-          };
-        } else {
-          // Default: cover the entire navbar area including safe-area padding.
-          const horizontalInset = 8;
-          const y = navRowTop;
-          const height = navRowBottom - navRowTop + insets.bottom;
-
-          spotlight = {
-            x: horizontalInset,
-            y,
-            width: screenWidth - horizontalInset * 2,
-            height,
-          };
+            if (step.id === 'chat') {
+              const tabCount = 5;
+              const askTabIndex = 2;
+              const tabWidth = screenWidth / tabCount;
+              const targetWidth = tabWidth * 0.9;
+              const x = tabWidth * askTabIndex + (tabWidth - targetWidth) / 2;
+              const targetHeight = navRowHeight * 0.9;
+              const y = navRowTop + (navRowHeight - targetHeight) / 2;
+              spotlight = { x, y, width: targetWidth, height: targetHeight };
+            } else if (step.id === 'nav') {
+              const horizontalInset = 8;
+              const paddingVertical = 4;
+              const y = navRowTop - paddingVertical;
+              const height = navRowHeight + paddingVertical * 2;
+              spotlight = {
+                x: horizontalInset,
+                y,
+                width: screenWidth - horizontalInset * 2,
+                height,
+              };
+            } else {
+              const horizontalInset = 8;
+              const y = navRowTop;
+              const height = navRowBottom - navRowTop + insets.bottom;
+              spotlight = {
+                x: horizontalInset,
+                y,
+                width: screenWidth - horizontalInset * 2,
+                height,
+              };
+            }
+          }
+          break;
         }
-        break;
+        case 'top':
+          // Header tools (menu, logo, search, notifications) with rounded corners
+          spotlight = {
+            x: 12,
+            y: insets.top,
+            width: screenWidth - 24,
+            height: 64,
+          };
+          break;
+        case 'middle':
+        default:
+          // Position spotlight to cover stats cards + consultation calendar
+          const headerHeight = 64 + insets.top; // Header + status bar
+          const welcomeSectionHeight = 120; // Welcome text section
+          const startY = headerHeight + welcomeSectionHeight;
+          
+          spotlight = {
+            x: 16,
+            y: startY * 1.6,
+            width: screenWidth - 32,
+            height: 300, // Tall enough to cover stats cards + calendar
+          };
+          break;
       }
-      case 'top':
-        // Header tools (menu, logo, search, notifications) with rounded corners
-        spotlight = {
-          x: 12,
-          y: insets.top,
-          width: screenWidth - 24,
-          height: 64,
-        };
-        break;
-      case 'middle':
-      default:
-        // Position spotlight to cover stats cards + consultation calendar
-        const headerHeight = 64 + insets.top; // Header + status bar
-        const welcomeSectionHeight = 120; // Welcome text section
-        const startY = headerHeight + welcomeSectionHeight;
-        
-        spotlight = {
-          x: 16,
-          y: startY * 1.6,
-          width: screenWidth - 32,
-          height: 300, // Tall enough to cover stats cards + calendar
-        };
-        break;
-    }
 
-    setSpotlightPosition(spotlight);
+      if (!cancelled && spotlight) {
+        setSpotlightPosition(spotlight);
+      }
+    };
+
+    // Initial compute using whatever layout data is available
+    computeSpotlight();
+
+    // Re-run shortly after mount to pick up async measurements from Navbar
+    const timer = setTimeout(computeSpotlight, 400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [visible, currentStep, steps, insets]);
 
   const handleComplete = async () => {

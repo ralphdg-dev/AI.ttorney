@@ -854,8 +854,11 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
             // Close any open menus when scrolling
             setOpenMenuPostId(null);
 
-            // Proactively trigger load more when the user is near the bottom
-            const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+            // Proactively trigger load more when the user is near the bottom.
+            // Clamp distanceFromBottom to avoid negative values from overscroll
+            // on some devices which can make it feel like the page "breaks".
+            const rawDistance = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+            const distanceFromBottom = Math.max(0, rawDistance);
             if (distanceFromBottom < 300) {
               handleLoadMore();
             }
@@ -870,6 +873,8 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
           // Start fetching the next page when the user is a bit further
           // from the end so new posts arrive more seamlessly.
           onEndReachedThreshold={0.6}
+          bounces={false}
+          overScrollMode="never"
           scrollEnabled={allPosts.length > 0 || initialLoading}
           removeClippedSubviews={true}
           maxToRenderPerBatch={10}
