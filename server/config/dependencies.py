@@ -11,8 +11,12 @@ security = HTTPBearer()
 
                        
 def get_supabase():
+    """
+    Get Supabase client with SERVICE_ROLE_KEY for backend operations.
+    This bypasses RLS policies and allows backend to manage data.
+    """
     supabase_url = os.getenv("SUPABASE_URL")
-    supabase_key = os.getenv("SUPABASE_ANON_KEY")
+    supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
     
     if not supabase_url or not supabase_key:
         raise ValueError("Missing Supabase configuration")
@@ -44,3 +48,11 @@ async def get_current_user(
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+async def get_current_user_dict(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    supabase = Depends(get_supabase)
+):
+    """Same as get_current_user but returns dict format for compatibility"""
+    return await get_current_user(credentials, supabase)
