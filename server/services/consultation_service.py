@@ -61,6 +61,22 @@ class ConsultationService:
     """
     Service layer for consultation operations.
     Handles business logic, validation, and database operations.
+    
+    CRITICAL ID RELATIONSHIPS:
+    ==========================
+    - consultation_requests.user_id → users.id (User who books)
+    - consultation_requests.lawyer_id → lawyer_info.id (Lawyer profile PRIMARY KEY, NOT users.id)
+    - lawyer_info.id → Primary key of lawyer profile
+    - lawyer_info.lawyer_id → users.id (Foreign key to user account)
+    
+    NOTIFICATION FLOW:
+    ==================
+    When sending notifications:
+    1. consultation_requests.lawyer_id = lawyer_info.id (for database queries)
+    2. lawyer_info.lawyer_id = users.id (for sending notifications to user account)
+    
+    Always use lawyer_info.id when storing/querying consultation_requests table.
+    Always use lawyer_info.lawyer_id (users.id) when sending notifications.
     """
     
     def __init__(self, supabase: Client):
@@ -139,6 +155,16 @@ class ConsultationService:
         """
         Create a new consultation request with comprehensive validation.
         
+        Args:
+            user_id: User UUID from users.id
+            lawyer_id: Lawyer Profile UUID from lawyer_info.id (NOT users.id)
+            message: Consultation message/concern
+            email: User email
+            mobile_number: User mobile number
+            consultation_date: Date in YYYY-MM-DD format
+            consultation_time: Time in HH:MM format (24-hour)
+            consultation_mode: 'online', 'onsite', or 'phone'
+        
         Validates:
         - Date is in the future (not today, must be at least tomorrow)
         - Time format is valid (HH:MM, 24-hour)
@@ -163,18 +189,20 @@ class ConsultationService:
                 raise InvalidTimeError()
             
                                                                     
-            logger.info(f" Checking if lawyer exists: {lawyer_id}")
+            # STEP 1: Validate lawyer exists and is accepting consultations
+            # lawyer_id here is lawyer_info.id (PRIMARY KEY)
+            logger.info(f"🔍 Validating lawyer_info.id: {lawyer_id[:8]}...")
             lawyer_result = self.supabase.table("lawyer_info")\
                 .select("name, accepting_consultations, lawyer_id")\
                 .eq("id", lawyer_id)\
                 .execute()
             
-            logger.info(f" Query result: {lawyer_result.data}")
+            logger.info(f"📊 Lawyer query result: {len(lawyer_result.data) if lawyer_result.data else 0} rows")
             
             if not lawyer_result.data:
-                logger.error(f" Lawyer not found in lawyer_info table: {lawyer_id}")
+                logger.error(f"❌ Lawyer not found in lawyer_info table: {lawyer_id[:8]}...")
                 raise ConsultationError(
-                    "This lawyer profile does not exist or is not available for consultations",
+                    "This lawyer profile does not exist or is not available for consultations. Please try selecting another lawyer.",
                     "LAWYER_NOT_FOUND",
                     404
                 )
@@ -218,21 +246,23 @@ class ConsultationService:
                                                                                 
             }
             
-            logger.info(f" Inserting consultation: user_id={user_id}, lawyer_id={lawyer_id}")
+            # STEP 4: Insert consultation into database
+            logger.info(f"💾 Inserting consultation: user_id={user_id[:8]}..., lawyer_id={lawyer_id[:8]}...")
             
             result = self.supabase.table("consultation_requests")\
                 .insert(consultation_data)\
                 .execute()
             
-            logger.info(f" Insert result: {result.data if result.data else 'No data'}")
+            logger.info(f"📊 Insert result: {len(result.data) if result.data else 0} rows")
             
             if result.data:
                 consultation_id = result.data[0]['id']
-                logger.info(f"Consultation created: {consultation_id} for lawyer {lawyer_id}")
+                logger.info(f"✅ Consultation created: {consultation_id[:8]}... for lawyer {lawyer_id[:8]}...")
                 
-                                                                                                
+                # STEP 5: Send notification to lawyer
+                # Use lawyer_user_id (users.id) for notifications, NOT lawyer_id (lawyer_info.id)
                 await self._notify_lawyer_new_consultation(
-                    lawyer_id=lawyer_user_id,                                    
+                    lawyer_id=lawyer_user_id,  # This is users.id for notifications
                     consultation_id=consultation_id,
                     consultation_date=consultation_date,
                     consultation_time=consultation_time,
@@ -244,8 +274,9 @@ class ConsultationService:
                     "data": result.data[0]
                 }
             else:
+                logger.error(f"❌ Failed to insert consultation - no data returned")
                 raise ConsultationError(
-                    "Failed to create consultation request",
+                    "Failed to create consultation request. Please try again.",
                     "CREATE_FAILED",
                     500
                 )
@@ -268,21 +299,28 @@ class ConsultationService:
         consultation_time: str,
         user_id: str
     ):
-        """Send notification to lawyer about new consultation"""
+        """
+        Send notification to lawyer about new consultation.
+        
+        CRITICAL: lawyer_id parameter is users.id (NOT lawyer_info.id)
+        This is the user account ID to send the notification to.
+        """
         try:
-            logger.info(f"📬 Attempting to send notification to lawyer {lawyer_id[:8]}...")
+            logger.info(f"📬 Sending notification to lawyer user_id: {lawyer_id[:8]}...")
             
+            # Get user's full name for notification
             user_result = self.supabase.table("users")\
                 .select("full_name")\
                 .eq("id", user_id)\
                 .execute()
             
             user_name = user_result.data[0]["full_name"] if user_result.data else "A user"
-            logger.info(f"👤 User name: {user_name}")
+            logger.info(f"👤 Booking user: {user_name}")
             
+            # Send notification to lawyer's user account
             notification_service = NotificationService(self.supabase)
             result = await notification_service.notify_consultation_booked(
-                lawyer_id=lawyer_id,
+                lawyer_id=lawyer_id,  # This is users.id
                 user_name=user_name,
                 consultation_date=consultation_date,
                 consultation_time=consultation_time,
@@ -290,14 +328,15 @@ class ConsultationService:
             )
             
             if result:
-                logger.info(f" Notification sent successfully to lawyer {lawyer_id[:8]}...")
+                logger.info(f"✅ Notification sent successfully to lawyer {lawyer_id[:8]}...")
             else:
-                logger.error(f" Notification failed - no result returned")
+                logger.error(f"⚠️  Notification failed - no result returned")
                 
         except Exception as e:
-            logger.error(f" Failed to send notification: {e}")
+            logger.error(f"❌ Failed to send notification: {e}")
             import traceback
             logger.error(traceback.format_exc())
+            # Don't fail the consultation creation if notification fails
     
     async def get_user_consultations(
         self, 

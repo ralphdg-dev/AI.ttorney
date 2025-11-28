@@ -6,8 +6,8 @@ import re
 
 class ConsultationRequestCreate(BaseModel):
     """Model for creating a consultation request with validation"""
-    user_id: str = Field(..., min_length=36, max_length=36, description="User UUID")
-    lawyer_id: str = Field(..., min_length=36, max_length=36, description="Lawyer UUID")
+    user_id: str = Field(..., min_length=36, max_length=36, description="User UUID (users.id)")
+    lawyer_id: str = Field(..., min_length=36, max_length=36, description="Lawyer Profile UUID (lawyer_info.id, NOT users.id)")
     message: str = Field(..., min_length=10, max_length=2000, description="Consultation message")
     email: EmailStr
     mobile_number: str = Field(..., min_length=10, max_length=20)
