@@ -29,7 +29,9 @@ class Lawyer(BaseModel):
     hours: Optional[str] = None              
     days: Optional[str] = None              
     available: bool
-    hours_available: Optional[dict] = None                                                
+    hours_available: Optional[dict] = None
+    profile_photo: Optional[str] = None
+    photo_url: Optional[str] = None                                                
     created_at: datetime
 
     class Config:
@@ -119,7 +121,7 @@ async def fetch_lawyers_from_db(supabase_service):
             url = f"{supabase_service.rest_url}/lawyer_info"
             response = await client.get(
                 url,
-                params={"select": "*"},
+                params={"select": "*,users(profile_photo,photo_url)"},
                 headers=supabase_service._get_headers(use_service_key=True)
             )
             
@@ -134,6 +136,12 @@ async def fetch_lawyers_from_db(supabase_service):
                 for lawyer_data in lawyers_data:
                     try:
                         accepting = bool(lawyer_data.get("accepting_consultations", False))
+                        
+                        # Extract user profile photo from joined data
+                        user_data = lawyer_data.get("users", {}) or {}
+                        profile_photo = user_data.get("profile_photo") if user_data else None
+                        photo_url = user_data.get("photo_url") if user_data else None
+                        
                         lawyer = Lawyer(
                             id=lawyer_data.get("id"),
                             lawyer_id=lawyer_data.get("lawyer_id"),
@@ -145,6 +153,8 @@ async def fetch_lawyers_from_db(supabase_service):
                             bio=lawyer_data.get("bio"),
                             available=accepting,
                             hours_available=lawyer_data.get("hours_available"),
+                            profile_photo=profile_photo,
+                            photo_url=photo_url,
                             created_at=lawyer_data.get("created_at"),
                         )
                         lawyers.append(lawyer)
@@ -164,7 +174,7 @@ async def fetch_lawyers_from_db(supabase_service):
         
                                      
         try:
-            response = supabase_service.supabase.table("lawyer_info").select("*").execute()
+            response = supabase_service.supabase.table("lawyer_info").select("*,users(profile_photo,photo_url)").execute()
             
             if hasattr(response, 'data') and response.data:
                 lawyers_data = response.data
@@ -174,6 +184,12 @@ async def fetch_lawyers_from_db(supabase_service):
                 for lawyer_data in lawyers_data:
                     try:
                         accepting = bool(lawyer_data.get("accepting_consultations", False))
+                        
+                        # Extract user profile photo from joined data
+                        user_data = lawyer_data.get("users", {}) or {}
+                        profile_photo = user_data.get("profile_photo") if user_data else None
+                        photo_url = user_data.get("photo_url") if user_data else None
+                        
                         lawyer = Lawyer(
                             id=lawyer_data.get("id"),
                             lawyer_id=lawyer_data.get("lawyer_id"),
@@ -185,6 +201,8 @@ async def fetch_lawyers_from_db(supabase_service):
                             bio=lawyer_data.get("bio"),
                             available=accepting,
                             hours_available=lawyer_data.get("hours_available"),
+                            profile_photo=profile_photo,
+                            photo_url=photo_url,
                             created_at=lawyer_data.get("created_at"),
                         )
                         lawyers.append(lawyer)

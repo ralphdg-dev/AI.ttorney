@@ -39,6 +39,8 @@ interface Lawyer {
   days: string | string[]; // Can be JSON array ["Monday", "Tuesday"] or string
   available: boolean;
   hours_available: string | string[] | Record<string, string[]>; // JSONB or legacy formats
+  profile_photo?: string;
+  photo_url?: string;
   created_at: string;
 }
 
@@ -386,11 +388,12 @@ export default function DirectoryScreen() {
     filtered = filtered.filter((lawyer) => lawyer.available);
     if (filtered.length === 0) return [];
 
-    // Apply search filter
+    // Apply search filter (name and location)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter((lawyer) =>
-        lawyer.name.toLowerCase().includes(query)
+        lawyer.name.toLowerCase().includes(query) ||
+        lawyer.location.toLowerCase().includes(query)
       );
       if (filtered.length === 0) return [];
     }
@@ -480,6 +483,7 @@ export default function DirectoryScreen() {
           lawyerDays: lawyer.displayDays,
           lawyerhours_available: JSON.stringify(lawyer.hours_available),
           lawyerBio: lawyer.bio,
+          lawyerAvatar: lawyer.profile_photo || lawyer.photo_url || "",
           userId: user.id,
         },
       });
@@ -513,7 +517,7 @@ export default function DirectoryScreen() {
             <UnifiedSearchBar
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholder="Search lawyers..."
+              placeholder="Search lawyers by name or location..."
               loading={loading}
               showFilterIcon={true}
               onFilterPress={() => setFilterVisible(true)}

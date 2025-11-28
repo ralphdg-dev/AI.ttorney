@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GUEST_SESSION_STORAGE_KEY } from '../config/guestConfig';
 
 // Role hierarchy based on backend schema
-export type UserRole = 'guest' | 'registered_user' | 'verified_lawyer' | 'admin' | 'superadmin';
+export type UserRole = 'guest' | 'registered_user' | 'authenticated' | 'verified_lawyer' | 'admin' | 'superadmin';
 
 export interface User {
   session: any;
@@ -165,11 +165,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [authState.session?.access_token]);
 
+  // Add a flag to prevent multiple simultaneous auth state changes
+  const [isProcessingAuth, setIsProcessingAuth] = React.useState(false);
+
   const handleAuthStateChange = React.useCallback(async (session: any, shouldNavigate: boolean = true) => {
     const currentPath = getCurrentRoute();
     console.log(`🔄 handleAuthStateChange called - shouldNavigate: ${shouldNavigate}, current path: ${currentPath}`);
     
-    const timeoutId = setTimeout(() => {
+    // Prevent multiple simultaneous auth processing
+    if (isProcessingAuth) {
+      console.log('🔄 Auth processing already in progress, skipping...');
+      return;
+    }
+    
+    setIsProcessingAuth(true);
+    
+    const authTimeoutId = setTimeout(() => {
       console.warn('Auth timeout');
       toast.show({
         placement: 'top',
@@ -182,13 +193,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ),
       });
       setIsLoading(false);
-    }, 15000);
+    }, 30000);
     
     try {
       if (!session) {
         setAuthState({ session: null, user: null, supabaseUser: null });
         setIsLoading(false);
-        clearTimeout(timeoutId);
+        clearTimeout(authTimeoutId);
         return;
       }
 
@@ -199,18 +210,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         console.log('🔍 Fetching profile for user:', session.user.id);
         
-        // Fetch profile through server API (bypasses RLS, faster for lawyers)
+        // Fetch profile through server API with fallback (bypasses RLS, faster for lawyers)
         const API_URL = await NetworkConfig.getBestApiUrl();
+        const controller = new AbortController();
+        const fetchTimeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
         const profileFetchPromise = fetch(`${API_URL}/auth/me`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
+          signal: controller.signal,
         }).then(async (response) => {
+          clearTimeout(fetchTimeoutId);
           if (!response.ok) {
             const errorText = await response.text();
             console.error('Profile fetch failed:', response.status, errorText);
+            
+            // If server is down (502, 503, 504), fall back to Supabase direct
+            if (response.status >= 502 && response.status <= 504) {
+              console.log('🔄 Server unavailable, falling back to Supabase direct fetch');
+              const { data: profileData, error: profileError } = await supabase.auth.getUser();
+              if (profileError) throw profileError;
+              return { success: true, user: { user: profileData.user, profile: profileData.user } };
+            }
+            
             throw new Error(`Profile fetch failed: ${response.status}`);
           }
           const data = await response.json();
@@ -219,33 +244,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // We want the profile data
           const profileData = data.user?.profile || data.user;
           return { data: profileData, error: null };
-        }).catch((error) => {
+        }).catch(async (error) => {
+          clearTimeout(fetchTimeoutId);
           console.error('Profile fetch network error:', error);
+          
+          // Handle network errors with fallback to Supabase
+          if (error.name === 'AbortError' || error.message.includes('fetch') || error.message.includes('network')) {
+            console.log('🔄 Network error, falling back to Supabase direct fetch');
+            try {
+              const { data: profileData, error: profileError } = await supabase.auth.getUser();
+              if (profileError) throw profileError;
+              return { data: profileData.user, error: null };
+            } catch (fallbackError) {
+              console.error('Supabase fallback also failed:', fallbackError);
+              throw error; // Throw original error
+            }
+          }
           throw error;
         });
         
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Profile fetch timeout')), 10000) // 10 second timeout
-        );
-        
-        const { data: profileData, error } = await Promise.race([
-          profileFetchPromise,
-          timeoutPromise
-        ]) as any;
+        const { data: profileData, error } = await profileFetchPromise;
         
         const fetchTime = Date.now() - startTime;
         console.log(`✅ Profile fetch completed in ${fetchTime}ms`);
 
         if (error) {
           console.error('❌ Profile fetch failed:', error);
-          console.error('Error details:', JSON.stringify(error, null, 2));
+          const errorObj = error as any;
+          console.error('Error details:', {
+            message: errorObj?.message || String(error),
+            name: errorObj?.name || 'Unknown',
+            stack: errorObj?.stack,
+            apiUrl: API_URL,
+            userId: session.user.id,
+            timestamp: new Date().toISOString()
+          });
           
           // Force complete sign out with storage clearing
           await clearAuthStorage();
           await supabase.auth.signOut({ scope: 'local' });
           setAuthState({ session: null, user: null, supabaseUser: null });
           setIsLoading(false);
-          clearTimeout(timeoutId);
+          clearTimeout(authTimeoutId);
           router.replace('/login');
           return;
         }
@@ -260,19 +300,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           user: profile,
           supabaseUser: session.user,
         });
+        
+        // Reset processing flag on success
+        setIsProcessingAuth(false);
 
       } catch (dbError: any) {
         const fetchTime = Date.now() - startTime;
         console.error('❌ Profile fetch exception after', fetchTime, 'ms:', dbError);
-        console.error('Exception details:', JSON.stringify(dbError, null, 2));
+        console.error('Exception details:', {
+          message: dbError?.message || String(dbError),
+          name: dbError?.name || 'Unknown',
+          stack: dbError?.stack,
+          timestamp: new Date().toISOString()
+        });
         
-        // Force complete sign out on timeout
+        // Clear timeout if it exists
+        if (typeof authTimeoutId !== 'undefined') {
+          clearTimeout(authTimeoutId);
+        }
+        
+        // Force complete sign out on error
         await clearAuthStorage();
         await supabase.auth.signOut({ scope: 'local' });
         setAuthState({ session: null, user: null, supabaseUser: null });
         setIsLoading(false);
-        clearTimeout(timeoutId);
-        router.replace('/login');
+        
+        // Reset processing flag on error
+        setIsProcessingAuth(false);
+        
+        // Only redirect if not already on login page to prevent loops
+        const currentRoute = getCurrentRoute();
+        if (currentRoute !== '/login') {
+          router.replace('/login');
+        }
         return;
       }
 
@@ -291,7 +351,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('   shouldNavigate:', shouldNavigate);
           console.log('   isValidPage:', isValidPage);
           setIsLoading(false);
-          clearTimeout(timeoutId);
+          clearTimeout(authTimeoutId);
           return;
         }
         
@@ -310,12 +370,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (!currentRoute.includes('/deactivated')) {
             console.log('🔐 Redirecting to deactivated page');
             setIsLoading(false);
-            clearTimeout(timeoutId);
+            clearTimeout(authTimeoutId);
             router.replace('/deactivated' as any);
           } else {
             console.log('🔐 Already on deactivated page, not redirecting');
             setIsLoading(false);
-            clearTimeout(timeoutId);
+            clearTimeout(authTimeoutId);
           }
           return;
         }
@@ -325,11 +385,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const currentRoute = getCurrentRoute();
           if (!currentRoute.includes('/banned')) {
             setIsLoading(false);
-            clearTimeout(timeoutId);
+            clearTimeout(authTimeoutId);
             router.replace('/banned' as any);
           } else {
             setIsLoading(false);
-            clearTimeout(timeoutId);
+            clearTimeout(authTimeoutId);
           }
           return;
         }
@@ -340,7 +400,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const suspensionStatus = await checkSuspensionStatus();
         if (suspensionStatus && suspensionStatus.isSuspended) {
           setIsLoading(false);
-          clearTimeout(timeoutId);
+          clearTimeout(authTimeoutId);
           try {
             router.replace('/suspended' as any);
           } catch (routerError) {
@@ -359,7 +419,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const redirectPath = `/onboarding/lawyer/lawyer-status/accepted`;
           console.log(`🚀 Navigating to: ${redirectPath} (accepted lawyer)`);
           setIsLoading(false);
-          clearTimeout(timeoutId);
+          clearTimeout(authTimeoutId);
           try {
             router.replace(redirectPath as any);
           } catch (routerError) {
@@ -380,7 +440,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           
           setIsLoading(false);
-          clearTimeout(timeoutId);
+          clearTimeout(authTimeoutId);
           try {
             router.replace(redirectPath as any);
           } catch (routerError) {
@@ -391,15 +451,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Token refresh - just update state, don't navigate
         console.log('🔄 Token refreshed, keeping user on current page');
         setIsLoading(false);
-        clearTimeout(timeoutId);
+        clearTimeout(authTimeoutId);
       }
     } catch (error) {
       console.error('Error handling auth state change:', error);
       setAuthState({ session: null, user: null, supabaseUser: null });
       setIsLoading(false);
-      clearTimeout(timeoutId);
+      setIsProcessingAuth(false);
+      clearTimeout(authTimeoutId);
     }
-  }, [checkLawyerApplicationStatus, checkSuspensionStatus, getCurrentRoute, toast]);
+  }, [checkLawyerApplicationStatus, checkSuspensionStatus, getCurrentRoute, toast, isProcessingAuth]);
 
   useEffect(() => {
     // Initialize auth state and listen for auth changes

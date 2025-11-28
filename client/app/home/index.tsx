@@ -9,9 +9,11 @@ import { SidebarWrapper } from '../../components/AppSidebar';
 import Colors from '../../constants/Colors';
 import RegisteredOnboardingOverlay from '../../components/onboarding/RegisteredOnboardingOverlay';
 import { AuthGuard } from '../../components/AuthGuard';
+import { useAuth } from '../../contexts/AuthContext';
 
 const HomePage: React.FC = () => {
   const router = useRouter();
+  const { isLoading, initialAuthCheck } = useAuth();
 
   const timelineRef = React.useRef<TimelineHandle>(null);
 
@@ -47,10 +49,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background.primary, // Match chatbot exact color
+    justifyContent: 'space-between', // Ensure proper spacing between header, content, and navbar
   },
   content: {
     flex: 1,
     backgroundColor: Colors.background.secondary, // Content area gray
+    minHeight: 0, // Ensure content can shrink when needed
   },
 });
 

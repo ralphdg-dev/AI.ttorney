@@ -105,11 +105,11 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
 
   '/home': { 
     path: '/home', 
-    requiredRole: 'registered_user',
+    allowedRoles: ['registered_user', 'authenticated'],
     redirectTo: 'role-based',
     serverValidation: true,
     errorBoundary: true,
-    fallbackRoute: '/role-selection'
+    fallbackRoute: '/login'
   },
   '*': {
     path: '*',
@@ -119,14 +119,14 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   },
   '/directory': { 
     path: '/directory', 
-    requiredRole: 'registered_user',
+    allowedRoles: ['registered_user', 'authenticated'],
     redirectTo: 'role-based',
     serverValidation: true,
     errorBoundary: true
   },
   '/guides': { 
     path: '/guides', 
-    requiredRole: 'registered_user',
+    allowedRoles: ['registered_user', 'authenticated'],
     redirectTo: '/login',
     errorBoundary: true
   },
@@ -144,21 +144,21 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   },
   '/booklawyer': { 
     path: '/booklawyer', 
-    requiredRole: 'registered_user',
+    allowedRoles: ['registered_user', 'authenticated'],
     redirectTo: 'role-based',
     serverValidation: true,
     errorBoundary: true
   },
   '/profile': { 
     path: '/profile', 
-    requiredRole: 'registered_user',
+    allowedRoles: ['registered_user', 'authenticated'],
     redirectTo: 'role-based',
     serverValidation: true,
     errorBoundary: true
   },
   '/profile/edit': { 
     path: '/profile/edit', 
-    requiredRole: 'registered_user',
+    allowedRoles: ['registered_user', 'authenticated'],
     redirectTo: 'role-based',
     serverValidation: true,
     errorBoundary: true
@@ -166,50 +166,50 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
 
   '/bookmarked-posts': { 
     path: '/bookmarked-posts', 
-    allowedRoles: ['registered_user', 'verified_lawyer'],
+    allowedRoles: ['registered_user', 'authenticated', 'verified_lawyer'],
     redirectTo: 'role-based',
     serverValidation: true,
     errorBoundary: true
   },
   '/favorite-terms': { 
     path: '/favorite-terms', 
-    requiredRole: 'registered_user',
+    allowedRoles: ['registered_user', 'authenticated'],
     redirectTo: 'role-based',
     serverValidation: true,
     errorBoundary: true
   },
   '/bookmarked-guides': { 
     path: '/bookmarked-guides', 
-    requiredRole: 'registered_user',
+    allowedRoles: ['registered_user', 'authenticated'],
     redirectTo: 'role-based',
     serverValidation: true,
     errorBoundary: true
   },
   '/consultations': { 
     path: '/consultations', 
-    requiredRole: 'registered_user',
+    allowedRoles: ['registered_user', 'authenticated'],
     redirectTo: 'role-based',
     serverValidation: true,
     errorBoundary: true
   },
   '/notifications': { 
     path: '/notifications', 
-    allowedRoles: ['registered_user', 'verified_lawyer'],
+    allowedRoles: ['registered_user', 'authenticated', 'verified_lawyer'],
     redirectTo: 'role-based',
     serverValidation: true,
     errorBoundary: true
   },
 
   '/settings': { 
-    path: '/settings', 
-    allowedRoles: ['registered_user', 'verified_lawyer'],
+    path: '/settings/index', 
+    allowedRoles: ['registered_user', 'authenticated', 'verified_lawyer'],
     redirectTo: 'role-based',
     serverValidation: true,
     errorBoundary: true
   },
   '/settings/change-password': { 
     path: '/settings/change-password', 
-    allowedRoles: ['registered_user', 'verified_lawyer'],
+    allowedRoles: ['registered_user', 'authenticated', 'verified_lawyer'],
     redirectTo: 'role-based',
     serverValidation: true,
     errorBoundary: true
@@ -359,11 +359,13 @@ export const getRoleBasedRedirect = (role: UserRole, isVerified?: boolean, pendi
     case 'superadmin':
       return '/admin';
     case 'registered_user':
-      return '/home';
+      return '/home'; // Use the correct Expo Router path
+    case 'authenticated':
+      return '/home'; // Handle 'authenticated' role properly
     case 'guest':
       return isVerified ? '/role-selection' : '/login';
     default:
-      return '/home';
+      return '/home'; // Use the correct Expo Router path
   }
 };
 

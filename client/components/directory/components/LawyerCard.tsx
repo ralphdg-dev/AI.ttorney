@@ -7,7 +7,7 @@ import { Box } from "@/components/ui/box";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "../../../constants/Colors";
 import { shadowPresets } from "../../../utils/shadowUtils";
-import TimeUtils from "../../../utils/timeUtils";
+// Removed TimeUtils import - no longer displaying available times
 
 interface Lawyer {
   id: string;
@@ -17,6 +17,8 @@ interface Lawyer {
   days: string;
   available: boolean;
   hours_available: Record<string, string[]> | string[]; // JSONB: {"Monday": ["09:00"]} or legacy string[]
+  profile_photo?: string;
+  photo_url?: string;
 }
 
 interface LawyerCardProps {
@@ -42,40 +44,9 @@ export default function LawyerCard({
   const primarySpecialization = cleanedSpecializations[0] || '';
   const additionalCount = cleanedSpecializations.length - 1;
 
-  // Get today's available times
-  const getTodayAvailableTimes = (): string[] => {
-    const today = new Date().toLocaleString("en-US", { weekday: "long" });
+  // Removed getTodayAvailableTimes function - no longer displaying available times
 
-    if (!lawyer.hours_available) {
-      return [];
-    }
-
-    // Handle JSONB format: {"Monday": ["09:00", "11:00"]}
-    if (typeof lawyer.hours_available === 'object' && !Array.isArray(lawyer.hours_available)) {
-      const times = lawyer.hours_available[today] || [];
-      return times.map(time => TimeUtils.convertTo12h(time));
-    }
-
-    // Legacy format: ["Monday= 9:00 AM, 11:00 AM"]
-    if (Array.isArray(lawyer.hours_available)) {
-      for (const daySchedule of lawyer.hours_available) {
-        if (typeof daySchedule === 'string' && daySchedule.includes("=")) {
-          const [day, times] = daySchedule.split("=").map((s) => s.trim());
-          if (day.toLowerCase() === today.toLowerCase()) {
-            return times
-              .split(",")
-              .map((time) => time.trim())
-              .filter((time) => time);
-          }
-        }
-      }
-    }
-
-    return [];
-  };
-
-  const todayTimes = getTodayAvailableTimes();
-  const hasTimesToday = todayTimes.length > 0;
+// Removed today's available times display - only showing available days
 
   const handleSpecializationPress = () => {
     setShowAllSpecialization(!showAllSpecialization);
@@ -102,10 +73,6 @@ export default function LawyerCard({
     : "Book Consultation";
 
   const hasAvailableDays = lawyer.days && lawyer.days.trim() !== "";
-  const hasAvailableHours = lawyer.hours_available && 
-    (typeof lawyer.hours_available === 'object' && !Array.isArray(lawyer.hours_available)
-      ? Object.keys(lawyer.hours_available).length > 0
-      : Array.isArray(lawyer.hours_available) && lawyer.hours_available.length > 0);
 
   return (
     <Box
@@ -249,68 +216,7 @@ export default function LawyerCard({
           </VStack>
         )}
 
-        {/* Today's Available Times */}
-        {hasTimesToday ? (
-          <VStack className="mb-3">
-            <HStack className="items-center mb-1">
-              <Ionicons
-                name="time-outline"
-                size={14}
-                color="#374151"
-              />
-              <Text
-                className="text-xs ml-1.5 font-semibold"
-                style={{ color: Colors.text.head }}
-              >
-                Available Today
-              </Text>
-            </HStack>
-            <HStack className="flex-wrap gap-1.5">
-              {todayTimes.slice(0, 4).map((time, index) => (
-                <Box
-                  key={index}
-                  className="bg-white px-2 py-0.5 rounded border border-gray-300"
-                  style={{ elevation: 0.5 }}
-                >
-                  <Text
-                    className="text-xs font-semibold"
-                    style={{ color: Colors.text.head }}
-                  >
-                    {time}
-                  </Text>
-                </Box>
-                ))}
-              {todayTimes.length > 4 && (
-                <Box className="bg-white px-2 py-0.5 rounded border border-gray-300" style={{ elevation: 0.5 }}>
-                  <Text
-                    className="text-xs font-semibold"
-                    style={{ color: Colors.text.head }}
-                  >
-                    +{todayTimes.length - 4} more
-                  </Text>
-                </Box>
-              )}
-            </HStack>
-          </VStack>
-        ) : (
-          <VStack className="mb-3">
-            <HStack className="items-center">
-              <Ionicons
-                name="information-circle-outline"
-                size={12}
-                color={Colors.text.sub}
-              />
-              <Text
-                className="ml-1 text-xs font-medium"
-                style={{ color: Colors.text.sub }}
-              >
-                {hasAvailableHours
-                  ? "No slots available today."
-                  : "Check booking for available schedule"}
-              </Text>
-            </HStack>
-          </VStack>
-        )}
+        {/* Removed Today's Available Times section - only showing available days */}
 
         {/* Book Button */}
         <Pressable

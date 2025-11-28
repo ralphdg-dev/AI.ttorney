@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Alert, useWindowDimensions, TouchableOpacity, TextInput, ActivityIndicator, View, Image } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Calendar, Clock, Mail, Phone, MessageSquare, Video, MapPin, User, Check, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2 } from "lucide-react-native";
@@ -97,7 +97,7 @@ export default function LawyerBookingView() {
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedDay, setSelectedDay] = useState(currentDate);
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
-  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+  // Removed loading state for ultra-fast performance
   
   const months = [
     "January",
@@ -117,33 +117,66 @@ export default function LawyerBookingView() {
 
   const isMediumScreen = width >= 375 && width < 768;
 
-  // Check if lawyer is available on a specific date
-  const isLawyerAvailableOnDate = (date: Date): boolean => {
-    if (!lawyerData || !lawyerData.hours_available) return false;
+  // Check if lawyer is available on a specific date - memoized for performance
+  const isLawyerAvailableOnDate = useCallback((date: Date): boolean => {
+    if (!lawyerData) return false;
 
     const dayName = date.toLocaleDateString("en-US", {
       weekday: "long",
     });
 
-    // Handle JSONB format: {"Monday": ["09:00", "11:00"]}
-    if (typeof lawyerData.hours_available === 'object' && !Array.isArray(lawyerData.hours_available)) {
-      const times = lawyerData.hours_available[dayName] || [];
-      return times.length > 0;
+    // First check hours_available (preferred method)
+    if (lawyerData.hours_available) {
+      // Handle JSONB format: {"Monday": ["09:00", "11:00"]}
+      if (typeof lawyerData.hours_available === 'object' && !Array.isArray(lawyerData.hours_available)) {
+        const times = lawyerData.hours_available[dayName] || [];
+        return times.length > 0;
+      }
+
+      // Legacy format: DayAvailability[]
+      if (Array.isArray(lawyerData.hours_available)) {
+        const dayAvailability = lawyerData.hours_available.find(
+          (availability) =>
+            availability.day.toLowerCase() === dayName.toLowerCase()
+        );
+        return dayAvailability ? dayAvailability.times.length > 0 : false;
+      }
     }
 
-    // Legacy format: DayAvailability[]
-    if (Array.isArray(lawyerData.hours_available)) {
-      const dayAvailability = lawyerData.hours_available.find(
-        (availability) =>
-          availability.day.toLowerCase() === dayName.toLowerCase()
+    // Fallback: Check days field if hours_available is not available
+    if (lawyerData.days) {
+      // Handle different formats of days field
+      let availableDays: string[] = [];
+      
+      if (typeof lawyerData.days === 'string') {
+        // Try to parse as JSON array first
+        try {
+          const parsed = JSON.parse(lawyerData.days);
+          if (Array.isArray(parsed)) {
+            availableDays = parsed;
+          } else {
+            // Split by comma or space
+            availableDays = lawyerData.days.split(/[,\s]+/).filter(day => day.trim());
+          }
+        } catch {
+          // Split by comma or space
+          availableDays = lawyerData.days.split(/[,\s]+/).filter(day => day.trim());
+        }
+      } else if (Array.isArray(lawyerData.days)) {
+        availableDays = lawyerData.days;
+      }
+
+      // Check if the day name matches any of the available days
+      return availableDays.some(day => 
+        day.toLowerCase().includes(dayName.toLowerCase()) || 
+        dayName.toLowerCase().includes(day.toLowerCase())
       );
-      return dayAvailability ? dayAvailability.times.length > 0 : false;
     }
 
     return false;
-  };
+  }, [lawyerData]);
 
-  const getTimeSlotsForSelectedDay = (): TimeSlot[] => {
+  const getTimeSlotsForSelectedDay = useCallback((): TimeSlot[] => {
     if (!lawyerData || !lawyerData.hours_available) return [];
 
     const selectedDate = new Date(selectedYear, selectedMonth, selectedDay);
@@ -178,8 +211,10 @@ export default function LawyerBookingView() {
     }
 
     return [];
-  };
-  const timeSlots: TimeSlot[] = getTimeSlotsForSelectedDay();
+  }, [lawyerData, selectedYear, selectedMonth, selectedDay]);
+  
+  // Ultra-fast memoized time slots
+  const timeSlots: TimeSlot[] = useMemo(() => getTimeSlotsForSelectedDay(), [getTimeSlotsForSelectedDay]);
 
   const validateEmail = (email: string): boolean => {
     // RFC 5322 compliant email regex (simplified)
@@ -250,16 +285,18 @@ export default function LawyerBookingView() {
       errors.timeSlot = "Please select a time slot";
     }
 
-    // Date validation (ensure date is in the future, not today)
+    // Date validation (ensure date is not in the past)
     const selectedDate = new Date(selectedYear, selectedMonth, selectedDay);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    selectedDate.setHours(0, 0, 0, 0); // Set to start of day for proper comparison
     
-    // Check if date is in the past or today
-    if (selectedDate <= today) {
-      errors.timeSlot = "Consultation date must be in the future";
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to start of day for proper comparison
+    
+    // Check if date is in the past (allow present and future dates only)
+    if (selectedDate < today) {
+      errors.timeSlot = "Please select today or a future date for your consultation";
       
-      // Show toast for same-day validation
+      // Show toast for past date validation
       toast.show({
         placement: 'top',
         duration: 4000,
@@ -268,7 +305,7 @@ export default function LawyerBookingView() {
           'warning',
           'solid',
           'Date Not Available',
-          'Same-day consultations are not available. Please select a future date.'
+          'Please select today or a future date for your consultation.'
         ),
       });
     }
@@ -448,7 +485,7 @@ export default function LawyerBookingView() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const generateCalendarDays = (month: number, year: number) => {
+  const generateCalendarDays = useCallback((month: number, year: number) => {
     const days: CalendarDay[] = [];
     const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -510,12 +547,16 @@ export default function LawyerBookingView() {
     }
 
     return days;
-  };
+  }, [today]);
+
+  // Ultra-fast calendar generation with minimal re-renders
+  const memoizedCalendarDays = useMemo(() => {
+    return generateCalendarDays(selectedMonth, selectedYear);
+  }, [generateCalendarDays, selectedMonth, selectedYear]);
 
   useEffect(() => {
-    setCalendarDays(generateCalendarDays(selectedMonth, selectedYear));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedMonth, selectedYear, selectedDay]);
+    setCalendarDays(memoizedCalendarDays);
+  }, [memoizedCalendarDays]);
 
   const canNavigateToPrevious = useMemo(() => {
     if (selectedYear < currentYear) return false;
@@ -523,56 +564,76 @@ export default function LawyerBookingView() {
     return true;
   }, [selectedMonth, selectedYear, currentMonth, currentYear]);
 
-  const navigateToPreviousMonth = () => {
+  // Memoize today's date for consistent past date validation
+  const todayStart = useMemo(() => {
+    const date = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }, [today]);
+
+  const navigateToPreviousMonth = useCallback(() => {
     if (!canNavigateToPrevious) return;
     
+    // Calculate new month and year
+    let newMonth, newYear;
     if (selectedMonth === 0) {
-      setSelectedMonth(11);
-      setSelectedYear(selectedYear - 1);
+      newMonth = 11;
+      newYear = selectedYear - 1;
     } else {
-      setSelectedMonth(selectedMonth - 1);
+      newMonth = selectedMonth - 1;
+      newYear = selectedYear;
     }
-    // Set to first available day of new month
-    const newDate = new Date(selectedYear, selectedMonth - 1, 1);
-    const firstAvailableDay = newDate < today ? today.getDate() : 1;
+    
+    // Calculate appropriate day for the new month
+    const newDate = new Date(newYear, newMonth, 1);
+    const firstAvailableDay = newDate < todayStart ? today.getDate() : 1;
+    
+    // Batch state updates to prevent multiple re-renders
+    setSelectedMonth(newMonth);
+    setSelectedYear(newYear);
     setSelectedDay(firstAvailableDay);
     setSelectedTimeSlot(null);
-  };
+  }, [canNavigateToPrevious, selectedMonth, selectedYear, todayStart, today]);
 
-  const navigateToNextMonth = () => {
+  const navigateToNextMonth = useCallback(() => {
+    // Calculate new month and year
+    let newMonth, newYear;
     if (selectedMonth === 11) {
-      setSelectedMonth(0);
-      setSelectedYear(selectedYear + 1);
+      newMonth = 0;
+      newYear = selectedYear + 1;
     } else {
-      setSelectedMonth(selectedMonth + 1);
+      newMonth = selectedMonth + 1;
+      newYear = selectedYear;
     }
-    setSelectedDay(1);
-    setSelectedTimeSlot(null);
-  };
-
-  const handleDaySelect = (day: CalendarDay) => {
-    // Simulate loading for better UX
-    setIsLoadingSlots(true);
     
+    // Calculate appropriate day for the new month (consistent with previous month logic)
+    const newDate = new Date(newYear, newMonth, 1);
+    const firstAvailableDay = newDate < todayStart ? today.getDate() : 1;
+    
+    // Batch state updates to prevent multiple re-renders
+    setSelectedMonth(newMonth);
+    setSelectedYear(newYear);
+    setSelectedDay(firstAvailableDay);
+    setSelectedTimeSlot(null);
+  }, [selectedMonth, selectedYear, todayStart, today]);
+
+  const handleDaySelect = useCallback((day: CalendarDay) => {
+    // Ultra-fast day selection - no loading state
     if (!day.isCurrentMonth) {
       setSelectedMonth(day.month);
       setSelectedYear(day.year);
     }
     setSelectedDay(day.date);
-
     setSelectedTimeSlot(null);
 
     if (validationErrors.timeSlot) {
       setValidationErrors((prev) => ({ ...prev, timeSlot: undefined }));
     }
+  }, [validationErrors.timeSlot]);
 
-    // Simulate async loading
-    setTimeout(() => setIsLoadingSlots(false), 300);
-  };
-
-  const handleBackPress = () => {
+  const handleBackPress = useCallback(() => {
     router.back();
-  };
+  }, [router]);
 
   const handleBookConsultation = async () => {
     const errors = validateBookingForm();
@@ -1013,21 +1074,21 @@ export default function LawyerBookingView() {
               ))}
             </HStack>
 
-            {/* Calendar Days Grid */}
+            {/* Calendar Days Grid - Optimized */}
             <HStack className="flex-wrap" style={{ width: '100%' }}>
               {calendarDays.map((day) => {
-                const dayDate = new Date(day.year, day.month, day.date);
-                const isPastDay =
-                  dayDate <
-                  new Date(
-                    today.getFullYear(),
-                    today.getMonth(),
-                    today.getDate()
-                  );
+                // Ultra-fast date comparison - no object creation
+                const dayTime = new Date(day.year, day.month, day.date).getTime();
+                const isPastDay = dayTime < todayStart.getTime();
                 
-                // Check if lawyer is available on this date
-                const isAvailable = isLawyerAvailableOnDate(dayDate);
+                // Quick availability check
+                const isAvailable = day.isCurrentMonth ? isLawyerAvailableOnDate(new Date(day.year, day.month, day.date)) : false;
                 const isDisabled = !day.isCurrentMonth || isPastDay || !isAvailable;
+                
+                // Calendar availability logic: 
+                // ✅ Users can book on TODAY and FUTURE dates that match lawyer's available days
+                // ❌ Users CANNOT book on PAST dates (dates before today)
+                // ❌ Users CANNOT book on dates when lawyer is not available
 
                 return (
                   <Pressable
@@ -1079,20 +1140,14 @@ export default function LawyerBookingView() {
 
           {/* Time Slots - Modern Grid */}
           <VStack className="pt-4 mt-4 border-t" style={{ borderColor: '#E5E7EB' }}>
-            <HStack className="items-center justify-between mb-3">
-              <HStack className="items-center">
-                <Clock size={16} color={Colors.primary.blue} strokeWidth={2} />
-                <Text className="ml-2 text-sm font-semibold" style={{ color: Colors.text.head }}>
-                  Available Time Slots
-                </Text>
-              </HStack>
-              {timeSlots.length > 0 && (
-                <Box className="px-2 py-1 rounded-full" style={{ backgroundColor: '#ECFDF5' }}>
-                  <Text className="text-xs font-semibold" style={{ color: '#059669' }}>
-                    {timeSlots.length} slots
-                  </Text>
-                </Box>
-              )}
+            <HStack className="items-center mb-3">
+              <Clock size={16} color={Colors.primary.blue} strokeWidth={2} />
+              <Text 
+                className={`ml-2 ${isMediumScreen ? 'text-sm' : 'text-base'} font-semibold`} 
+                style={{ color: Colors.text.head }}
+              >
+                Available Time Slots
+              </Text>
             </HStack>
             
             {validationErrors.timeSlot && (
@@ -1104,24 +1159,13 @@ export default function LawyerBookingView() {
               </HStack>
             )}
 
-            {isLoadingSlots ? (
-              <HStack className="items-center justify-center py-8">
-                <ActivityIndicator size="small" color={Colors.primary.blue} />
-                <Text className="ml-2 text-sm" style={{ color: Colors.text.sub }}>
-                  Loading available slots...
-                </Text>
-              </HStack>
-            ) : timeSlots.length > 0 ? (
+            {timeSlots.length > 0 ? (
               <HStack className="flex-wrap">
                 {timeSlots.map((slot) => {
-                  const selectedDate = new Date(
-                    selectedYear,
-                    selectedMonth,
-                    selectedDay
-                  );
-                  const isTodaySelected =
-                    selectedDate.toDateString() === today.toDateString();
-
+                  // Fast date calculations
+                  const selectedDate = new Date(selectedYear, selectedMonth, selectedDay);
+                  const isTodaySelected = selectedDate.toDateString() === today.toDateString();
+                  
                   let isPastTime = false;
 
                   if (isTodaySelected) {
