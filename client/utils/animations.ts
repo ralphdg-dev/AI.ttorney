@@ -226,6 +226,11 @@ export const createRotationAnimation = (
       duration,
       easing: Easing.linear,
       useNativeDriver: shouldUseNativeDriver('transform'),
-    })
+    }),
+    {
+      // Ensure each iteration starts from the initial value so the spinner
+      // keeps rotating instead of stopping after the first turn.
+      resetBeforeIteration: true,
+    },
   );
 };
