@@ -1767,6 +1767,25 @@ If you lack sufficient information, clearly state that and focus on the recommen
             answer = "I apologize, but I can only provide general legal information, not personal legal advice. For specific guidance on your situation, please consult with a licensed attorney."
         confidence = "low"
     
+    # CRITICAL: Validate numerical accuracy to prevent hallucinations
+    if context:  # Only validate if we have context to compare against
+        from utils.numerical_validator import get_numerical_validator
+        validator = get_numerical_validator()
+        is_numerically_valid, numerical_errors = validator.validate_response(answer, context, question)
+        
+        if not is_numerically_valid:
+            logger.error(f"❌ NUMERICAL HALLUCINATION DETECTED - Blocking response")
+            logger.error(f"Question: {question[:100]}")
+            logger.error(f"Errors: {numerical_errors}")
+            logger.error(f"Response: {answer[:300]}...")
+            
+            # Block the response and provide error message
+            if language == "tagalog":
+                answer = "Paumanhin po, ngunit napansin naming may hindi tumpak na impormasyon sa sagot. Para sa inyong kaligtasan, hindi namin maibibigay ang sagot na ito. Pakisubukang muling itanong o kumonsulta sa lisensyadong abogado para sa tamang impormasyon."
+            else:
+                answer = "I apologize, but I detected potentially inaccurate numerical information in my response. For your safety, I cannot provide this answer. Please try rephrasing your question or consult with a licensed attorney for accurate information."
+            confidence = "low"
+    
                                                    
     follow_up_questions = []
     if answer:
