@@ -118,6 +118,7 @@ class LawyerProfileService:
                     "hours_available": hours_available,
                     "phone_number": profile_data.get("phone_number"),
                     "bio": profile_data.get("bio"),
+                    "avatar": profile_data.get("avatar"),
                     "updated_at": "now()"
                 }
                 
@@ -162,6 +163,7 @@ class LawyerProfileService:
                     "hours_available": hours_available,
                     "phone_number": profile_data.get("phone_number"),
                     "bio": profile_data.get("bio"),
+                    "avatar": profile_data.get("avatar"),
                     "roll_number": roll_number,
                     "roll_signing_date": roll_signing_date,
                     "created_at": "now()",

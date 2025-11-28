@@ -369,7 +369,7 @@ interface Message {
 
 export default function ChatbotScreen() {
   const insets = useSafeAreaInsets();
-  const { user, session, isLawyer } = useAuth();
+  const { user, session, isLawyer, initialAuthCheck } = useAuth();
   
   // Responsive sizing variables
   const navbarHeight = LAYOUT.NAVBAR_HEIGHT;
@@ -1633,37 +1633,41 @@ export default function ChatbotScreen() {
     >
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       
-      {/* Sidebar - Guest or Regular */}
-      {isGuestMode ? (
-        <GuestSidebar
-          isOpen={isGuestSidebarOpen}
-          onClose={() => setIsGuestSidebarOpen(false)}
-        />
-      ) : (
-        <ChatHistorySidebar
-          ref={sidebarRef}
-          userId={user?.id}
-          sessionToken={session?.access_token}
-          currentConversationId={currentConversationId}
-          onConversationSelect={handleConversationSelect}
-          onNewChat={handleNewChat}
-        />
+      {/* Sidebar - Guest or Regular - Only show after auth is loaded */}
+      {initialAuthCheck && (
+        isGuestMode ? (
+          <GuestSidebar
+            isOpen={isGuestSidebarOpen}
+            onClose={() => setIsGuestSidebarOpen(false)}
+          />
+        ) : (
+          <ChatHistorySidebar
+            ref={sidebarRef}
+            userId={user?.id}
+            sessionToken={session?.access_token}
+            currentConversationId={currentConversationId}
+            onConversationSelect={handleConversationSelect}
+            onNewChat={handleNewChat}
+          />
+        )
       )}
 
-      {/* Header */}
-      <Header 
-        title="AI Legal Assistant" 
-        showMenu={true}
-        onMenuPress={isGuestMode ? () => setIsGuestSidebarOpen(true) : undefined}
-        showChatHistoryToggle={!isGuestMode}
-        isChatHistoryOpen={isSidebarOpen}
-        onChatHistoryToggle={() => {
-          const newIsOpen = !isSidebarOpen;
-          setIsSidebarOpen(newIsOpen);
-          sidebarRef.current?.toggleSidebar?.();
-        }}
-        menuRef={menuRef}
-      />
+      {/* Header - Only show after auth is loaded to prevent incorrect menu state */}
+      {initialAuthCheck && (
+        <Header 
+          title="AI Legal Assistant" 
+          showMenu={true}
+          onMenuPress={isGuestMode ? () => setIsGuestSidebarOpen(true) : undefined}
+          showChatHistoryToggle={!isGuestMode}
+          isChatHistoryOpen={isSidebarOpen}
+          onChatHistoryToggle={() => {
+            const newIsOpen = !isSidebarOpen;
+            setIsSidebarOpen(newIsOpen);
+            sidebarRef.current?.toggleSidebar?.();
+          }}
+          menuRef={menuRef}
+        />
+      )}
 
       {/* Guest Rate Limit Banner - Show for guest users */}
       {isGuestMode && showLimitBanner && (
@@ -2042,16 +2046,22 @@ export default function ChatbotScreen() {
           paddingBottom: Platform.OS === 'ios' ? insets.bottom : 0,
         }}
       >
-        {isGuestMode ? (
-          <GuestNavbar activeTab="ask" glossaryRef={glossaryRef} navbarRef={navbarRef} />
-        ) : user?.role === "verified_lawyer" ? (
-          <LawyerNavbar activeTab="chatbot" />
+        {/* Only render navbar after auth state is properly loaded to prevent race condition */}
+        {initialAuthCheck ? (
+          isGuestMode && !user ? (
+            <GuestNavbar activeTab="ask" glossaryRef={glossaryRef} navbarRef={navbarRef} />
+          ) : user?.role === "verified_lawyer" ? (
+            <LawyerNavbar activeTab="chatbot" />
+          ) : (
+            <Navbar activeTab="ask" />
+          )
         ) : (
-          <Navbar activeTab="ask" />
+          // Show empty placeholder while auth is loading to prevent navbar flashing
+          <View style={{ height: LAYOUT.NAVBAR_HEIGHT + (Platform.OS === 'ios' ? insets.bottom : 0) }} />
         )}
       </View>
       
-      {!isGuestMode && <SidebarWrapper />}
+      {!isGuestMode && initialAuthCheck && <SidebarWrapper />}
       
       {/* Tutorial Overlay */}
       {isGuestMode && (

@@ -226,6 +226,8 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // FAANG Best Practice: Memoize context value to prevent unnecessary re-renders
   const value: GuestContextType = React.useMemo(() => ({
+    // Simple guest mode detection - just check if guest session exists
+    // Auth check will be done at consumption point to avoid circular dependency
     isGuestMode: !!guestSession,
     guestSession,
     promptCount: guestSession?.promptCount || 0,

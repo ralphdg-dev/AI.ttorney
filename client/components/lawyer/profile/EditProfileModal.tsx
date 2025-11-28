@@ -23,6 +23,7 @@ import Colors from "../../../constants/Colors";
 import { TimeSlot } from "../../../services/lawyerProfileServices";
 import TimeUtils from "../../../utils/timeUtils";
 import { Avatar, AvatarImage, AvatarFallbackText } from "../../../components/ui/avatar";
+import * as ImagePicker from 'expo-image-picker';
 
 interface ProfileData {
   name: string;
@@ -72,47 +73,12 @@ for (let h = 0; h < 24; h++) {
 }
 
 const LAW_SPECIALIZATIONS = [
-  "Administrative Law",
-  "Admiralty and Maritime Law",
-  "Agricultural Law",
-  "Alternative Dispute Resolution",
-  "Appellate Practice",
-  "Aviation Law",
-  "Banking and Finance Law",
-  "Bankruptcy Law",
-  "Civil Law",
-  "Commercial Law",
-  "Constitutional Law",
-  "Construction Law",
-  "Corporate Law",
-  "Criminal Law",
-  "Cyberspace Law",
-  "Election Law",
-  "Energy Law",
-  "Entertainment Law",
-  "Environmental Law",
   "Family Law",
-  "General Practice",
-  "Immigration Law",
-  "Insurance Law",
-  "Intellectual Property Law",
-  "International Law",
-  "Labor and Employment Law",
-  "Legal Ethics",
-  "Medical Law",
-  "Mining Law",
-  "Notarial Practice",
-  "Patent Law",
-  "Property Law",
-  "Public Interest Law",
-  "Public International Law",
-  "Real Estate Law",
-  "Regulatory Practice",
-  "Tax Law",
-  "Tort Law",
-  "Trademark Law",
-  "Transportation Law",
-  "Wills and Succession",
+  "Civil Law", 
+  "Criminal Law",
+  "Consumer Law",
+  "Labor Law",
+  "Others",
 ];
 
 const EditProfileModal: React.FC<EditProfileModalProps> = ({
@@ -137,6 +103,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [, setLocalAvailabilitySlots] = React.useState<TimeSlot[]>(availabilitySlots);
+  const [customSpecialization, setCustomSpecialization] = React.useState("");
+  const [showCustomSpecializationInput, setShowCustomSpecializationInput] = React.useState(false);
+  const [selectedImageUri, setSelectedImageUri] = React.useState<string | null>(null);
 
   const [selectedDays, setSelectedDays] = React.useState<string[]>([]);
   const [dayTimeSlots, setDayTimeSlots] = React.useState<
@@ -149,6 +118,18 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   React.useEffect(() => {
     setEditFormData(profileData);
     setValidationErrors({});
+
+    // Initialize custom specialization input visibility based on existing data
+    const currentSpecializations = profileData.specialization || [];
+    if (currentSpecializations.includes("Others")) {
+      setShowCustomSpecializationInput(true);
+    } else {
+      setShowCustomSpecializationInput(false);
+      setCustomSpecialization("");
+    }
+
+    // Initialize selected image URI
+    setSelectedImageUri(profileData.avatar || null);
 
     if (profileData.days) {
       const daysArray = profileData.days
@@ -341,16 +322,39 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
         "specialization",
         currentSpecializations.filter((s) => s !== specialization)
       );
+      // If removing "Others", also hide the custom input
+      if (specialization === "Others") {
+        setShowCustomSpecializationInput(false);
+        setCustomSpecialization("");
+      }
     } else {
       updateFormField("specialization", [
         ...currentSpecializations,
         specialization,
       ]);
+      // If selecting "Others", show the custom input
+      if (specialization === "Others") {
+        setShowCustomSpecializationInput(true);
+      }
     }
   };
 
   const isSpecializationSelected = (specialization: string) => {
     return editFormData.specialization?.includes(specialization) || false;
+  };
+
+  const addCustomSpecialization = () => {
+    if (customSpecialization.trim()) {
+      const currentSpecializations = editFormData.specialization || [];
+      // Replace "Others" with the actual custom specialization
+      const updatedSpecializations = currentSpecializations
+        .filter(s => s !== "Others")
+        .concat(customSpecialization.trim());
+      
+      updateFormField("specialization", updatedSpecializations);
+      setCustomSpecialization("");
+      setShowCustomSpecializationInput(false);
+    }
   };
 
   const validateForm = (): boolean => {
@@ -509,6 +513,15 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     setShowSpecializationDropdown(false);
     setIsEditingAvailability(false);
     setSearchQuery("");
+    
+    // Reset custom specialization input visibility based on original data
+    const originalSpecializations = profileData.specialization || [];
+    if (originalSpecializations.includes("Others")) {
+      setShowCustomSpecializationInput(true);
+    } else {
+      setShowCustomSpecializationInput(false);
+      setCustomSpecialization("");
+    }
 
     if (profileData.days) {
       const daysArray = profileData.days
@@ -566,6 +579,77 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     return timeOptions ? timeOptions.label : time;
   };
 
+  const getAvailableTimeOptions = (day: string) => {
+    const selectedTimes = dayTimeSlots[day] || [];
+    return TIME_OPTIONS.filter((timeOption) => 
+      !selectedTimes.includes(timeOption.value)
+    );
+  };
+
+  const requestPermissions = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Photo library permission is required to select images.');
+      return false;
+    }
+    return true;
+  };
+
+  const showImagePickerOptions = () => {
+    Alert.alert(
+      'Change Profile Photo',
+      'Choose how you want to update your profile photo',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Camera', onPress: pickImageFromCamera },
+        { text: 'Photo Library', onPress: pickImageFromLibrary },
+        { text: 'Remove Photo', onPress: removeProfilePhoto, style: 'destructive' },
+      ]
+    );
+  };
+
+  const pickImageFromCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Camera permission is required to take photos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setSelectedImageUri(result.assets[0].uri);
+      setEditFormData(prev => ({ ...prev, avatar: result.assets[0].uri }));
+    }
+  };
+
+  const pickImageFromLibrary = async () => {
+    const hasPermission = await requestPermissions();
+    if (!hasPermission) return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setSelectedImageUri(result.assets[0].uri);
+      setEditFormData(prev => ({ ...prev, avatar: result.assets[0].uri }));
+    }
+  };
+
+  const removeProfilePhoto = () => {
+    setSelectedImageUri(null);
+    setEditFormData(prev => ({ ...prev, avatar: '' }));
+  };
+
   return (
     <Modal
       visible={isVisible}
@@ -617,6 +701,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   tw`absolute -bottom-2 -right-2 w-8 h-8 rounded-full border-2 border-white flex items-center justify-center`,
                   { backgroundColor: Colors.primary.blue },
                 ]}
+                onPress={showImagePickerOptions}
+                disabled={isSaving}
               >
                 <Camera size={16} color="white" />
               </TouchableOpacity>
@@ -766,6 +852,54 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                         </Text>
                       </View>
                     )}
+
+                  {/* Custom Specialization Input */}
+                  {showCustomSpecializationInput && (
+                    <View style={tw`p-3 border-t border-gray-200 bg-gray-50`}>
+                      <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>
+                        Enter your specialization:
+                      </Text>
+                      <View style={tw`flex-row items-center`}>
+                        <TextInput
+                          style={tw`flex-1 px-3 py-2 text-base text-gray-900 border border-gray-300 rounded-lg mr-2`}
+                          placeholder="e.g., Environmental Law, Tax Law, etc."
+                          value={customSpecialization}
+                          onChangeText={setCustomSpecialization}
+                          editable={!isSaving}
+                        />
+                        <TouchableOpacity
+                          style={[
+                            tw`px-3 py-2 rounded-lg`,
+                            {
+                              backgroundColor: customSpecialization.trim() 
+                                ? Colors.primary.blue 
+                                : "#9CA3AF"
+                            }
+                          ]}
+                          onPress={addCustomSpecialization}
+                          disabled={!customSpecialization.trim() || isSaving}
+                        >
+                          <Text style={tw`text-white font-medium text-sm`}>Add</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={tw`ml-2 px-3 py-2 rounded-lg border border-gray-300`}
+                          onPress={() => {
+                            setShowCustomSpecializationInput(false);
+                            setCustomSpecialization("");
+                            // Remove "Others" from selection if cancelled
+                            const currentSpecializations = editFormData.specialization || [];
+                            updateFormField(
+                              "specialization",
+                              currentSpecializations.filter(s => s !== "Others")
+                            );
+                          }}
+                          disabled={isSaving}
+                        >
+                          <Text style={tw`text-gray-600 font-medium text-sm`}>Cancel</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
                 </View>
               )}
 
@@ -904,19 +1038,27 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                             showsVerticalScrollIndicator={true}
                             scrollEventThrottle={16}
                           >
-                            {TIME_OPTIONS.map((timeOption) => (
-                              <TouchableOpacity
-                                key={timeOption.value}
-                                style={tw`px-3 py-2 border-b border-gray-100`}
-                                onPress={() =>
-                                  addTimeSlot(day, timeOption.value)
-                                }
-                              >
-                                <Text style={tw`text-sm text-gray-900`}>
-                                  {timeOption.label}
+                            {getAvailableTimeOptions(day).length > 0 ? (
+                              getAvailableTimeOptions(day).map((timeOption) => (
+                                <TouchableOpacity
+                                  key={timeOption.value}
+                                  style={tw`px-3 py-2 border-b border-gray-100`}
+                                  onPress={() =>
+                                    addTimeSlot(day, timeOption.value)
+                                  }
+                                >
+                                  <Text style={tw`text-sm text-gray-900`}>
+                                    {timeOption.label}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))
+                            ) : (
+                              <View style={tw`px-3 py-4`}>
+                                <Text style={tw`text-sm text-gray-500 text-center`}>
+                                  All time slots have been selected
                                 </Text>
-                              </TouchableOpacity>
-                            ))}
+                              </View>
+                            )}
                           </ScrollView>
                         </View>
                       )}
