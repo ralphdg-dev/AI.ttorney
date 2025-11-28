@@ -2,7 +2,7 @@ import logging
 from typing import Dict, Any, Optional
 from datetime import datetime, date, timedelta
 from supabase import Client
-from .models.consultation_models import (
+from ..models.consultation_models import (
     ConsultationRequestCreate,
     ConsultationError,
     InvalidDateError,
