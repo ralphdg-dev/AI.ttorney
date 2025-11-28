@@ -4,6 +4,32 @@ from datetime import date
 import re
 
 
+# Custom Exception Classes
+class ConsultationError(Exception):
+    """Base exception for consultation-related errors"""
+    pass
+
+
+class InvalidDateError(ConsultationError):
+    """Raised when consultation date is invalid"""
+    pass
+
+
+class InvalidTimeError(ConsultationError):
+    """Raised when consultation time is invalid"""
+    pass
+
+
+class BookingConflictError(ConsultationError):
+    """Raised when there's a scheduling conflict"""
+    pass
+
+
+class DuplicatePendingError(ConsultationError):
+    """Raised when user has a pending consultation with the same lawyer"""
+    pass
+
+
 class ConsultationRequestCreate(BaseModel):
     """Model for creating a consultation request with validation"""
     user_id: Optional[str] = Field(None, min_length=36, max_length=36, description="User UUID (users.id) - Optional, extracted from token")
