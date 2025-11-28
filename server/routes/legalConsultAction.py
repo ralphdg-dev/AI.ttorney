@@ -123,7 +123,7 @@ async def fetch_user_data_fallback(supabase: Client, user_id: str) -> Dict[str, 
 
                               
 USER_JOIN_QUERY = """*,
-    users!consultation_requests_user_id_fkey(
+    users(
         full_name,
         email,
         username,
@@ -184,32 +184,35 @@ async def get_my_consultations(
         
         consultations = response.data if hasattr(response, 'data') else []
         
-        # DEBUG: Log raw consultation data to check if users object is present
-        logger.info(f"🔍 DEBUG: Raw consultation data from database:")
+        # ALWAYS use fallback to ensure we get user data
         enhanced_consultations = []
         
         for idx, consultation in enumerate(consultations):
+            logger.info(f"  [{idx+1}] Processing consultation: {consultation.get('id', 'unknown')[:8]}...")
             logger.info(f"  [{idx+1}] Keys: {list(consultation.keys())}")
             logger.info(f"  [{idx+1}] Has 'users': {'users' in consultation}")
             
-            if 'users' in consultation and consultation['users']:
-                logger.info(f"  [{idx+1}] ✅ Users data found in JOIN")
-                enhanced_consultations.append(consultation)
-            else:
-                logger.warning(f"  [{idx+1}] ❌ Missing 'users' object! Using fallback query...")
-                # Fallback: manually fetch user data
-                user_id = consultation.get('user_id')
-                if user_id:
+            # Always try to get user data, either from JOIN or fallback
+            user_id = consultation.get('user_id')
+            if user_id:
+                # Check if JOIN worked
+                if 'users' in consultation and consultation['users']:
+                    logger.info(f"  [{idx+1}] ✅ Users data found in JOIN: {consultation['users']}")
+                else:
+                    logger.warning(f"  [{idx+1}] ❌ Missing 'users' object! Using fallback query...")
                     try:
                         fallback_user_data = await fetch_user_data_fallback(supabase, user_id)
                         if fallback_user_data:
                             consultation['users'] = fallback_user_data
-                            logger.info(f"  [{idx+1}] ✅ Fallback user data fetched: {fallback_user_data.get('full_name')}")
+                            logger.info(f"  [{idx+1}] ✅ Fallback user data fetched: {fallback_user_data}")
                         else:
                             logger.warning(f"  [{idx+1}] ❌ Fallback fetch returned no data")
                     except Exception as e:
                         logger.error(f"  [{idx+1}] ❌ Fallback fetch failed: {e}")
-                enhanced_consultations.append(consultation)
+            else:
+                logger.error(f"  [{idx+1}] ❌ No user_id found in consultation!")
+                
+            enhanced_consultations.append(consultation)
         
         # Replace original consultations with enhanced ones
         consultations = enhanced_consultations
@@ -388,11 +391,13 @@ async def get_consultation_detail(
                     fallback_user_data = await fetch_user_data_fallback(supabase, user_id)
                     if fallback_user_data:
                         consultation['users'] = fallback_user_data
-                        logger.info(f"  ✅ Fallback user data fetched: {fallback_user_data.get('full_name')}")
+                        logger.info(f"  ✅ Fallback user data fetched: {fallback_user_data}")
                     else:
                         logger.warning(f"  ❌ Fallback fetch returned no data")
                 except Exception as e:
                     logger.error(f"  ❌ Fallback fetch failed: {e}")
+            else:
+                logger.error(f"  ❌ No user_id found in consultation!")
         
         # DEBUG: Log final transformed data
         transformed_data = transform_consultation_data(consultation)
