@@ -99,6 +99,16 @@ class LawyerProfileService:
             
             logger.info(f"Saving availability for user {user_id}: {hours_available}")
             
+            # Ensure specialization is properly formatted as array
+            specialization = profile_data.get("specialization")
+            if isinstance(specialization, str):
+                # If it's a string, split it into an array
+                specialization = [s.strip() for s in specialization.split(",")]
+            elif not isinstance(specialization, list):
+                specialization = []
+            
+            logger.info(f"Processed specialization: {specialization}")
+            
             # Check if lawyer_info record exists
             existing = self.supabase.table("lawyer_info")\
                 .select("*")\
@@ -112,7 +122,7 @@ class LawyerProfileService:
                 
                 lawyer_info_data = {
                     "name": profile_data.get("name"),
-                    "specialization": profile_data.get("specialization"),
+                    "specialization": specialization,
                     "location": profile_data.get("location"),
                     "days": profile_data.get("days"),
                     "hours_available": hours_available,
@@ -157,7 +167,7 @@ class LawyerProfileService:
                 lawyer_info_data = {
                     "lawyer_id": user_id,
                     "name": profile_data.get("name"),
-                    "specialization": profile_data.get("specialization"),
+                    "specialization": specialization,
                     "location": profile_data.get("location"),
                     "days": profile_data.get("days"),
                     "hours_available": hours_available,
@@ -194,6 +204,9 @@ class LawyerProfileService:
         
         except Exception as e:
             logger.error(f"Error upserting lawyer profile: {e}")
+            logger.error(f"Profile data received: {profile_data}")
+            logger.error(f"Exception type: {type(e)}")
+            logger.error(f"Exception details: {str(e)}")
             raise
     
     async def update_accepting_consultations(

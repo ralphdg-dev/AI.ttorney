@@ -8,6 +8,8 @@ import {
   TextInput,
   Modal,
   Alert,
+  Image,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -106,6 +108,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [customSpecialization, setCustomSpecialization] = React.useState("");
   const [showCustomSpecializationInput, setShowCustomSpecializationInput] = React.useState(false);
   const [selectedImageUri, setSelectedImageUri] = React.useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = React.useState(false);
 
   const [selectedDays, setSelectedDays] = React.useState<string[]>([]);
   const [dayTimeSlots, setDayTimeSlots] = React.useState<
@@ -492,6 +495,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
       };
 
       console.log("Confirming save with JSONB:", hoursAvailableJsonb);
+      console.log("Full form data being saved:", updatedFormData);
+      console.log("Specialization type:", typeof updatedFormData.specialization);
+      console.log("Specialization value:", updatedFormData.specialization);
       await onSave(updatedFormData);
       setShowConfirmModal(false);
       onClose();
@@ -522,6 +528,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
       setShowCustomSpecializationInput(false);
       setCustomSpecialization("");
     }
+
+    // Reset selected image URI to original data
+    setSelectedImageUri(profileData.avatar || null);
 
     if (profileData.days) {
       const daysArray = profileData.days
@@ -609,39 +618,55 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   };
 
   const pickImageFromCamera = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission Required', 'Camera permission is required to take photos.');
-      return;
-    }
+    try {
+      setIsUploadingPhoto(true);
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Camera permission is required to take photos.');
+        return;
+      }
 
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
 
-    if (!result.canceled && result.assets[0]) {
-      setSelectedImageUri(result.assets[0].uri);
-      setEditFormData(prev => ({ ...prev, avatar: result.assets[0].uri }));
+      if (!result.canceled && result.assets[0]) {
+        setSelectedImageUri(result.assets[0].uri);
+        setEditFormData(prev => ({ ...prev, avatar: result.assets[0].uri }));
+      }
+    } catch (error) {
+      console.error('Error picking image from camera:', error);
+      Alert.alert('Error', 'Failed to take photo. Please try again.');
+    } finally {
+      setIsUploadingPhoto(false);
     }
   };
 
   const pickImageFromLibrary = async () => {
-    const hasPermission = await requestPermissions();
-    if (!hasPermission) return;
+    try {
+      setIsUploadingPhoto(true);
+      const hasPermission = await requestPermissions();
+      if (!hasPermission) return;
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
 
-    if (!result.canceled && result.assets[0]) {
-      setSelectedImageUri(result.assets[0].uri);
-      setEditFormData(prev => ({ ...prev, avatar: result.assets[0].uri }));
+      if (!result.canceled && result.assets[0]) {
+        setSelectedImageUri(result.assets[0].uri);
+        setEditFormData(prev => ({ ...prev, avatar: result.assets[0].uri }));
+      }
+    } catch (error) {
+      console.error('Error picking image from library:', error);
+      Alert.alert('Error', 'Failed to select photo. Please try again.');
+    } finally {
+      setIsUploadingPhoto(false);
     }
   };
 
@@ -682,27 +707,56 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
         <ScrollView style={tw`flex-1 p-4`} showsVerticalScrollIndicator={false}>
           <View style={tw`bg-white rounded-lg p-4 mb-4 items-center`}>
             <View style={tw`relative mb-4`}>
-              <Avatar 
-                size="xl" 
-                style={{ 
-                  backgroundColor: '#023D7B'
-                }}
-              >
-                <AvatarFallbackText style={{ color: '#FFFFFF' }}>
-                  {editFormData.name || "User"}
-                </AvatarFallbackText>
-                <AvatarImage 
-                  source={{ uri: editFormData.avatar }} 
-                  alt="Profile"
-                />
-              </Avatar>
+              {(selectedImageUri || editFormData.avatar) ? (
+                <View style={[
+                  tw`w-24 h-24 overflow-hidden rounded-full relative`,
+                  { backgroundColor: '#F3F4F6' }
+                ]}>
+                  <Image
+                    source={{ 
+                      uri: selectedImageUri || editFormData.avatar
+                    }}
+                    style={tw`w-full h-full`}
+                    resizeMode="cover"
+                  />
+                  {isUploadingPhoto && (
+                    <View style={[
+                      tw`absolute inset-0 flex items-center justify-center rounded-full`,
+                      { backgroundColor: 'rgba(0,0,0,0.5)' }
+                    ]}>
+                      <ActivityIndicator size="large" color="white" />
+                    </View>
+                  )}
+                </View>
+              ) : (
+                <View style={tw`relative`}>
+                  <Avatar 
+                    size="xl" 
+                    style={{ 
+                      backgroundColor: '#023D7B'
+                    }}
+                  >
+                    <AvatarFallbackText style={{ color: '#FFFFFF' }}>
+                      {editFormData.name || "User"}
+                    </AvatarFallbackText>
+                  </Avatar>
+                  {isUploadingPhoto && (
+                    <View style={[
+                      tw`absolute inset-0 flex items-center justify-center rounded-full`,
+                      { backgroundColor: 'rgba(0,0,0,0.5)' }
+                    ]}>
+                      <ActivityIndicator size="large" color="white" />
+                    </View>
+                  )}
+                </View>
+              )}
               <TouchableOpacity
                 style={[
                   tw`absolute -bottom-2 -right-2 w-8 h-8 rounded-full border-2 border-white flex items-center justify-center`,
                   { backgroundColor: Colors.primary.blue },
                 ]}
                 onPress={showImagePickerOptions}
-                disabled={isSaving}
+                disabled={isSaving || isUploadingPhoto}
               >
                 <Camera size={16} color="white" />
               </TouchableOpacity>

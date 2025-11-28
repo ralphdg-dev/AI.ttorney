@@ -187,7 +187,7 @@ const LawyerProfilePage: React.FC = () => {
   ]);
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [, setIsLoading] = useState(true);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [showAllSpecializations, setShowAllSpecializations] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isAcceptingConsultations, setIsAcceptingConsultations] =
@@ -476,7 +476,7 @@ const LawyerProfilePage: React.FC = () => {
     if (!user?.id) return;
 
     try {
-      setIsLoading(true);
+      setIsProfileLoading(true);
       
       // Use server API instead of direct Supabase queries
       const { data: { session } } = await supabase.auth.getSession();
@@ -534,7 +534,7 @@ const LawyerProfilePage: React.FC = () => {
         hours_available: "",
       });
     } finally {
-      setIsLoading(false);
+      setIsProfileLoading(false);
     }
   }, [user?.id]);
 
@@ -582,14 +582,14 @@ const LawyerProfilePage: React.FC = () => {
   const refreshProfileData = useCallback(async () => {
     if (!user) return;
 
-    setIsLoading(true);
+    setIsProfileLoading(true);
     try {
       await Promise.all([fetchLawyerContactInfo(), fetchProfessionalInfo()]);
       await refreshUserData();
     } catch (error) {
       console.error("Error refreshing profile data:", error);
     } finally {
-      setIsLoading(false);
+      setIsProfileLoading(false);
     }
   }, [user, fetchLawyerContactInfo, fetchProfessionalInfo, refreshUserData]);
 
