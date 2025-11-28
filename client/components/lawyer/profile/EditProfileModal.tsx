@@ -405,21 +405,22 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     ) {
       errors.specialization = "At least one specialization is required";
     } else {
-      // Allow custom specializations when "Others" was selected and replaced with custom text
-      const invalidSpecializations = editFormData.specialization.filter(
-        (spec) => {
-          // Valid if: in predefined list OR is custom text (non-empty) OR is "Others" (temporarily allowed)
-          const isValid = LAW_SPECIALIZATIONS.includes(spec) || 
-                          (spec.trim() !== "") || 
-                          spec === "Others";
-          
-          // Return true for invalid specializations (only empty strings that aren't "Others")
-          return !isValid;
+      // Check if "Others" is selected but no custom specialization was added
+      if (editFormData.specialization.includes("Others")) {
+        errors.specialization = "Please add your custom specialization or remove 'Others'";
+      } else {
+        // Allow custom specializations when "Others" was selected and replaced with custom text
+        const invalidSpecializations = editFormData.specialization.filter(
+          (spec) => {
+            // Invalid if: not in predefined list AND is empty string
+            // Valid if: in predefined list OR is custom text (non-empty)
+            return !LAW_SPECIALIZATIONS.includes(spec) && spec.trim() === "";
+          }
+        );
+        if (invalidSpecializations.length > 0) {
+          errors.specialization =
+            "Please select valid specializations from the list";
         }
-      );
-      if (invalidSpecializations.length > 0) {
-        errors.specialization =
-          "Please select valid specializations from the list";
       }
     }
 
@@ -538,8 +539,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
       const hoursAvailableJsonb = formatHoursAvailable();
 
       // Don't send avatar to lawyer profile service since it's saved in users table
+      // Also filter out "Others" if it somehow remains in the specialization array
+      const cleanedSpecializations = editFormData.specialization.filter(spec => spec !== "Others");
+      
       const updatedFormData = {
         ...editFormData,
+        specialization: cleanedSpecializations,
         avatar: '', // Clear avatar since it's handled separately
         days: formattedDays,
         hours_available: hoursAvailableJsonb, // JSONB format

@@ -389,7 +389,7 @@ export default function LawyerBookingView() {
     try {
       const specialization = params.lawyerSpecialization
         ? JSON.parse(params.lawyerSpecialization as string)
-        : ["General Law"];
+        : [];
 
       const hours_available = params.lawyerhours_available
         ? TimeUtils.parseHoursAvailable(JSON.parse(params.lawyerhours_available as string))
@@ -414,7 +414,7 @@ export default function LawyerBookingView() {
         id: params.id as string, // lawyer_info.id (primary key)
         lawyer_id: params.lawyerId as string, // lawyer_info.lawyer_id (foreign key to users)
         name: params.lawyerName as string,
-        specialization: ["General Law"],
+        specialization: [],
         hours: params.lawyerHours as string,
         days: params.lawyerDays as string,
         hours_available: [],

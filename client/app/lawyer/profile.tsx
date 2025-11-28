@@ -497,7 +497,11 @@ const LawyerProfilePage: React.FC = () => {
             phone_number: lawyerInfo.phone_number || "",
             location: lawyerInfo.location || "",
             bio: lawyerInfo.bio || "",
-            specializations: lawyerInfo.specialization || "",
+            specializations: Array.isArray(lawyerInfo.specialization) 
+              ? lawyerInfo.specialization.join(", ")
+              : (typeof lawyerInfo.specialization === 'string' 
+                  ? lawyerInfo.specialization.replace(/[\[\]"]/g, '').replace(/,/g, ', ')
+                  : ""),
             days: lawyerInfo.days || "",
             hours_available: lawyerInfo.hours_available || "",
           });
@@ -617,7 +621,11 @@ const LawyerProfilePage: React.FC = () => {
               phone_number: data.phone_number || "",
               location: data.location || "",
               bio: data.bio || "",
-              specializations: data.specialization || "",
+              specializations: Array.isArray(data.specialization) 
+                ? data.specialization.join(", ")
+                : (typeof data.specialization === 'string' 
+                    ? data.specialization.replace(/[\[\]"]/g, '').replace(/,/g, ', ')
+                    : ""),
               days: data.days || "",
               hours_available: data.hours_available || "",
             });
@@ -718,7 +726,11 @@ const LawyerProfilePage: React.FC = () => {
           rollSigningDate: editFormData.rollSigningDate || "",
         });
 
-        Alert.alert("Success", "Profile updated successfully!");
+        toast.show({
+          placement: 'top',
+          duration: 3000,
+          render: createSafeAreaToastRenderer('top', 'success', 'solid', 'Success', 'Profile updated successfully!'),
+        });
         setIsEditingProfile(false);
 
         await refreshProfileData();
@@ -815,11 +827,15 @@ const LawyerProfilePage: React.FC = () => {
                 style={tw`mb-2`}
               >
                 <View style={tw`flex-row flex-wrap items-center`}>
-                  <Text style={tw`text-sm text-gray-600`}>
-                    {lawyerContactInfo.specializations
-                      ? lawyerContactInfo.specializations.split(",")[0].trim()
-                      : "General Law"}
-                  </Text>
+                  {lawyerContactInfo.specializations && lawyerContactInfo.specializations.trim() ? (
+                    <Text style={tw`text-sm text-gray-600`}>
+                      {lawyerContactInfo.specializations.split(",")[0].trim()}
+                    </Text>
+                  ) : (
+                    <Text style={tw`text-sm text-gray-400 italic`}>
+                      No specializations set yet
+                    </Text>
+                  )}
                   {lawyerContactInfo.specializations &&
                     lawyerContactInfo.specializations.split(",").length > 1 && (
                       <Text

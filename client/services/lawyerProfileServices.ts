@@ -53,6 +53,8 @@ class LawyerProfileService {
       };
 
       console.log("Sending payload to backend:", payload);
+      console.log("Specialization being sent:", payload.specialization);
+      console.log("Specialization type:", typeof payload.specialization);
 
       const apiUrl = await NetworkConfig.getBestApiUrl();
       const response = await fetch(`${apiUrl}/api/lawyer/profile`, {
