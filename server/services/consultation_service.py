@@ -1,20 +1,21 @@
-from typing import Dict, Any, Optional, List
-from datetime import datetime, date, time, timedelta
-from supabase import Client
-from services.notification_service import NotificationService
 import logging
-import re
+from typing import Dict, Any, Optional
+from datetime import datetime, date, timedelta
+from supabase import Client
+from .models.consultation_models import (
+    ConsultationRequestCreate,
+    ConsultationError,
+    InvalidDateError,
+    InvalidTimeError,
+    BookingConflictError,
+    DuplicatePendingError
+)
+from .notification_service import NotificationService
+import json
 
 logger = logging.getLogger(__name__)
 
 
-class ConsultationError(Exception):
-    """Base exception for consultation errors"""
-    def __init__(self, message: str, code: str, status_code: int = 400):
-        self.message = message
-        self.code = code
-        self.status_code = status_code
-        super().__init__(self.message)
 
 
 class BookingConflictError(ConsultationError):
@@ -193,7 +194,7 @@ class ConsultationService:
             # lawyer_id here is lawyer_info.id (PRIMARY KEY)
             logger.info(f"🔍 Validating lawyer_info.id: {lawyer_id[:8]}...")
             lawyer_result = self.supabase.table("lawyer_info")\
-                .select("name, accepting_consultations, lawyer_id")\
+                .select("name, accepting_consultations, lawyer_id, hours_available")\
                 .eq("id", lawyer_id)\
                 .execute()
             
@@ -210,11 +211,22 @@ class ConsultationService:
             lawyer_name = lawyer_result.data[0]["name"]
             lawyer_user_id = lawyer_result.data[0]["lawyer_id"]                                       
             accepting_consultations = lawyer_result.data[0].get("accepting_consultations", False)
+            hours_available = lawyer_result.data[0].get("hours_available", {})
             
             if not accepting_consultations:
                 raise ConsultationError(
                     f"{lawyer_name} is not currently accepting consultations",
                     "LAWYER_NOT_ACCEPTING",
+                    400
+                )
+            
+            # STEP 2: Validate that selected time is within lawyer's available hours
+            logger.info(f"⏰ Validating time slot availability...")
+            if not self._validate_lawyer_availability(hours_available, consultation_date, consultation_time):
+                logger.warning(f"⚠️  Time slot {consultation_time} on {consultation_date} not in lawyer's available hours")
+                raise ConsultationError(
+                    f"{lawyer_name} is not available at {consultation_time} on {consultation_date}. Please select a different time slot.",
+                    "TIME_NOT_AVAILABLE",
                     400
                 )
             
@@ -610,3 +622,135 @@ class ConsultationService:
                 "DELETE_FAILED",
                 500
             )
+
+    def _validate_lawyer_availability(
+        self, 
+        hours_available: Dict[str, Any], 
+        consultation_date: str, 
+        consultation_time: str
+    ) -> bool:
+        """
+        Validate that the selected time slot is within the lawyer's available hours.
+        
+        Args:
+            hours_available: Dictionary with day names as keys and time arrays as values
+            consultation_date: Date in YYYY-MM-DD format
+            consultation_time: Time in HH:MM format (24-hour)
+            
+        Returns:
+            True if time slot is available, False otherwise
+        """
+        try:
+            # Get day name from date (e.g., "Monday", "Tuesday", etc.)
+            date_obj = datetime.strptime(consultation_date, "%Y-%m-%d")
+            day_name = date_obj.strftime("%A")
+            
+            logger.info(f"📅 Checking availability for {day_name} at {consultation_time}")
+            
+            # Parse hours_available (handle JSON string, dict, and legacy array formats)
+            if isinstance(hours_available, str):
+                try:
+                    parsed_hours = json.loads(hours_available)
+                except json.JSONDecodeError:
+                    # Handle legacy format like "Monday=09:00,17:00;Tuesday=09:00,17:00"
+                    parsed_hours = self._parse_legacy_hours_available(hours_available)
+            elif isinstance(hours_available, dict):
+                # JSONB format: {"Monday": ["09:00", "11:00"]}
+                parsed_hours = hours_available
+            elif isinstance(hours_available, list):
+                # Legacy array format: [{day: "Monday", times: ["09:00", "11:00"]}]
+                parsed_hours = self._parse_legacy_array_format(hours_available)
+            else:
+                parsed_hours = {}
+            
+            # Get available times for the specific day
+            day_available_times = parsed_hours.get(day_name, [])
+            
+            logger.info(f"📊 Available times for {day_name}: {day_available_times}")
+            
+            # Check if the consultation time is in the available times
+            is_available = consultation_time in day_available_times
+            
+            if is_available:
+                logger.info(f"✅ Time slot {consultation_time} is available on {day_name}")
+            else:
+                logger.warning(f"❌ Time slot {consultation_time} is NOT available on {day_name}")
+            
+            return is_available
+            
+        except Exception as e:
+            logger.error(f"Error validating lawyer availability: {e}")
+            # If we can't validate, allow the booking but log the error
+            return True
+
+    def _parse_legacy_hours_available(self, hours_str: str) -> Dict[str, list]:
+        """
+        Parse legacy hours_available format like "Monday=09:00,17:00;Tuesday=09:00,17:00"
+        """
+        parsed = {}
+        try:
+            if not hours_str:
+                return parsed
+                
+            # Split by semicolon to get day entries
+            day_entries = hours_str.split(';')
+            
+            for entry in day_entries:
+                if '=' not in entry:
+                    continue
+                    
+                day, times = entry.split('=', 1)
+                day = day.strip()
+                times_str = times.strip()
+                
+                if not day or not times_str:
+                    continue
+                
+                # Split times by comma and clean them
+                time_slots = []
+                for time_str in times_str.split(','):
+                    time_str = time_str.strip()
+                    if time_str and self._validate_time_format(time_str):
+                        time_slots.append(time_str)
+                
+                if time_slots:
+                    parsed[day] = time_slots
+                    
+        except Exception as e:
+            logger.error(f"Error parsing legacy hours_available: {e}")
+            
+        return parsed
+
+    def _parse_legacy_array_format(self, hours_list: list) -> Dict[str, list]:
+        """
+        Parse legacy array format like [{"day": "Monday", "times": ["09:00", "11:00"]}]
+        """
+        parsed = {}
+        try:
+            if not hours_list:
+                return parsed
+                
+            for item in hours_list:
+                if not isinstance(item, dict):
+                    continue
+                    
+                day = item.get('day', '').strip()
+                times = item.get('times', [])
+                
+                if not day or not isinstance(times, list):
+                    continue
+                
+                # Filter and validate times
+                valid_times = []
+                for time_str in times:
+                    time_str = str(time_str).strip()
+                    if time_str and self._validate_time_format(time_str):
+                        valid_times.append(time_str)
+                
+                if valid_times:
+                    parsed[day] = valid_times
+                    
+        except Exception as e:
+            logger.error(f"Error parsing legacy array format: {e}")
+            
+        return parsed

@@ -139,7 +139,7 @@ test_book_consultation() {
             \"email\": \"${USER_EMAIL}\",
             \"mobile_number\": \"+63 912 345 6789\",
             \"consultation_date\": \"${TOMORROW}\",
-            \"consultation_time\": \"14:00\",
+            \"consultation_time\": \"23:00\",
             \"consultation_mode\": \"online\"
         }")
     
