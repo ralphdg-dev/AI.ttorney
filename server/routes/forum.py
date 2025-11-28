@@ -518,9 +518,12 @@ async def list_recent_posts(
                     headers=posts_headers
                 )
 
-            if posts_response.status_code != 200:
-                logger.error(f"Posts query failed: {posts_response.status_code}")
-                return ListPostsResponse(success=True, data=[])
+            # Supabase returns 206 Partial Content when using range/limit with count=exact.
+            # Treat both 200 and 206 as success; anything else is a real error.
+            if posts_response.status_code not in (200, 206):
+                error_text = posts_response.text if posts_response.content else "No error text"
+                logger.error(f"Posts query failed: {posts_response.status_code} - {error_text}")
+                raise HTTPException(status_code=502, detail="Failed to fetch forum posts from database")
 
             base_posts = posts_response.json() if posts_response.content else []
 
@@ -636,11 +639,13 @@ async def list_recent_posts(
             
             final_posts.append(post_copy)
         
-        # Check if there are more posts available
-        if total_count is not None:
-            has_more = (offset + len(base_posts)) < total_count
-        else:
-            has_more = len(base_posts) == limit
+        # Check if there are more posts available.
+        # We rely only on the current page size to decide if more pages exist:
+        # - If we received a full batch (len == limit), we assume there may be more.
+        # - If we received fewer than limit, we've reached the end.
+        # This avoids depending on Supabase's total count which can sometimes
+        # be misleading when using range/limit with count.
+        has_more = len(base_posts) == limit
 
         return ListPostsResponse(
             success=True, 
