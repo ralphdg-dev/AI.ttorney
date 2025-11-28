@@ -328,11 +328,13 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       // Only update if component is still mounted
       if (isComponentMounted.current) {
         if (loadMore) {
-          // Append new posts to existing ones
-          setPosts(prevPosts => [...prevPosts, ...mapped]);
+          // Append new posts to existing ones and update cache directly
+          const newPosts = [...posts, ...mapped];
+          setPosts(newPosts);
+          setCachedPosts(newPosts);
           updateCurrentPage(pageToFetch);
         } else {
-          // Replace posts for fresh load
+          // Replace posts for fresh load and update cache directly
           setPosts(mapped);
           setCachedPosts(mapped);
           updateCurrentPage(pageToFetch);
@@ -389,7 +391,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         loadingMoreRef.current = false;
       }
     }
-  }, [isAuthenticated, getAuthHeaders, mapApiToPost, isCacheValid, getCachedPosts, setCachedPosts, setLastFetchTime, posts.length, updateCurrentPage]);
+  }, [isAuthenticated, getAuthHeaders, mapApiToPost, isCacheValid, getCachedPosts, setCachedPosts, setLastFetchTime, posts, updateCurrentPage]);
 
   // Track if we've loaded before to prevent unnecessary reloads
   const hasInitialLoadRef = useRef(false);
@@ -433,6 +435,19 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         if (cachedPosts && cachedPosts.length > 0) {
           setPosts(cachedPosts);
           setInitialLoading(false);
+
+          // Reconstruct pagination state from cached posts so that
+          // currentPageRef and hasMoreRef stay in sync with what is shown.
+          const totalPosts = cachedPosts.length;
+          const approxPage = Math.max(1, Math.ceil(totalPosts / 15));
+          updateCurrentPage(approxPage);
+
+          // If the cached list length is an exact multiple of page size,
+          // there might be more posts available; otherwise we've likely
+          // reached the end.
+          const inferredHasMore = totalPosts % 15 === 0;
+          setHasMore(inferredHasMore);
+          hasMoreRef.current = inferredHasMore;
         }
       } else {
         if (__DEV__) console.log('📱 Timeline: Screen focused, cache invalid - refreshing');
@@ -767,7 +782,20 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       return !hasOptimisticMatch;
     });
 
-    return [...optimisticPosts, ...filteredRealPosts];
+    // Combine optimistic and real posts, then dedupe by id to avoid
+    // duplicate keys in FlatList even if the same post is appended twice.
+    const combined = [...optimisticPosts, ...filteredRealPosts];
+    const seen = new Set<string>();
+    const unique: PostData[] = [];
+
+    for (const post of combined) {
+      const id = post.id;
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      unique.push(post);
+    }
+
+    return unique;
   }, [optimisticPosts, posts]);
 
   // Use optimized list hook
