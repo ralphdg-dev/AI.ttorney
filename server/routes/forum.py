@@ -482,15 +482,25 @@ async def list_recent_posts(
         # Page-specific cache key for pagination
         cache_key = f"global_posts_page_{page}_limit_{limit}"
         current_time = time.time()
+        offset = max(page - 1, 0) * limit
         
                                         
         base_posts = None
+        total_count = None
         if cache_key in _posts_cache:
-            cached_posts, cache_time = _posts_cache[cache_key]
+            cached_entry = _posts_cache[cache_key]
+            if len(cached_entry) == 3:
+                cached_posts, cache_time, cached_total = cached_entry
+                total_count = cached_total
+            else:
+                cached_posts, cache_time = cached_entry
+                cached_total = None
             age = current_time - cache_time
             logger.info(f"Cache found, age: {age:.1f}s, limit: {CACHE_DURATION}s")
             if age < CACHE_DURATION:
                 base_posts = cached_posts
+                if total_count is None:
+                    total_count = cached_total
                 logger.info(" USING CACHED POSTS - No database query needed!")
             else:
                 logger.info("Cache expired, fetching fresh data")
@@ -501,13 +511,11 @@ async def list_recent_posts(
         if base_posts is None:
             supabase = SupabaseService()
             async with httpx.AsyncClient(timeout=15.0) as client:
-                                                                                 
-                # Calculate offset for pagination
-                offset = (page - 1) * limit
-                
+                posts_headers = supabase._get_headers(use_service_key=True).copy()
+                posts_headers["Prefer"] = "count=exact"
                 posts_response = await client.get(
                     f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&order=created_at.desc&is_flagged=eq.false&limit={limit}&offset={offset}",
-                    headers=supabase._get_headers(use_service_key=True)
+                    headers=posts_headers
                 )
 
             if posts_response.status_code != 200:
@@ -515,6 +523,15 @@ async def list_recent_posts(
                 return ListPostsResponse(success=True, data=[])
 
             base_posts = posts_response.json() if posts_response.content else []
+
+            # Extract total count from Content-Range header if available
+            content_range = posts_response.headers.get("content-range") or posts_response.headers.get("Content-Range")
+            if content_range and "/" in content_range:
+                try:
+                    total_part = content_range.split("/")[-1]
+                    total_count = int(total_part)
+                except (ValueError, TypeError):
+                    total_count = None
             
                                                    
             if base_posts:
@@ -592,7 +609,7 @@ async def list_recent_posts(
                             post["forum_replies"] = []
             
                                                       
-            _posts_cache[cache_key] = (base_posts, current_time)
+            _posts_cache[cache_key] = (base_posts, current_time, total_count)
             logger.info(f"📦 CACHED {len(base_posts)} posts with replies for {CACHE_DURATION}s")
         
                                                        
@@ -620,12 +637,16 @@ async def list_recent_posts(
             final_posts.append(post_copy)
         
         # Check if there are more posts available
-        has_more = len(base_posts) == limit
-        
+        if total_count is not None:
+            has_more = (offset + len(base_posts)) < total_count
+        else:
+            has_more = len(base_posts) == limit
+
         return ListPostsResponse(
             success=True, 
             data=final_posts,
             hasMore=has_more,
+            total=total_count,
             page=page,
             limit=limit
         )
