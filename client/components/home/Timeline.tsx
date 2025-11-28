@@ -85,6 +85,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
   const [loadingMore, setLoadingMore] = useState(false);
 
   // Refs for optimization
+  const currentPageRef = useRef(1);
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isComponentMounted = useRef(true);
   const loadingMoreRef = useRef(false);
@@ -212,6 +213,12 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     }
   }, [session?.access_token]);
 
+  // Keep current page in sync between state and ref for stable pagination
+  const updateCurrentPage = useCallback((page: number) => {
+    setCurrentPage(page);
+    currentPageRef.current = page;
+  }, []);
+
   // Optimized loadPosts with retry logic and proper pagination
   const loadPosts = useCallback(async (force = false, retryCount = 0, loadMore = false) => {
     const MAX_RETRIES = 2;
@@ -252,7 +259,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         setRefreshing(true);
         refreshingRef.current = true;
         // Reset pagination for fresh load
-        setCurrentPage(1);
+        updateCurrentPage(1);
         setHasMore(true);
         hasMoreRef.current = true;
       }
@@ -269,7 +276,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
 
       // Calculate page for API call
-      const pageToFetch = loadMore ? currentPage + 1 : 1;
+      const pageToFetch = loadMore ? currentPageRef.current + 1 : 1;
 
       if (__DEV__) {
         console.log(`Timeline: Fetching posts page ${pageToFetch} (attempt ${retryCount + 1}/${MAX_RETRIES + 1}), loadMore: ${loadMore}`);
@@ -323,12 +330,12 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         if (loadMore) {
           // Append new posts to existing ones
           setPosts(prevPosts => [...prevPosts, ...mapped]);
-          setCurrentPage(pageToFetch);
+          updateCurrentPage(pageToFetch);
         } else {
           // Replace posts for fresh load
           setPosts(mapped);
           setCachedPosts(mapped);
-          setCurrentPage(pageToFetch);
+          updateCurrentPage(pageToFetch);
         }
         
         // Update hasMore based on API response
@@ -377,7 +384,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         loadingMoreRef.current = false;
       }
     }
-  }, [isAuthenticated, getAuthHeaders, mapApiToPost, isCacheValid, getCachedPosts, setCachedPosts, setLastFetchTime, posts.length]);
+  }, [isAuthenticated, getAuthHeaders, mapApiToPost, isCacheValid, getCachedPosts, setCachedPosts, setLastFetchTime, posts.length, updateCurrentPage]);
 
   // Track if we've loaded before to prevent unnecessary reloads
   const hasInitialLoadRef = useRef(false);
@@ -553,10 +560,10 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         return;
       }
 
-      if (__DEV__) console.log('Timeline: Loading more posts...', { currentPage, hasMore: hasMoreRef.current });
+      if (__DEV__) console.log('Timeline: Loading more posts...', { currentPage: currentPageRef.current, hasMore: hasMoreRef.current });
       loadPosts(false, 0, true); // loadMore = true
     }, 300); // 300ms debounce
-  }, [loadPosts, currentPage]);
+  }, [loadPosts]);
 
   const handleCreatePost = useCallback(() => {
     const route = context === 'lawyer' ? '/lawyer/CreatePost' : '/home/CreatePost';
