@@ -34,8 +34,13 @@ export default function LawyerCard({
 }: LawyerCardProps) {
   const [showAllSpecialization, setShowAllSpecialization] = useState(false);
 
-  const primarySpecialization = lawyer.specialization[0];
-  const additionalCount = lawyer.specialization.length - 1;
+  // Clean specialization data and get primary specialization
+  const cleanedSpecializations = lawyer.specialization
+    .map(spec => typeof spec === 'string' ? spec.replace(/[\[\]"]/g, '').trim() : spec)
+    .filter(spec => spec && spec.length > 0);
+  
+  const primarySpecialization = cleanedSpecializations[0] || '';
+  const additionalCount = cleanedSpecializations.length - 1;
 
   // Get today's available times
   const getTodayAvailableTimes = (): string[] => {
@@ -189,7 +194,7 @@ export default function LawyerCard({
               All Specializations
             </Text>
             <VStack className="gap-1">
-              {lawyer.specialization.map((spec, index) => (
+              {cleanedSpecializations.map((spec, index) => (
                 <HStack key={index} className="items-center">
                   <Box
                     className="w-1.5 h-1.5 rounded-full mr-2"
