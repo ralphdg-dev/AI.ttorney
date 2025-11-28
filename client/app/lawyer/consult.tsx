@@ -641,7 +641,7 @@ const LawyerConsultPage: React.FC = () => {
                         {(request.client_profile_photo || request.client_photo_url) ? (
                           <Image
                             source={{ uri: (request.client_profile_photo || request.client_photo_url) as string }}
-                            style={tw`w-12 h-12 rounded-full bg-gray-200`}
+                            style={[tw`w-12 h-12 rounded-full`, { backgroundColor: '#E5E7EB' }]}
                             resizeMode="cover"
                             onError={(error) => {
                               console.log('❌ Image Load Error (List):', error.nativeEvent.error);
@@ -653,14 +653,15 @@ const LawyerConsultPage: React.FC = () => {
                           />
                         ) : (
                           <View
-                            style={tw`items-center justify-center w-12 h-12 bg-gray-200 rounded-full`}
+                            style={[tw`items-center justify-center w-12 h-12 rounded-full`, { backgroundColor: Colors.primary.blue + '20' }]}
                           >
-                            <Text style={tw`font-semibold text-gray-600 text-sm`}>
+                            <Text style={[tw`text-sm font-semibold`, { color: Colors.primary.blue }]}>
                               {request.client_name
                                 .split(" ")
                                 .map((n) => n[0])
                                 .join("")
-                                .toUpperCase()}
+                                .toUpperCase()
+                                .slice(0, 2)}
                             </Text>
                           </View>
                         )}
@@ -677,7 +678,7 @@ const LawyerConsultPage: React.FC = () => {
                       <View style={tw`flex-1 ml-3`}>
                         <View style={tw`flex-row items-center mb-1`}>
                           <Text
-                            style={tw`mr-2 font-semibold text-gray-900 flex-1`}
+                            style={tw`flex-1 mr-2 font-semibold text-gray-900`}
                             numberOfLines={1}
                             ellipsizeMode="tail"
                             adjustsFontSizeToFit={true}
