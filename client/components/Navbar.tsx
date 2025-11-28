@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, usePathname } from 'expo-router';
@@ -27,6 +27,8 @@ const Navbar: React.FC<NavbarProps> = ({
   const pathname = usePathname();
   const { user } = useAuth();
   const { width } = useWindowDimensions();
+  const navRowRef = useRef<View | null>(null);
+  const askTabRef = useRef<any | null>(null);
   
   // Navigation guard to prevent spam clicking
   const isNavigatingRef = useRef(false);
@@ -123,6 +125,36 @@ const Navbar: React.FC<NavbarProps> = ({
     ? Math.max(insets.bottom - 8, 0)
     : insets.bottom;
 
+  // Measure navbar and Ask AI tab to help onboarding overlay position its spotlight
+  useEffect(() => {
+    const measureLayouts = () => {
+      try {
+        if (navRowRef.current && typeof navRowRef.current.measureInWindow === 'function') {
+          navRowRef.current.measureInWindow((x: number, y: number, width: number, height: number) => {
+            (global as any).registeredOnboardingLayout = {
+              ...(global as any).registeredOnboardingLayout,
+              navRow: { x, y, width, height },
+            };
+          });
+        }
+
+        if (askTabRef.current && typeof askTabRef.current.measureInWindow === 'function') {
+          askTabRef.current.measureInWindow((x: number, y: number, width: number, height: number) => {
+            (global as any).registeredOnboardingLayout = {
+              ...(global as any).registeredOnboardingLayout,
+              askTab: { x, y, width, height },
+            };
+          });
+        }
+      } catch {
+        // Silent failure – onboarding overlay will fall back to layout constants
+      }
+    };
+
+    const timer = setTimeout(measureLayouts, 350);
+    return () => clearTimeout(timer);
+  }, [width, bottomInset]);
+
   const tabs = [
     {
       id: 'home',
@@ -158,7 +190,7 @@ const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <View style={[styles.container, { paddingBottom: bottomInset }]}>
-      <View style={styles.navbar}>
+      <View style={styles.navbar} ref={navRowRef}>
         {tabs.map((tab) => {
           const IconComponent = tab.icon;
           return (
@@ -167,6 +199,7 @@ const Navbar: React.FC<NavbarProps> = ({
               style={styles.tabItem}
               onPress={() => handleTabPress(tab.id)}
               activeOpacity={0.7}
+              ref={tab.id === 'ask' ? askTabRef : undefined}
             >
               <IconComponent
                 size={iconSize}
