@@ -527,12 +527,15 @@ const ViewPost: React.FC = () => {
           setPostReady(true);
           setLoading(false);
           
-          // Set replies from cache
+          // Set replies from cache (but still try API for fresh data)
           if (cachedPostWithComments.replies && Array.isArray(cachedPostWithComments.replies)) {
+            setRepliesLoading(true);
             setReplies(cachedPostWithComments.replies as Reply[]);
             setRepliesLoading(false);
           }
-          return;
+          
+          // Don't return here - try API for fresh data to ensure we have latest replies
+          // return; // REMOVED: Prevent API fallback
         }
         
         // Step 2: Check if we have basic post data from forum cache
@@ -562,8 +565,9 @@ const ViewPost: React.FC = () => {
           setPostReady(true);
           setLoading(false);
           
-          // If forum_replies exist in the forum cache, use them
+          // If forum_replies exist in the forum cache, use them (but still try API for fresh data)
           if ((forumPost as any).forum_replies && Array.isArray((forumPost as any).forum_replies)) {
+            setRepliesLoading(true);
             const mappedReplies = ((forumPost as any).forum_replies as any[]).map((r: any) => {
               const isReplyAnon = !!r.is_anonymous;
               const replyUserData = r?.users || {};
@@ -589,20 +593,19 @@ const ViewPost: React.FC = () => {
             
             setReplies(mappedReplies);
             setRepliesLoading(false);
-            
-            // Post with replies already set in state
-            // No need to cache again here
           }
-          return;
+          
+          // Don't return here - try API for fresh data to ensure we have latest replies
+          // return; // REMOVED: Prevent API fallback
         }
         
         // Step 3: No cache available, fetch from API
         await loadFromAPI(String(postId));
         
-      } catch {
-      console.error('Error loading post from cache:');
-      setLoading(false);
-    }
+      } catch (error) {
+          console.error('Error loading post from cache:', error);
+          setLoading(false);
+        }
   };
   
   loadPost();
@@ -717,6 +720,7 @@ const ViewPost: React.FC = () => {
         
         // Fetch replies immediately after post
         try {
+          setRepliesLoading(true);
           const repliesResponse = await fetch(`${apiUrl}/api/forum/posts/${postId}/replies`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json', ...headers } as HeadersInit,
@@ -1036,10 +1040,20 @@ const ViewPost: React.FC = () => {
             console.log('[ViewPost] Redirecting to search with query:', query);
             router.push(`/search?query=${encodeURIComponent(query)}` as any);
           } else {
-            // Default: use router.back() to return to previous page (timeline)
-            // This handles all cases: timeline, home, lawyer forum, etc.
-            console.log('[ViewPost] Using router.back() to return to previous page');
-            router.back();
+            // Try to go back first, but if that fails, navigate to lawyer forum
+            try {
+              console.log('[ViewPost] Using router.back() to return to previous page');
+              router.back();
+              
+              // Fallback timeout - if back doesn't work after a short delay, navigate explicitly
+              setTimeout(() => {
+                console.log('[ViewPost] Back navigation fallback - navigating to lawyer forum');
+                router.replace('/lawyer/forum' as any);
+              }, 100);
+            } catch (error) {
+              console.log('[ViewPost] Back navigation failed, navigating to lawyer forum');
+              router.replace('/lawyer/forum' as any);
+            }
           }
         }}
         rightComponent={
