@@ -1738,61 +1738,131 @@ export default function GoogleLawFirmsFinder({ searchQuery, cache }: GoogleLawFi
   );
 
   // Render Map View (Full Screen) - Uses same cached data as list view
-  const renderMapView = () => (
-    <Box className="relative flex-1">
-      {/* Law Firm Counter - Top Right */}
-      {filteredLawFirms.length > 0 && (
-        <Box className="absolute top-3 right-3" style={{ zIndex: LAYOUT.Z_INDEX.sticky }}>
-          <Box style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            paddingHorizontal: 10,
-            paddingVertical: 5,
-            borderRadius: 12,
-            ...shadowPresets.light,
-            borderWidth: 1,
-            borderColor: 'rgba(0, 0, 0, 0.1)'
-          }}>
-            <Text style={{
-              fontSize: 11,
-              fontWeight: '600',
-              color: Colors.text.head
-            }}>
-              {filteredLawFirms.length} locations
-            </Text>
-          </Box>
-        </Box>
-      )}
-
-      {/* Full Screen Map */}
-      {webViewSupported && WebView ? (
-        <WebView
-          source={{ html: generateSortedMapHTML() }}
-          style={{ flex: 1 }}
-          onMessage={handleWebViewMessage}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          startInLoadingState={true}
-          renderLoading={() => (
-            <Box className="items-center justify-center flex-1 bg-gray-50">
-              <VStack space="md" className="items-center">
-                <Spinner size="large" color={Colors.primary.blue} />
-                <Text className="text-sm" style={{ color: Colors.text.body }}>Loading map...</Text>
-              </VStack>
-            </Box>
-          )}
-        />
-      ) : (
-        <Box className="items-center justify-center flex-1 bg-gray-100">
+  const renderMapView = () => {
+    // Check if Google Maps API key is available
+    const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+    
+    if (!googleMapsApiKey) {
+      return (
+        <Box className="items-center justify-center flex-1 bg-gray-100 px-6">
           <VStack space="md" className="items-center">
             <MapPin size={48} color={Colors.text.sub} />
-            <Text style={{ fontSize: 16, color: Colors.text.sub }}>
-              Map not available on this platform
+            <Text style={{ fontSize: 16, color: Colors.text.head, fontWeight: '600', textAlign: 'center' }}>
+              Google Maps API Key Missing
+            </Text>
+            <Text style={{ fontSize: 14, color: Colors.text.sub, textAlign: 'center' }}>
+              Please configure EXPO_PUBLIC_GOOGLE_MAPS_API_KEY in your environment variables.
             </Text>
           </VStack>
         </Box>
-      )}
-    </Box>
-  );
+      );
+    }
+    
+    return (
+      <Box className="relative flex-1">
+        {/* Law Firm Counter - Top Right */}
+        {filteredLawFirms.length > 0 && (
+          <Box className="absolute top-3 right-3" style={{ zIndex: LAYOUT.Z_INDEX.sticky }}>
+            <Box style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: 12,
+              ...shadowPresets.light,
+              borderWidth: 1,
+              borderColor: 'rgba(0, 0, 0, 0.1)'
+            }}>
+              <Text style={{
+                fontSize: 11,
+                fontWeight: '600',
+                color: Colors.text.head
+              }}>
+                {filteredLawFirms.length} locations
+              </Text>
+            </Box>
+          </Box>
+        )}
+
+        {/* Full Screen Map */}
+        {webViewSupported && WebView ? (
+          <WebView
+            source={{ html: generateSortedMapHTML() }}
+            style={{ flex: 1 }}
+            onMessage={handleWebViewMessage}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            startInLoadingState={true}
+            // Android-specific optimizations
+            androidHardwareAccelerationDisabled={false}
+            androidLayerType="hardware"
+            mixedContentMode="always"
+            allowsInlineMediaPlayback={true}
+            mediaPlaybackRequiresUserAction={false}
+            // Error handling
+            onError={(syntheticEvent: any) => {
+              const { nativeEvent } = syntheticEvent;
+              console.error('WebView error:', nativeEvent);
+              Alert.alert(
+                'Map Loading Error',
+                'Unable to load the map. Please check your internet connection and try again.'
+              );
+            }}
+            onHttpError={(syntheticEvent: any) => {
+              const { nativeEvent } = syntheticEvent;
+              console.error('WebView HTTP error:', nativeEvent.statusCode, nativeEvent.description);
+            }}
+            renderLoading={() => (
+              <Box className="items-center justify-center flex-1 bg-gray-50">
+                <VStack space="md" className="items-center">
+                  <Spinner size="large" color={Colors.primary.blue} />
+                  <Text className="text-sm" style={{ color: Colors.text.body }}>Loading map...</Text>
+                </VStack>
+              </Box>
+            )}
+            renderError={(errorName: any) => (
+              <Box className="items-center justify-center flex-1 bg-gray-100 px-6">
+                <VStack space="md" className="items-center">
+                  <MapPin size={48} color="#EF4444" />
+                  <Text style={{ fontSize: 16, color: Colors.text.head, fontWeight: '600', textAlign: 'center' }}>
+                    Map Failed to Load
+                  </Text>
+                  <Text style={{ fontSize: 14, color: Colors.text.sub, textAlign: 'center' }}>
+                    {errorName || 'An error occurred while loading the map. Please try switching to List view.'}
+                  </Text>
+                  <Button
+                    size="sm"
+                    style={{ backgroundColor: Colors.primary.blue, marginTop: 12 }}
+                    onPress={() => setCurrentView('list')}
+                  >
+                    <ButtonText className="text-white">Switch to List View</ButtonText>
+                  </Button>
+                </VStack>
+              </Box>
+            )}
+          />
+        ) : (
+          <Box className="items-center justify-center flex-1 bg-gray-100 px-6">
+            <VStack space="md" className="items-center">
+              <MapPin size={48} color={Colors.text.sub} />
+              <Text style={{ fontSize: 16, color: Colors.text.head, fontWeight: '600', textAlign: 'center' }}>
+                Map Not Available
+              </Text>
+              <Text style={{ fontSize: 14, color: Colors.text.sub, textAlign: 'center' }}>
+                WebView is not supported on this platform. Please use the List view instead.
+              </Text>
+              <Button
+                size="sm"
+                style={{ backgroundColor: Colors.primary.blue, marginTop: 12 }}
+                onPress={() => setCurrentView('list')}
+              >
+                <ButtonText className="text-white">Switch to List View</ButtonText>
+              </Button>
+            </VStack>
+          </Box>
+        )}
+      </Box>
+    );
+  };
 
   return (
     <Box className="flex-1 bg-gray-50">
