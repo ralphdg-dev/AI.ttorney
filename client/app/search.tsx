@@ -121,31 +121,23 @@ const SearchScreen: React.FC = () => {
               data={searchResults}
               keyExtractor={(item) => String(item.id)}
               renderItem={({ item, index }: { item: any; index: number }) => {
-                const isAnon = !!item?.is_anonymous;
-                const userData = item?.users || {};
-                
+                // Handle both cached post format (from Timeline) and raw API format
                 const postData = {
                   id: item.id,
-                  user: isAnon
-                    ? { 
-                        name: 'Anonymous User', 
-                        username: 'anonymous', 
-                        avatar: 'https://cdn-icons-png.flaticon.com/512/1077/1077114.png' // Detective icon for anonymous
-                      }
-                    : {
-                        name: userData?.full_name || userData?.username || 'User',
-                        username: userData?.username || 'user',
-                        avatar: userData?.photo_url || userData?.profile_photo || undefined,
-                        isLawyer: userData?.role === 'verified_lawyer',
-                        lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
-                        account_status: userData?.account_status,
-                      },
-                  timestamp: item.created_at,
+                  user: item.user || {
+                    name: item.users?.full_name || item.users?.username || 'User',
+                    username: item.users?.username || 'user',
+                    avatar: item.users?.photo_url || item.users?.profile_photo || undefined,
+                    isLawyer: item.users?.role === 'verified_lawyer',
+                    lawyerBadge: item.users?.role === 'verified_lawyer' ? 'Verified' : undefined,
+                    account_status: item.users?.account_status,
+                  },
+                  timestamp: item.timestamp || item.created_at,
                   created_at: item.created_at,
-                  category: item.category || 'General',
+                  category: item.category || item.domain || 'General',
                   content: item.content || item.body || '',
-                  comments: 0,
-                  is_anonymous: isAnon,
+                  comments: item.comments || 0,
+                  is_anonymous: item.is_anonymous,
                   is_flagged: !!item?.is_flagged,
                 };
 
