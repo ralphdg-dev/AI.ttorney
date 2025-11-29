@@ -192,26 +192,34 @@ export default function DirectoryScreen() {
     }
   }, [filterVisible, fadeAnim, slideAnim]);
 
-  const fetchLawyers = useCallback(async (forceRefresh: boolean = false) => {
+  const fetchLawyers = useCallback(async (forceRefresh: boolean = false, retryCount: number = 0) => {
+    const MAX_RETRIES = 2;
+    const now = Date.now();
+    const hasCachedData = frontendCache.lawyers && frontendCache.lawyers.length > 0;
+    
     try {
-      // Don't show loading spinner if we have cached data
-      const now = Date.now();
-      const hasCachedData = frontendCache.lawyers && frontendCache.lawyers.length > 0;
-      
-      if (!hasCachedData) {
-        setLoading(true);
-      }
-
-      // Check cache first
-      if (
-        !forceRefresh &&
-        frontendCache.lawyers &&
-        now - frontendCache.timestamp < frontendCache.ttl
-      ) {
+      // ⚡ OPTIMIZATION 1: Stale-While-Revalidate Pattern
+      // Show cached data immediately, fetch fresh data in background
+      if (!forceRefresh && hasCachedData) {
+        const cacheAge = now - frontendCache.timestamp;
+        const isStale = cacheAge > frontendCache.ttl;
+        
+        // Show cached data instantly (0ms load time)
+        console.log(`⚡ Instant load from cache (${Math.round(cacheAge / 1000)}s old)`);
         setLawyersData(frontendCache.lawyers);
         setLoading(false);
         setRefreshing(false);
-        return;
+        
+        // If cache is fresh enough, don't fetch
+        if (!isStale) {
+          return;
+        }
+        
+        // If stale, fetch in background without blocking UI
+        console.log('🔄 Background refresh for stale cache...');
+      } else {
+        // No cache - show loading state
+        setLoading(true);
       }
 
       const { NetworkConfig } = await import('@/utils/networkConfig');
@@ -220,36 +228,56 @@ export default function DirectoryScreen() {
         ? `${apiUrl}/legal-consultations/lawyers?refresh=true`
         : `${apiUrl}/legal-consultations/lawyers`;
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
-      const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeoutId);
+      const response = await fetch(url, {
+        // Add cache headers for better performance
+        headers: {
+          'Cache-Control': 'max-age=300', // 5 minutes browser cache
+        }
+      });
+      
+      // ⚡ OPTIMIZATION 3: Handle non-200 responses gracefully
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
       
       const result = await response.json();
 
       if (result.success) {
         const lawyers = result.data || [];
+        console.log(`✅ Fetched ${lawyers.length} lawyers from server`);
         setLawyersData(lawyers);
 
-        // Update cache
+        // Update cache with fresh data
         frontendCache.lawyers = lawyers;
         frontendCache.timestamp = now;
       } else {
-        // Only show alert if we don't have cached data
-        if (!hasCachedData) {
-          Alert.alert("Error", "Failed to fetch lawyers: " + result.error);
-        }
+        throw new Error(result.error || 'Unknown error');
       }
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        console.warn('Lawyer fetch timeout');
-      } else {
-        console.error("Error fetching lawyers:", error);
+      console.error("Error fetching lawyers:", error.message);
+      
+      // ⚡ OPTIMIZATION 4: Retry logic for transient failures
+      if (retryCount < MAX_RETRIES && error.name !== 'AbortError') {
+        console.log(`🔄 Retrying lawyer fetch... (${retryCount + 1}/${MAX_RETRIES}) - Error: ${error.message}`);
+        // Exponential backoff: 1s, 2s
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+        return fetchLawyers(forceRefresh, retryCount + 1);
       }
-      // Only show alert if we don't have cached data
-      if (!frontendCache.lawyers || frontendCache.lawyers.length === 0) {
-        Alert.alert("Error", "Failed to connect to server");
+      
+      // ⚡ OPTIMIZATION 5: Graceful degradation - use stale cache on error
+      if (hasCachedData) {
+        console.log('⚠️ Using stale cache due to network error');
+        setLawyersData(frontendCache.lawyers);
+        // Show subtle error indicator without blocking UI
+        if (!forceRefresh) {
+          console.warn('Failed to refresh, showing cached data');
+        }
+      } else {
+        // No cache available - show user-friendly error
+        const errorMessage = error.name === 'AbortError' 
+          ? 'Connection is slow. Please check your internet and try again.'
+          : 'Unable to load lawyers. Please try again later.';
+        Alert.alert("Connection Error", errorMessage);
       }
     } finally {
       setLoading(false);
@@ -268,19 +296,23 @@ export default function DirectoryScreen() {
     try {
       const { NetworkConfig } = await import('@/utils/networkConfig');
       const apiUrl = await NetworkConfig.getBestApiUrl();
+      
+      // ⚡ OPTIMIZATION: Faster timeout (3s instead of 5s)
       const response = await fetch(
         `${apiUrl}/legal-consultations/user/${user.id}/active-requests`,
-        { signal: AbortSignal.timeout(5000) } // 5s timeout
+        { signal: AbortSignal.timeout(3000) }
       );
       
       if (response.ok) {
         const result = await response.json();
         setHasActiveRequest(result.has_active_requests || false);
       } else {
+        // Fail silently - not critical for UX
         setHasActiveRequest(false);
       }
     } catch (error) {
-      console.warn('Error checking active requests:', error);
+      // Fail silently - not critical for UX
+      console.warn('Error checking active requests (non-critical):', error);
       setHasActiveRequest(false);
     } finally {
       setCheckingActiveRequest(false);
@@ -293,23 +325,21 @@ export default function DirectoryScreen() {
   useEffect(() => {
     // Only fetch lawyers when lawyers tab is active
     if (activeTab === "lawyers") {
-      // Check if we have valid cached data
-      const now = Date.now();
-      const hasCachedData = frontendCache.lawyers && 
-                           frontendCache.lawyers.length > 0 &&
-                           now - frontendCache.timestamp < frontendCache.ttl;
+      // ⚡ OPTIMIZATION: Always show cached data first, then refresh
+      const hasCachedData = frontendCache.lawyers && frontendCache.lawyers.length > 0;
       
-      // Only fetch if we don't have cached data OR it's the first load
-      if (!hasCachedData || !hasLoadedRef.current) {
-        fetchLawyers();
-        hasLoadedRef.current = true;
-      } else {
-        // Use cached data immediately
+      if (hasCachedData) {
+        // Show cached data immediately (instant load)
+        console.log('⚡ Showing cached lawyers instantly');
         setLawyersData(frontendCache.lawyers);
         setLoading(false);
       }
       
-      // Always check active request (it's fast)
+      // Always fetch fresh data (will use stale-while-revalidate)
+      fetchLawyers();
+      hasLoadedRef.current = true;
+      
+      // Check active request in parallel (non-blocking)
       checkActiveRequest();
     }
   }, [activeTab, fetchLawyers, checkActiveRequest]);
