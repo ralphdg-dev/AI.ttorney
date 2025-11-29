@@ -110,8 +110,7 @@ const LawyerProfilePage: React.FC = () => {
   const [profileData, setProfileData] = useState<ProfileData>({
     name: "",
     email: "",
-    avatar:
-      "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
+    avatar: "", // Empty by default - will show initials fallback
     experience: "8 years",
     verificationStatus: "Verified Lawyer",
   });
@@ -560,7 +559,7 @@ const LawyerProfilePage: React.FC = () => {
         const userProfileData: ProfileData = {
           name: user.full_name || "Attorney",
           email: user.email || "",
-          avatar: user.profile_photo || (user as any).photo_url || profileData.avatar,
+          avatar: user.profile_photo || (user as any).photo_url || "", // Empty string triggers initials fallback
           experience: profileData.experience,
           verificationStatus:
             user.role === "verified_lawyer"
@@ -588,7 +587,7 @@ const LawyerProfilePage: React.FC = () => {
     if (user) {
       setProfileData(prev => ({
         ...prev,
-        avatar: user.profile_photo || (user as any).photo_url || prev.avatar,
+        avatar: user.profile_photo || (user as any).photo_url || "", // Empty triggers initials fallback
         name: user.full_name || prev.name,
         email: user.email || prev.email,
       }));
@@ -795,7 +794,7 @@ const LawyerProfilePage: React.FC = () => {
         <View style={tw`p-4 bg-white border-b border-gray-200`}>
           <View style={tw`flex-row items-center`}>
             <View style={[tw`relative mr-4`, { overflow: 'visible' }]}>
-              {profileData.avatar && !profileData.avatar.includes('unsplash') ? (
+              {profileData.avatar && profileData.avatar.trim() !== '' && !profileData.avatar.includes('unsplash') && !profileData.avatar.includes('flaticon') ? (
                 <Image
                   source={{ uri: profileData.avatar }}
                   style={[tw`rounded-full`, { width: avatarSize, height: avatarSize }]}

@@ -133,16 +133,18 @@ export default function UserProfilePage() {
             <Avatar 
               size="xl" 
               style={{ 
-                backgroundColor: '#023D7B'
+                backgroundColor: Colors.primary.blue
               }}
             >
-              <AvatarFallbackText style={{ color: '#FFFFFF' }}>
+              <AvatarFallbackText style={{ color: '#FFFFFF', fontWeight: '600' }}>
                 {user?.full_name || "User"}
               </AvatarFallbackText>
-              <AvatarImage 
-                source={{ uri: user?.profile_photo || undefined }} 
-                alt="Profile"
-              />
+              {user?.profile_photo && (
+                <AvatarImage 
+                  source={{ uri: user.profile_photo }} 
+                  alt="Profile"
+                />
+              )}
             </Avatar>
           </View>
           

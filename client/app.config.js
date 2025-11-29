@@ -22,7 +22,7 @@ export default {
       ],
       config: {
         googleMaps: {
-          apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
+          apiKey: process.env.GOOGLE_MAPS_API_KEY
         }
       }
     },
@@ -53,8 +53,8 @@ export default {
       [
         "react-native-maps",
         {
-          ios: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
-          android: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
+          ios: process.env.GOOGLE_MAPS_API_KEY,
+          android: process.env.GOOGLE_MAPS_API_KEY
         }
       ]
     ],

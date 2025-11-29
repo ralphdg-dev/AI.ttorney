@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { WebView as RNWebView } from 'react-native-webview';
 import * as Location from 'expo-location';
+import Constants from 'expo-constants';
 import { filterByRadius } from '@/utils/distanceCalculator';
 import { VStack } from '@/components/ui/vstack';
 import { HStack } from '@/components/ui/hstack';
@@ -610,7 +611,7 @@ export default function GoogleLawFirmsFinder({ searchQuery, cache }: GoogleLawFi
     if (userLocation) {
       // Use reverse geocoding to get location name, then search
       try {
-        const geocodeResponse = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${userLocation.coords.latitude},${userLocation.coords.longitude}&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}`);
+        const geocodeResponse = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${userLocation.coords.latitude},${userLocation.coords.longitude}&key=${Constants.expoConfig?.extra?.googleMapsApiKey}`);
         const geocodeData = await geocodeResponse.json();
         
         if (geocodeData.status === 'OK' && geocodeData.results[0]) {
@@ -800,7 +801,7 @@ export default function GoogleLawFirmsFinder({ searchQuery, cache }: GoogleLawFi
 
   // Generate sorted map HTML for better marker ordering
   const generateSortedMapHTML = useCallback(() => {
-    const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const googleMapsApiKey = Constants.expoConfig?.extra?.googleMapsApiKey;
     
     const markers = sortedLawFirms.map(firm => ({
       lat: firm.latitude,
@@ -1740,7 +1741,7 @@ export default function GoogleLawFirmsFinder({ searchQuery, cache }: GoogleLawFi
   // Render Map View (Full Screen) - Uses same cached data as list view
   const renderMapView = () => {
     // Check if Google Maps API key is available
-    const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const googleMapsApiKey = Constants.expoConfig?.extra?.googleMapsApiKey;
     
     if (!googleMapsApiKey) {
       return (
@@ -1751,7 +1752,7 @@ export default function GoogleLawFirmsFinder({ searchQuery, cache }: GoogleLawFi
               Google Maps API Key Missing
             </Text>
             <Text style={{ fontSize: 14, color: Colors.text.sub, textAlign: 'center' }}>
-              Please configure EXPO_PUBLIC_GOOGLE_MAPS_API_KEY in your environment variables.
+              Please configure GOOGLE_MAPS_API_KEY in your environment variables.
             </Text>
           </VStack>
         </Box>

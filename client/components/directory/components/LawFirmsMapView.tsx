@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Alert, Linking, Platform, ScrollView, Keyboard, Dimensions } from 'react-native';
 import * as Location from 'expo-location';
+import Constants from 'expo-constants';
 import { NetworkConfig } from '../../../utils/networkConfig';
 import { VStack } from '@/components/ui/vstack';
 import { HStack } from '@/components/ui/hstack';
@@ -648,7 +649,7 @@ export default function LawFirmsMapView({ searchQuery, cache }: LawFirmsMapViewP
   };
 
   const generateMapHTML = () => {
-    const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const googleMapsApiKey = Constants.expoConfig?.extra?.googleMapsApiKey;
     
     // If no API key, return a message
     if (!googleMapsApiKey) {
