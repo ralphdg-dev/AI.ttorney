@@ -62,6 +62,11 @@ async def sign_in(request: Request, credentials: UserSignIn):
     # If user is not verified, automatically send OTP for verification
     profile = result.get("profile", {})
     is_verified = profile.get("is_verified", False)
+    user_role = profile.get("role", "guest")
+    
+    # Debug logging to help troubleshoot verification issues
+    logger.info(f"🔍 Login verification check - Email: {credentials.email}")
+    logger.info(f"🔍 Profile data: role={user_role}, is_verified={is_verified}")
     
     response_data = {
         "success": True,
@@ -73,13 +78,14 @@ async def sign_in(request: Request, credentials: UserSignIn):
         "redirect_path": result.get("redirect_path", "/home")
     }
     
-    # Send OTP to unverified users automatically
-    if not is_verified:
+    # Only send OTP to users who are truly unverified (guest role + is_verified=False)
+    # This allows manually verified users to login without OTP
+    if user_role == "guest" and not is_verified:
         try:
             supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
             user_check = supabase.table('users').select('full_name').eq('email', credentials.email).execute()
             user_name = user_check.data[0].get('full_name', 'User') if user_check.data else 'User'
-            logger.info(f"📧 Sending verification OTP for unverified user: {credentials.email}")
+            logger.info(f"📧 Sending verification OTP for unverified guest user: {credentials.email}")
             
             otp_result = await otp_service.send_verification_otp(credentials.email, user_name)
             response_data["otp_sent"] = otp_result["success"]
@@ -91,6 +97,11 @@ async def sign_in(request: Request, credentials: UserSignIn):
         except Exception as otp_error:
             logger.error(f"❌ Error sending verification OTP: {str(otp_error)}")
             response_data["otp_sent"] = False
+    else:
+        # User is verified or has a proper role - no OTP needed
+        logger.info(f"✅ User verified or has proper role - no OTP required: {credentials.email}")
+        response_data["otp_sent"] = False
+        response_data["requires_verification"] = False
     
     return response_data
 
