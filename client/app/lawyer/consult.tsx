@@ -575,7 +575,7 @@ const LawyerConsultPage: React.FC = () => {
                           : tw`text-gray-700`,
                       ]}
                     >
-                      {filterOption === "all" ? "All Requests" : filterOption}
+                      {filterOption === "all" ? "All Requests" : filterOption === "accepted" ? "Ongoing" : filterOption}
                     </Text>
                   </TouchableOpacity>
                 )
