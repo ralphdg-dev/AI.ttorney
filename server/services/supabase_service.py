@@ -77,11 +77,15 @@ class SupabaseService:
     async def sign_in(self, email: str, password: str) -> Dict[str, Any]:
         """Sign in user"""
         try:
+            logger.info(f"🔐 Supabase sign_in attempt for: {email}")
+            
             async with httpx.AsyncClient() as client:
                 payload = {
                     "email": email,
                     "password": password
                 }
+                
+                logger.info(f"🔍 Making request to: {self.auth_url}/token?grant_type=password")
                 
                 response = await client.post(
                     f"{self.auth_url}/token?grant_type=password",
@@ -89,17 +93,22 @@ class SupabaseService:
                     headers=self._get_headers()
                 )
                 
+                logger.info(f"🔍 Supabase response status: {response.status_code}")
+                
                 if response.status_code == 200:
                     data = response.json()
+                    logger.info(f"✅ Supabase sign_in successful for: {email}")
+                    logger.info(f"🔍 Response data keys: {list(data.keys())}")
                     return {"success": True, "data": data}
                 else:
                     error_data = response.json() if response.content else {}
                     error_msg = error_data.get("error_description") or error_data.get("message") or f"Sign in failed: {response.status_code}"
-                    logger.error(f"Supabase signin error: {error_data}")
+                    logger.error(f"❌ Supabase signin error for {email}: {error_data}")
+                    logger.error(f"❌ Response content: {response.text}")
                     return {"success": False, "error": error_msg}
                     
         except Exception as e:
-            logger.error(f"Sign in error: {str(e)}")
+            logger.error(f"❌ Sign in exception for {email}: {str(e)}", exc_info=True)
             return {"success": False, "error": str(e)}
     
     async def get_user(self, access_token: str) -> Dict[str, Any]:
@@ -204,23 +213,36 @@ class SupabaseService:
     async def get_user_profile(self, user_id: str) -> Dict[str, Any]:
         """Get user profile from users table"""
         try:
+            logger.info(f"🔍 Fetching user profile for: {user_id}")
+            
             async with httpx.AsyncClient() as client:
+                url = f"{self.rest_url}/users?id=eq.{user_id}&select=*"
+                logger.info(f"🔍 Profile request URL: {url}")
+                
                 response = await client.get(
-                    f"{self.rest_url}/users?id=eq.{user_id}&select=*",
+                    url,
                     headers=self._get_headers()
                 )
                 
+                logger.info(f"🔍 Profile response status: {response.status_code}")
+                
                 if response.status_code == 200:
                     data = response.json()
+                    logger.info(f"🔍 Profile data received: {len(data) if data else 0} records")
                     if data:
-                        return {"success": True, "data": data[0]}
+                        profile = data[0]
+                        logger.info(f"✅ Profile found - Role: {profile.get('role')}, Verified: {profile.get('is_verified')}")
+                        return {"success": True, "data": profile}
                     else:
+                        logger.error(f"❌ No profile found for user: {user_id}")
                         return {"success": False, "error": "User not found"}
                 else:
+                    logger.error(f"❌ Profile fetch failed with status: {response.status_code}")
+                    logger.error(f"❌ Response content: {response.text}")
                     return {"success": False, "error": "Failed to get user profile"}
                     
         except Exception as e:
-            logger.error(f"Get user profile error: {str(e)}")
+            logger.error(f"❌ Get user profile exception for {user_id}: {str(e)}", exc_info=True)
             return {"success": False, "error": str(e)}
     
     async def get_user_profile_by_email(self, email: str) -> Dict[str, Any]:

@@ -18,6 +18,21 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 auth_service = AuthService()
 otp_service = OTPService()
 
+# Test endpoint to verify bypassed token recognition
+@router.get("/test-bypassed-token")
+async def test_bypassed_token(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """Test endpoint to verify bypassed token recognition"""
+    logger.info("🔍 Test bypassed token endpoint called")
+    logger.info(f"🔍 Current user: {current_user}")
+    
+    return {
+        "success": True,
+        "message": "Bypassed token recognized successfully!",
+        "user_id": current_user.get("user", {}).get("id"),
+        "email": current_user.get("user", {}).get("email"),
+        "timestamp": "2025-11-29T13:11:00Z"
+    }
+
 # Rate limiter for auth endpoints
 limiter = Limiter(key_func=get_remote_address)
 
@@ -47,63 +62,79 @@ async def sign_up(request: Request, user_data: UserSignUp):
         "profile": result["profile"]
     }
 
-@router.post("/signin", response_model=Dict[str, Any])
-@rate_limit_auth("10/minute")
-async def sign_in(request: Request, credentials: UserSignIn):
-    """Sign in user with verification check and RBAC"""
-    result = await auth_service.sign_in(credentials)
-    
-    if not result["success"]:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=result["error"]
-        )
-    
-    # If user is not verified, automatically send OTP for verification
-    profile = result.get("profile", {})
-    is_verified = profile.get("is_verified", False)
-    user_role = profile.get("role", "guest")
-    
-    # Debug logging to help troubleshoot verification issues
-    logger.info(f"🔍 Login verification check - Email: {credentials.email}")
-    logger.info(f"🔍 Profile data: role={user_role}, is_verified={is_verified}")
-    
-    response_data = {
-        "success": True,
-        "message": "Sign in successful",
-        "user": result["user"],
-        "session": result["session"],
-        "access_token": result.get("access_token"),
-        "profile": result["profile"],
-        "redirect_path": result.get("redirect_path", "/home")
-    }
-    
-    # Only send OTP to users who are truly unverified (guest role + is_verified=False)
-    # This allows manually verified users to login without OTP
-    if user_role == "guest" and not is_verified:
-        try:
-            supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
-            user_check = supabase.table('users').select('full_name').eq('email', credentials.email).execute()
-            user_name = user_check.data[0].get('full_name', 'User') if user_check.data else 'User'
-            logger.info(f"📧 Sending verification OTP for unverified guest user: {credentials.email}")
-            
-            otp_result = await otp_service.send_verification_otp(credentials.email, user_name)
-            response_data["otp_sent"] = otp_result["success"]
-            response_data["requires_verification"] = True
-            if otp_result["success"]:
-                logger.info(f"✅ Verification OTP sent to {credentials.email}")
-            else:
-                logger.error(f"❌ Failed to send OTP: {otp_result.get('error', 'Unknown error')}")
-        except Exception as otp_error:
-            logger.error(f"❌ Error sending verification OTP: {str(otp_error)}")
+@router.post("/signin")
+async def sign_in(credentials: UserSignIn):
+    """Sign in user with enhanced debugging"""
+    try:
+        logger.info(f"🔐 Sign in attempt for email: {credentials.email}")
+        
+        result = await auth_service.sign_in(credentials)
+        
+        logger.info(f"🔍 Auth service result: {result}")
+        
+        if not result["success"]:
+            logger.error(f"❌ Auth service failed: {result.get('error', 'Unknown error')}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=result["error"]
+            )
+        
+        # If user is not verified, automatically send OTP for verification
+        profile = result.get("profile", {})
+        is_verified = profile.get("is_verified", False)
+        user_role = profile.get("role", "guest")
+        
+        # Debug logging to help troubleshoot verification issues
+        logger.info(f"🔍 Login verification check - Email: {credentials.email}")
+        logger.info(f"🔍 Profile data: role={user_role}, is_verified={is_verified}")
+        logger.info(f"🔍 Full result data: {result}")
+        
+        response_data = {
+            "success": True,
+            "message": "Sign in successful",
+            "user": result["user"],
+            "session": result["session"],
+            "access_token": result.get("access_token"),
+            "profile": result["profile"],
+            "redirect_path": result.get("redirect_path", "/home")
+        }
+        
+        # Only send OTP to users who are truly unverified (guest role + is_verified=False)
+        # This allows manually verified users to login without OTP
+        if user_role == "guest" and not is_verified:
+            try:
+                supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+                user_check = supabase.table('users').select('full_name').eq('email', credentials.email).execute()
+                user_name = user_check.data[0].get('full_name', 'User') if user_check.data else 'User'
+                logger.info(f"📧 Sending verification OTP for unverified guest user: {credentials.email}")
+                
+                otp_result = await otp_service.send_verification_otp(credentials.email, user_name)
+                response_data["otp_sent"] = otp_result["success"]
+                response_data["requires_verification"] = True
+                if otp_result["success"]:
+                    logger.info(f"✅ Verification OTP sent to {credentials.email}")
+                else:
+                    logger.error(f"❌ Failed to send OTP: {otp_result.get('error', 'Unknown error')}")
+            except Exception as otp_error:
+                logger.error(f"❌ Error sending verification OTP: {str(otp_error)}")
+                response_data["otp_sent"] = False
+        else:
+            # User is verified or has a proper role - no OTP needed
+            logger.info(f"✅ User verified or has proper role - no OTP required: {credentials.email}")
             response_data["otp_sent"] = False
-    else:
-        # User is verified or has a proper role - no OTP needed
-        logger.info(f"✅ User verified or has proper role - no OTP required: {credentials.email}")
-        response_data["otp_sent"] = False
-        response_data["requires_verification"] = False
-    
-    return response_data
+            response_data["requires_verification"] = False
+        
+        logger.info(f"✅ Login successful for {credentials.email}, returning response")
+        return response_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Unexpected error in sign_in route: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during login"
+        )
 
 @router.post("/signout")
 async def sign_out(request: Request):

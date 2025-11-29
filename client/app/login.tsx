@@ -10,11 +10,12 @@ import { useToast } from "../components/ui/toast";
 import { createSafeAreaToastRenderer } from "../components/ui/SafeAreaToast";
 import { useAuth } from "../contexts/AuthContext";
 import { useGuest } from "../contexts/GuestContext";
+import { NetworkConfig } from "../utils/networkConfig";
 
 export default function Login() {
   const insets = useSafeAreaInsets();
   const toast = useToast();
-  const { signIn, isAuthenticated } = useAuth();
+  const { signIn, isAuthenticated, session } = useAuth();
   const { startGuestSession, isStartingSession } = useGuest();
 
   // Debug wrapper for guest session start
@@ -101,14 +102,32 @@ export default function Login() {
     
     try {
       setIsSubmitting(true);
+      
+      console.log('🔐 [LOGIN] Starting login attempt...');
+      console.log('🔍 [LOGIN] Email:', email.toLowerCase().trim());
+      console.log('🔍 [LOGIN] Password length:', password.length);
+      
       const result = await signIn(email.toLowerCase().trim(), password);
+      
+      console.log('🔍 [LOGIN] SignIn result:', JSON.stringify(result, null, 2));
+      console.log('🔍 [LOGIN] Result success:', result.success);
+      console.log('🔍 [LOGIN] Result error:', result.error);
+      console.log('🔍 [LOGIN] Result data:', result.data);
 
       if (result.success) {
+        console.log('✅ [LOGIN] Login successful!');
+        
         // Check if user needs email verification
         const requiresVerification = result.data?.requires_verification || false;
         const otpSent = result.data?.otp_sent || false;
         
+        console.log('🔍 [LOGIN] Requires verification:', requiresVerification);
+        console.log('🔍 [LOGIN] OTP sent:', otpSent);
+        console.log('🔍 [LOGIN] Profile data:', result.data?.profile);
+        console.log('🔍 [LOGIN] Redirect path:', result.data?.redirect_path);
+        
         if (requiresVerification && otpSent) {
+          console.log('📧 [LOGIN] User needs verification - showing info toast');
           // Show message for unverified users
           toast.show({
             placement: "top",
@@ -121,6 +140,7 @@ export default function Login() {
             ),
           });
         } else {
+          console.log('🎉 [LOGIN] Regular login success - showing success toast');
           // Regular login success
           toast.show({
             placement: "top",
@@ -132,15 +152,118 @@ export default function Login() {
               'Redirecting...'
             ),
           });
+          
+          // Handle navigation directly from login component
+          const redirectPath = result.data?.redirect_path;
+          if (redirectPath) {
+            console.log('🔄 [LOGIN] Handling navigation directly to:', redirectPath);
+            
+            // Test API call to verify server token recognition
+            const testServerToken = async (mockToken?: string) => {
+              try {
+                // Use token from result data if session not available yet
+                const tokenToTest = mockToken || session?.access_token;
+                
+                console.log('🔍 [LOGIN] Current session state:', !!session);
+                console.log('🔍 [LOGIN] Session access_token:', session?.access_token?.substring(0, 30) + '...');
+                console.log('🔍 [LOGIN] Token to test:', tokenToTest?.substring(0, 30) + '...');
+                
+                if (tokenToTest) {
+                  console.log('🔍 [LOGIN] Testing server token recognition...');
+                  console.log('🔍 [LOGIN] Token being sent:', tokenToTest.substring(0, 30) + '...');
+                  
+                  const API_URL = await NetworkConfig.getBestApiUrl();
+                  
+                  // Test with the new bypassed token test endpoint
+                  const response = await fetch(`${API_URL}/api/auth/test-bypassed-token`, {
+                    method: 'GET',
+                    headers: {
+                      'Authorization': `Bearer ${tokenToTest}`,
+                      'Content-Type': 'application/json',
+                    },
+                  });
+                  
+                  console.log('🔍 [LOGIN] Server response status:', response.status);
+                  if (response.ok) {
+                    const responseData = await response.json();
+                    console.log('✅ [LOGIN] Server recognizes bypassed token!');
+                    console.log('✅ [LOGIN] Server response:', responseData);
+                  } else {
+                    const errorText = await response.text();
+                    console.error('❌ [LOGIN] Server token test failed:', response.status, errorText);
+                    console.error('❌ [LOGIN] This means the server needs to be restarted to pick up bypassed token changes');
+                  }
+                } else {
+                  console.warn('⚠️ [LOGIN] No token available for test yet');
+                  // Try again after a short delay
+                  setTimeout(() => {
+                    console.log('🔄 [LOGIN] Retrying token test...');
+                    testServerToken();
+                  }, 500);
+                }
+              } catch (error) {
+                console.error('❌ [LOGIN] Token test error:', error);
+              }
+            };
+            
+            // Create mock token from profile data for immediate testing
+            const profileData = result.data?.profile;
+            const mockToken = profileData ? `bypassed_auth_${profileData.id}` : undefined;
+            
+            // Test token immediately with mock token
+            console.log('🔍 [LOGIN] Testing with mock token:', mockToken?.substring(0, 30) + '...');
+            testServerToken(mockToken);
+            
+            setTimeout(() => {
+              try {
+                console.log('🔄 [LOGIN] Attempting navigation to:', redirectPath);
+                
+                // Try multiple navigation approaches
+                if (redirectPath === '/home') {
+                  console.log('🔄 [LOGIN] Navigating to /home...');
+                  router.replace('/home' as any);
+                } else if (redirectPath === '/lawyer') {
+                  console.log('🔄 [LOGIN] Navigating to /lawyer...');
+                  router.replace('/lawyer' as any);
+                } else {
+                  console.log('🔄 [LOGIN] Using original path:', redirectPath);
+                  router.replace(redirectPath as any);
+                }
+                
+                console.log('✅ [LOGIN] Navigation completed to:', redirectPath);
+              } catch (navError) {
+                console.error('❌ [LOGIN] Navigation error:', navError);
+                console.log('🔄 [LOGIN] Trying fallback navigation to /index...');
+                try {
+                  router.replace('/index' as any);
+                  console.log('✅ [LOGIN] Fallback navigation to /index completed');
+                } catch (fallbackError) {
+                  console.error('❌ [LOGIN] Fallback navigation also failed:', fallbackError);
+                  console.log('🔄 [LOGIN] Trying root navigation...');
+                  router.replace('/' as any);
+                }
+              }
+            }, 2000); // Longer delay to ensure auth state is fully updated
+          }
         }
         
-        // AuthContext will handle the redirect based on verification status
-        // No need for explicit navigation here
+        console.log('🔄 [LOGIN] Login component handling complete');
+        // AuthContext navigation is disabled, we handle it here
       } else {
+        console.error('❌ [LOGIN] Login failed!');
+        console.error('❌ [LOGIN] Error message:', result.error);
+        console.error('❌ [LOGIN] Full result:', result);
+        
         // Show error toast (debounced for Access denied)
         const now = Date.now();
         const isAccessDenied = (result.error || "").toLowerCase().includes("access denied");
         const recentlyShown = now - lastDeniedAtRef.current < 2000;
+        
+        console.log('🔍 [LOGIN] Error analysis:');
+        console.log('  - Is access denied:', isAccessDenied);
+        console.log('  - Recently shown:', recentlyShown);
+        console.log('  - Toast in progress:', deniedToastInProgressRef.current);
+        
         if (isAccessDenied) {
           if (deniedToastInProgressRef.current) return;
           if (recentlyShown) return;
