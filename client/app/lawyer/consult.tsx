@@ -205,7 +205,7 @@ const LawyerConsultPage: React.FC = () => {
       case "pending":
         return { bg: "#FEF3C7", text: "#78350F" }; // Light yellow bg, dark yellow text
       case "accepted":
-        return { bg: "#D1FAE5", text: "#064E3B" }; // Light green bg, dark green text
+        return { bg: "#FEF3C7", text: "#78350F" }; // Light yellow bg, dark yellow text
       case "rejected":
         return { bg: "#FEE2E2", text: "#7F1D1D" }; // Light red bg, dark red text
       case "completed":
@@ -618,6 +618,7 @@ const LawyerConsultPage: React.FC = () => {
               const ModeIcon = getModeIcon(request.consultation_mode);
               const modeStyle = getModeColor(request.consultation_mode);
               const statusStyle = getStatusColor(request.status);
+              const statusLabel = request.status === "accepted" ? "ongoing" : request.status;
 
               return (
                 <View
@@ -709,7 +710,7 @@ const LawyerConsultPage: React.FC = () => {
                             { color: statusStyle.text },
                           ]}
                         >
-                          {request.status}
+                          {statusLabel}
                         </Text>
                       </View>
                     </View>

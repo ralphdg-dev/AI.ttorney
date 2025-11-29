@@ -67,51 +67,60 @@ export default function ConsultationsScreen() {
 
     try {
       setLoading(true);
-      console.log("🔄 Fetching consultations for user:", user.id);
+      console.log("🔄 Fetching consultations for user via API:", user.id);
 
-      // Optimized query with limit for faster initial load
-      const { data, error } = await supabase
-        .from("consultation_requests")
-        .select(
-          `
-          *,
-          lawyer_info:lawyer_id (
-            name,
-            specialization,
-            location
-          )
-        `
-        )
-        .eq("user_id", user.id)
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false })
-        .limit(50); // Limit to 50 most recent for faster loading
+      const { NetworkConfig } = await import('@/utils/networkConfig');
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const headers = await getAuthHeaders();
 
-      if (error) {
-        console.error("❌ Error fetching consultations:", error);
-        setLoading(false);
+      const requestUrl = `${apiUrl}/consultation-requests/user/${user.id}?page=1&page_size=50&status_filter=all`;
+      console.log("📡 Requesting consultations from:", requestUrl);
+
+      const response = await fetch(requestUrl, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        let errorPayload: any = null;
+        try {
+          errorPayload = await response.json();
+        } catch {
+          // Ignore JSON parse errors for non-JSON responses
+        }
+
+        console.error("❌ Error fetching consultations from API:", {
+          status: response.status,
+          error: errorPayload,
+        });
+
+        if (!__DEV__) {
+          Alert.alert(
+            "Error",
+            "Failed to load your consultations. Please try again."
+          );
+        }
+
+        setConsultations([]);
         return;
       }
 
-      console.log("✅ Fetched consultations raw data:", JSON.stringify(data, null, 2));
-      console.log("📊 Total consultations found:", data?.length || 0);
+      const result = await response.json();
+      const items = Array.isArray(result?.data) ? result.data : [];
 
-      // Set consultations regardless of whether data is empty or not
-      setConsultations(data || []);
-      
-      if (!data || data.length === 0) {
-        console.log("⚠️  No consultations found for user");
-      } else {
-        console.log("✅ Setting consultations state with", data.length, "items");
-      }
+      console.log("✅ Fetched consultations from API:", {
+        total: items.length,
+      });
+
+      setConsultations(items || []);
     } catch (error) {
-      console.error("❌ Exception in fetchConsultations:", error);
+      console.error("❌ Exception in fetchConsultations (API):", error);
       setConsultations([]);
     } finally {
       setLoading(false);
       console.log("✅ Loading complete");
     }
-  }, [user?.id]);
+  }, [user?.id, getAuthHeaders]);
 
   const onRefresh = async () => {
     setRefreshing(true);
