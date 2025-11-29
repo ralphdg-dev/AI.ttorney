@@ -1,31 +1,23 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, ActivityIndicator, StatusBar, FlatList } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StatusBar, FlatList } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Search } from 'lucide-react-native';
 import Colors from '../constants/Colors';
-import { NetworkConfig } from '../utils/networkConfig';
 import Post from '../components/home/Post';
-import { useAuth } from '../contexts/AuthContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Header from '../components/Header';
 import { useForumCache } from '../contexts/ForumCacheContext';
 
 const SearchScreen: React.FC = () => {
   const router = useRouter();
   const { query: initialQueryParam } = useLocalSearchParams<{ query?: string }>();
-  const { session } = useAuth();
-  const { prefetchPost } = useForumCache();
+  const { prefetchPost, getCachedPosts } = useForumCache();
   const insets = useSafeAreaInsets();
 
   const [query] = useState<string>(typeof initialQueryParam === 'string' ? initialQueryParam : '');
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [hasSearched, setHasSearched] = useState<boolean>(false);
   const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
-
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Handle post press - reuse Timeline logic
   const handlePostPress = useCallback((postId: string) => {
@@ -60,106 +52,33 @@ const SearchScreen: React.FC = () => {
     setOpenMenuPostId(prev => prev === postId ? null : postId);
   }, []);
 
-  // Auth headers helper (exact copy from Timeline)
-  const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
-    try {
-      // First try to get token from AuthContext session
-      if (session?.access_token) {
-        return {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        };
-      }
-
-      // Fallback to AsyncStorage
-      const token = await AsyncStorage.getItem('access_token');
-      if (token) {
-        return {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        };
-      }
-
-      if (__DEV__) console.warn('Search: No authentication token available');
-      return { 'Content-Type': 'application/json' };
-    } catch (error) {
-      if (__DEV__) console.error('Search auth error:', error);
-      return { 'Content-Type': 'application/json' };
-    }
-  }, [session]);
-
-  // Fetch API (debounced)
+  // Frontend-only search - instant filtering of cached posts (no API call)
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!query?.trim()) {
       setSearchResults([]);
-      setLoading(false);
-      setError(null);
       setHasSearched(false);
       return;
     }
 
-    debounceRef.current = setTimeout(() => {
-      (async () => {
-        try {
-          setLoading(true);
-          setError(null);
-          setHasSearched(true);
-          const apiUrl = await NetworkConfig.getBestApiUrl();
-          const headers = await getAuthHeaders();
-
-          // Get all posts first, then filter client-side since backend doesn't support search yet
-          try {
-            const res = await fetch(`${apiUrl}/api/forum/posts/recent`, {
-              method: 'GET',
-              headers,
-            });
-            
-            if (res.ok) {
-              const data = await res.json();
-              let allPosts = [];
-              
-              if (Array.isArray(data)) {
-                allPosts = data;
-              } else if (Array.isArray(data?.data)) {
-                allPosts = data.data;
-              }
-              
-              // Filter posts that contain the search query
-              const filteredPosts = allPosts.filter((post: any) => {
-                const content = (post.content || post.body || '').toLowerCase();
-                const category = (post.category || '').toLowerCase();
-                const userName = (post.users?.full_name || post.users?.username || '').toLowerCase();
-                const searchTerm = query.toLowerCase();
-                
-                return content.includes(searchTerm) || 
-                       category.includes(searchTerm) || 
-                       userName.includes(searchTerm);
-              });
-              
-              setSearchResults(filteredPosts);
-            } else {
-              await res.text();
-              setError(`API Error: ${res.status} ${res.statusText}`);
-              setSearchResults([]);
-            }
-          } catch {
-            setError('Network error occurred');
-            setSearchResults([]);
-          }
-        } catch {
-          setError('Failed to fetch search results');
-          setSearchResults([]);
-        } finally {
-          setLoading(false);
-        }
-      })();
-    }, 350); // debounce 350ms
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [query, getAuthHeaders]);
+    setHasSearched(true);
+    
+    // Get cached posts from ForumCacheContext
+    const cachedPosts = getCachedPosts() || [];
+    
+    // Filter posts that contain the search query (instant, no network)
+    const searchTerm = query.toLowerCase().trim();
+    const filteredPosts = cachedPosts.filter((post: any) => {
+      const content = (post.content || post.body || '').toLowerCase();
+      const category = (post.category || post.domain || '').toLowerCase();
+      const userName = (post.user?.name || post.users?.full_name || post.users?.username || '').toLowerCase();
+      
+      return content.includes(searchTerm) || 
+             category.includes(searchTerm) || 
+             userName.includes(searchTerm);
+    });
+    
+    setSearchResults(filteredPosts);
+  }, [query, getCachedPosts]);
 
   const EmptyState = (
     <View className="flex-1 justify-center items-center px-8 py-12">
@@ -193,17 +112,7 @@ const SearchScreen: React.FC = () => {
           </View>
         )}
 
-        {loading ? (
-          <View className="flex-1 justify-center items-center">
-            <ActivityIndicator size="large" color={Colors.primary.blue} />
-            <Text className="text-gray-500 text-base mt-3">Searching discussions…</Text>
-          </View>
-        ) : error ? (
-          <View className="flex-1 justify-center items-center px-8">
-            <Text className="text-red-500 text-lg font-medium text-center">Search Error</Text>
-            <Text className="text-gray-500 text-sm text-center mt-2">{error}</Text>
-          </View>
-        ) : searchResults.length === 0 && hasSearched ? (
+        {searchResults.length === 0 && hasSearched ? (
           EmptyState
         ) : searchResults.length > 0 ? (
           <View style={{ flex: 1, backgroundColor: Colors.background.secondary }}>
