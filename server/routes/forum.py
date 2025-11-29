@@ -1116,7 +1116,15 @@ async def get_user_bookmarks(
         result = await bookmark_service.get_user_bookmarks(user_id)
         
         if result["success"]:
-            return ListPostsResponse(success=True, data=result.get("data", []))
+            data = result.get("data", []) or []
+            return ListPostsResponse(
+                success=True,
+                data=data,
+                hasMore=False,
+                total=len(data),
+                page=1,
+                limit=len(data)
+            )
         else:
             raise HTTPException(status_code=400, detail=result.get("error", "Failed to get bookmarks"))
             

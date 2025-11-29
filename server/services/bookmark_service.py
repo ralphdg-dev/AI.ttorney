@@ -130,12 +130,16 @@ class BookmarkService:
     async def get_user_bookmarks(self, user_id: str) -> Dict[str, Any]:
         """Get all bookmarks for a user with full post and user data"""
         try:
-                                                
+            logger.info(f"📚 Getting bookmarks for user: {user_id}")
+            
+            # Query all bookmarks for this user (select * to avoid column name issues)
             async with httpx.AsyncClient(timeout=20.0) as client:
                 bookmarks_response = await client.get(
-                    f"{self.supabase.rest_url}/user_forum_bookmarks?select=post_id,bookmarked_at&user_id=eq.{user_id}&order=bookmarked_at.desc",
+                    f"{self.supabase.rest_url}/user_forum_bookmarks?select=*&user_id=eq.{user_id}",
                     headers=self.supabase._get_headers(use_service_key=True)
                 )
+            
+            logger.info(f"📚 Bookmarks response: {bookmarks_response.status_code}")
             
             if bookmarks_response.status_code != 200:
                 details = {}
@@ -147,29 +151,37 @@ class BookmarkService:
                 return {"success": False, "error": details.get("message", "Failed to get bookmarks")}
             
             bookmarks = bookmarks_response.json() if bookmarks_response.content else []
+            logger.info(f"📚 Found {len(bookmarks)} bookmarks: {bookmarks}")
             
             if not bookmarks:
                 return {"success": True, "data": []}
             
                               
             post_ids = [str(b.get("post_id")) for b in bookmarks if b.get("post_id")]
+            logger.info(f"📚 Post IDs to fetch: {post_ids}")
             
             if not post_ids:
                 return {"success": True, "data": []}
             
-                                                                        
+            # Fetch full post details with user info
             ids_param = ",".join(post_ids)
+            posts_url = f"{self.supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&id=in.({ids_param})"
+            logger.info(f"📚 Posts URL: {posts_url}")
+            
             async with httpx.AsyncClient(timeout=20.0) as client:
                 posts_response = await client.get(
-                    f"{self.supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role)&id=in.({ids_param})",
+                    posts_url,
                     headers=self.supabase._get_headers(use_service_key=True)
                 )
             
+            logger.info(f"📚 Posts response: {posts_response.status_code}")
+            
             if posts_response.status_code != 200:
-                logger.error(f"Get posts for bookmarks failed: {posts_response.status_code}")
+                logger.error(f"Get posts for bookmarks failed: {posts_response.status_code} - {posts_response.text}")
                 return {"success": False, "error": "Failed to fetch post details"}
             
             posts = posts_response.json() if posts_response.content else []
+            logger.info(f"📚 Found {len(posts)} posts")
             
                                            
             if posts:

@@ -389,7 +389,11 @@ export default function BookmarkedPostsScreen() {
     <AuthGuard>
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
-        <Header title="Bookmarked Posts" showBackButton={true} />
+        <Header 
+          title="Bookmarked Posts" 
+          showBackButton={true} 
+          onBackPress={() => router.replace('/home')}
+        />
 
         {loading ? (
           <PostSkeletonList count={5} />
