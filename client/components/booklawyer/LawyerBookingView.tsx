@@ -848,28 +848,7 @@ export default function LawyerBookingView() {
       >
         {/* Lawyer Profile Card - Modern Design */}
         <VStack className={`${isSmallScreen ? 'mx-3 p-5' : 'mx-4 p-6'} mt-2 mb-3 bg-white rounded-2xl`} style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 }}>
-          <HStack className="items-start mb-5">
-            {lawyerData.avatar ? (
-              <View style={{ shadowColor: Colors.primary.blue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}>
-                <Image
-                  source={{ uri: lawyerData.avatar }}
-                  className={`${
-                    isSmallScreen ? "w-20 h-20" : "w-24 h-24"
-                  } rounded-2xl mr-4`}
-                  resizeMode="cover"
-                />
-              </View>
-            ) : (
-              <Box
-                className={`${
-                  isSmallScreen ? "w-20 h-20" : "w-24 h-24"
-                } rounded-2xl items-center justify-center mr-4`}
-                style={{ backgroundColor: Colors.primary.blue, shadowColor: Colors.primary.blue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}
-              >
-                <User size={isSmallScreen ? 36 : 44} color="white" strokeWidth={2.5} />
-              </Box>
-            )}
-            <VStack className="flex-1">
+          <VStack className="mb-5">
               <Text
                 className={`${
                   isSmallScreen ? "text-xl" : "text-2xl"
@@ -899,8 +878,7 @@ export default function LawyerBookingView() {
                   </Text>
                 </HStack>
               )}
-            </VStack>
-          </HStack>
+          </VStack>
 
           {/* Specializations - Modern Pills */}
           <VStack className="pb-5 mb-5 border-b" style={{ borderColor: '#F3F4F6' }}>
@@ -1324,7 +1302,7 @@ export default function LawyerBookingView() {
                 style={{ flex: 1, marginLeft: 8, color: Colors.text.head, fontSize: 14, padding: 0, outlineStyle: 'none' } as any}
                 value={mobileNumber}
                 onChangeText={handleMobileChange}
-                placeholder="+63 912 345 6789"
+                placeholder="09123456789"
                 keyboardType="phone-pad"
                 autoComplete="tel"
                 maxLength={20}

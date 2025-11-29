@@ -15,12 +15,14 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   Platform,
   Linking,
   Image,
   Animated,
   StatusBar,
   KeyboardAvoidingView,
+  Keyboard,
   } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
@@ -386,6 +388,7 @@ export default function ChatbotScreen() {
   const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false); // Track keyboard visibility for mobile
   const isStreamingRef = useRef<boolean>(false); // Track if currently streaming
   const isInitializingRef = useRef<boolean>(false); // Track initialization to prevent duplicate calls
   const messages = localMessages; // Same state for everyone
@@ -450,8 +453,24 @@ export default function ChatbotScreen() {
     }, [isGuestMode, setShowTutorial])
   );
   
-  // KeyboardAvoidingView handles keyboard events automatically - no manual listeners needed
-  
+  // Keyboard visibility detection for mobile - hide navbar when keyboard is open
+  useEffect(() => {
+    if (Platform.OS === 'web') return; // Skip on web
+    
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setIsKeyboardVisible(true)
+    );
+    const keyboardWillHide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setIsKeyboardVisible(false)
+    );
+    
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
+    };
+  }, []);
     
   // Sync localMessages to GuestChatContext for guest persistence (optimized)
   useEffect(() => {
@@ -1690,10 +1709,11 @@ export default function ChatbotScreen() {
       {/* KeyboardAvoidingView with immediate response */}
       <KeyboardAvoidingView
         style={tw`flex-1`}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-        keyboardVerticalOffset={0}
-        enabled={true}
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        enabled={Platform.OS !== 'web'}
       >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         {/* Messages list or centered placeholder */}
         <View style={tw`flex-1`}>
         {messages.length === 0 ? (
@@ -1757,7 +1777,7 @@ export default function ChatbotScreen() {
                 {(isLawyer() ? [
                   "Analyze the elements of estafa under Article 315 RPC",
                   "Compare grounds for annulment vs legal separation",
-                  "Summarize employer obligations under DOLE DO 174",
+                  "What constitutes a hostile work environment?",
                 ] : [
                   // Use single-word legal categories to trigger deterministic, comprehensive answers
                   "How do I file a small claims case?",
@@ -1928,6 +1948,7 @@ export default function ChatbotScreen() {
           />
         )}
         </View>
+        </TouchableWithoutFeedback>
 
         {/* Input Field - Sits directly on keyboard with no gap */}
         <View
@@ -1937,10 +1958,10 @@ export default function ChatbotScreen() {
               borderTopColor: Colors.border.light,
               backgroundColor: '#FFFFFF',
               paddingHorizontal: horizontalPadding,
-              paddingVertical: Platform.OS === 'android' ? 4 : 12,
-              paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 12) : 2,
+              paddingVertical: 8,
+              paddingBottom: 8,
               position: 'relative',
-              marginBottom: Platform.OS === 'android' ? 16 : 0
+              marginBottom: 0
             }
           ]}
         >
@@ -2040,26 +2061,24 @@ export default function ChatbotScreen() {
         </View>
       </KeyboardAvoidingView>
       
-      {/* Navbar - Fixed at bottom */}
-      <View
-        style={{
-          paddingBottom: Platform.OS === 'ios' ? insets.bottom : 0,
-        }}
-      >
-        {/* Only render navbar after auth state is properly loaded to prevent race condition */}
-        {initialAuthCheck ? (
-          isGuestMode && !user ? (
-            <GuestNavbar activeTab="ask" glossaryRef={glossaryRef} navbarRef={navbarRef} />
-          ) : user?.role === "verified_lawyer" ? (
-            <LawyerNavbar activeTab="chatbot" />
+      {/* Navbar - Fixed at bottom, hidden when keyboard is visible on mobile */}
+      {!isKeyboardVisible && (
+        <>
+          {/* Only render navbar after auth state is properly loaded to prevent race condition */}
+          {initialAuthCheck ? (
+            isGuestMode && !user ? (
+              <GuestNavbar activeTab="ask" glossaryRef={glossaryRef} navbarRef={navbarRef} />
+            ) : user?.role === "verified_lawyer" ? (
+              <LawyerNavbar activeTab="chatbot" />
+            ) : (
+              <Navbar activeTab="ask" />
+            )
           ) : (
-            <Navbar activeTab="ask" />
-          )
-        ) : (
-          // Show empty placeholder while auth is loading to prevent navbar flashing
-          <View style={{ height: LAYOUT.NAVBAR_HEIGHT + (Platform.OS === 'ios' ? insets.bottom : 0) }} />
-        )}
-      </View>
+            // Show empty placeholder while auth is loading to prevent navbar flashing
+            <View style={{ height: LAYOUT.NAVBAR_HEIGHT + (Platform.OS === 'ios' ? insets.bottom : 0) }} />
+          )}
+        </>
+      )}
       
       {!isGuestMode && initialAuthCheck && <SidebarWrapper />}
       
