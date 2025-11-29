@@ -4,7 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native';
 import tw from "tailwind-react-native-classnames";
 import Header from "../components/Header";
-import Navbar from "../../client/components/Navbar";
+import Navbar from "../components/Navbar";
 import { SidebarWrapper } from "../components/AppSidebar";
 import Colors from "../constants/Colors";
 import { useAuth } from "../contexts/AuthContext";
@@ -367,7 +367,7 @@ export default function ConsultationsScreen() {
         
         <ScrollView
           style={tw`flex-1`}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 56 + (insets.bottom || 0) + 20, paddingTop: 0, flexGrow: 0 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 56 + (insets.bottom || 0) + 20, paddingTop: 0, flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
           removeClippedSubviews={true}
           refreshControl={
