@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, Image, TextInput, Animated, StatusBar, useWindowDimensions, Keyboard, Platform } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, TouchableWithoutFeedback, Image, TextInput, Animated, StatusBar, useWindowDimensions, Keyboard, Platform, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { User, Bookmark, MoreHorizontal, Flag, Send } from 'lucide-react-native';
@@ -1130,17 +1130,23 @@ const ViewPost: React.FC = () => {
         </>
       )}
 
-      {/* Use KeyboardAvoidingView for iOS, regular View for Android */}
-      <View style={tw`flex-1 bg-white`}>
+      {/* KeyboardAvoidingView for proper keyboard handling */}
+      <KeyboardAvoidingView 
+        style={tw`flex-1 bg-white`}
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        enabled={Platform.OS !== 'web'}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <ScrollView 
           style={tw`flex-1`}
           contentContainerStyle={{ 
             flexGrow: 1, 
-            paddingBottom: isLawyer ? responsive.replyInputHeight + LAYOUT.SPACING.sm * 2 + getSafeBottomPosition(insets.bottom) + keyboardHeight : 20 
+            paddingBottom: 20 
           }}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="always"
-          keyboardDismissMode="none"
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
         >
         
         {!post && !loading && !postReady && error && (
@@ -1388,27 +1394,17 @@ const ViewPost: React.FC = () => {
           </View>
         )}
         </ScrollView>
+        </TouchableWithoutFeedback>
 
         {/* Reply Input - Only visible for lawyers */}
         {isLawyer && post && (
-          <Animated.View 
+          <View 
             style={[
               tw`bg-white border-t border-gray-200`, 
               { 
                 paddingHorizontal: responsive.horizontalPadding, 
                 paddingVertical: LAYOUT.SPACING.sm, 
-                paddingBottom: getSafeBottomPosition(insets.bottom, 16), // Extra padding at bottom when keyboard is hidden
-                position: 'absolute', // Always use absolute positioning
-                bottom: 0, // Anchor to bottom of screen
-                left: 0,
-                right: 0,
-                zIndex: 999, // Ensure it stays on top
-              },
-              // When keyboard is visible, position above keyboard with extra space
-              isKeyboardVisible && {
-                // Position directly above keyboard, subtracting safe area to avoid large gap
-                bottom: Math.max(keyboardHeight - getSafeBottomPosition(insets.bottom), 0),
-                paddingBottom: 8, // Small internal padding when keyboard is visible
+                paddingBottom: isKeyboardVisible ? 8 : getSafeBottomPosition(insets.bottom, 16),
               }
             ]}
           >
@@ -1462,9 +1458,9 @@ const ViewPost: React.FC = () => {
               <Send size={18} color="white" />
             </TouchableOpacity>
           </View>
-        </Animated.View>
+        </View>
       )}
-      </View>
+      </KeyboardAvoidingView>
 
       {/* Report Post Modal */}
       <ReportModal
