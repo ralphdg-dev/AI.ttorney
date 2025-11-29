@@ -228,18 +228,12 @@ export default function DirectoryScreen() {
         ? `${apiUrl}/legal-consultations/lawyers?refresh=true`
         : `${apiUrl}/legal-consultations/lawyers`;
 
-      // ⚡ OPTIMIZATION 2: Faster timeout for slow connections (5s instead of 10s)
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-      const response = await fetch(url, { 
-        signal: controller.signal,
+      const response = await fetch(url, {
         // Add cache headers for better performance
         headers: {
           'Cache-Control': 'max-age=300', // 5 minutes browser cache
         }
       });
-      clearTimeout(timeoutId);
       
       // ⚡ OPTIMIZATION 3: Handle non-200 responses gracefully
       if (!response.ok) {
@@ -264,7 +258,7 @@ export default function DirectoryScreen() {
       
       // ⚡ OPTIMIZATION 4: Retry logic for transient failures
       if (retryCount < MAX_RETRIES && error.name !== 'AbortError') {
-        console.log(`🔄 Retrying... (${retryCount + 1}/${MAX_RETRIES})`);
+        console.log(`🔄 Retrying lawyer fetch... (${retryCount + 1}/${MAX_RETRIES}) - Error: ${error.message}`);
         // Exponential backoff: 1s, 2s
         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
         return fetchLawyers(forceRefresh, retryCount + 1);
