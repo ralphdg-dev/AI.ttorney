@@ -1397,7 +1397,7 @@ const ViewPost: React.FC = () => {
               { 
                 paddingHorizontal: responsive.horizontalPadding, 
                 paddingVertical: LAYOUT.SPACING.sm, 
-                paddingBottom: getSafeBottomPosition(insets.bottom) + 16, // Added extra 16px padding at bottom
+                paddingBottom: getSafeBottomPosition(insets.bottom, 16), // Extra padding at bottom when keyboard is hidden
                 position: 'absolute', // Always use absolute positioning
                 bottom: 0, // Anchor to bottom of screen
                 left: 0,
@@ -1406,8 +1406,9 @@ const ViewPost: React.FC = () => {
               },
               // When keyboard is visible, position above keyboard with extra space
               isKeyboardVisible && {
-                bottom: keyboardHeight, // Position directly above keyboard
-                paddingBottom: getSafeBottomPosition(insets.bottom) + 8, // Slightly less padding when keyboard is visible
+                // Position directly above keyboard, subtracting safe area to avoid large gap
+                bottom: Math.max(keyboardHeight - getSafeBottomPosition(insets.bottom), 0),
+                paddingBottom: 8, // Small internal padding when keyboard is visible
               }
             ]}
           >
@@ -1434,7 +1435,6 @@ const ViewPost: React.FC = () => {
               onFocus={() => {
                 // INSTANT RESPONSE - Force keyboard visibility and animation
                 setIsKeyboardVisible(true);
-                setKeyboardHeight(300); // Use default height until actual height is known
                 keyboardAnimatedValue.setValue(1);
                 
                 // Force immediate layout update
