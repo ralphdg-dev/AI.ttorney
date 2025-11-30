@@ -94,11 +94,11 @@ export function getStatusColor(status: ConsultationStatus) {
       };
     case 'accepted':
       return {
-        bg: '#D1FAE5',
-        border: '#A7F3D0',
-        text: '#059669',
+        bg: '#FEF3C7',
+        border: '#FDE68A',
+        text: '#D97706',
         label: 'Ongoing',
-        icon: '✓'
+        icon: '⏳'
       };
     case 'rejected':
       return {
@@ -110,9 +110,9 @@ export function getStatusColor(status: ConsultationStatus) {
       };
     case 'completed':
       return {
-        bg: '#E0E7FF',
-        border: '#C7D2FE',
-        text: '#4F46E5',
+        bg: '#D1FAE5',
+        border: '#A7F3D0',
+        text: '#059669',
         label: 'Completed',
         icon: '✓'
       };

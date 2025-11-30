@@ -42,14 +42,10 @@ export const ConsultationsProvider: React.FC<ConsultationsProviderProps> = ({ ch
         query = query.eq("lawyer_id", user.id).eq("status", "pending");
         console.log("📋 ConsultationsContext: Counting pending requests for lawyer");
       } 
-      // For users: count upcoming/accepted consultations they need to attend
+      // For users: count all ongoing (accepted) consultations
       else {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const todayString = today.toISOString();
-        console.log("📅 ConsultationsContext: Today's date (ISO):", todayString);
-        query = query.eq("user_id", user.id).eq("status", "accepted").gte("consultation_date", todayString);
-        console.log("📋 ConsultationsContext: Counting upcoming consultations for user");
+        query = query.eq("user_id", user.id).eq("status", "accepted");
+        console.log("📋 ConsultationsContext: Counting ongoing consultations for user");
       }
 
       console.log("🔍 ConsultationsContext: Executing query...");
