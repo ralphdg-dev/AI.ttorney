@@ -507,6 +507,7 @@ const LawyerProfilePage: React.FC = () => {
         } else {
           // No lawyer info found - set defaults
           console.log("No lawyer info found for user:", user.id);
+          setIsAcceptingConsultations(false);
           setLawyerContactInfo({
             phone_number: "",
             location: "",
@@ -528,6 +529,7 @@ const LawyerProfilePage: React.FC = () => {
     } catch (error) {
       console.error("Error in fetchLawyerContactInfo:", error);
       // Fallback to empty data on error
+      setIsAcceptingConsultations(false);
       setLawyerContactInfo({
         phone_number: "",
         location: "",
