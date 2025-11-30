@@ -18,12 +18,12 @@ export interface QuickStatConfig {
 
 export const QUICK_STATS_CONFIG: QuickStatConfig[] = [
   {
-    label: "Today's Consultations",
+    label: "Ongoing Consultations",
     getValue: (stats) => stats.today_sessions.toString(),
     icon: Calendar,
     color: '#059669',
     bgColor: '#ECFDF5',
-    getChange: (stats) => `${stats.accepted_requests} total accepted`,
+    getChange: (stats) => `${stats.completed_requests} total completed`,
     changeType: 'positive',
   },
   {

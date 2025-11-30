@@ -171,16 +171,13 @@ export const fetchLawyerDashboardData = async (
     }
     
     // Calculate stats locally (avoid separate API call)
-    const today = new Date().toISOString().split('T')[0];
     const stats: DashboardStats = {
       total_requests: allConsultations.length,
       pending_requests: allConsultations.filter(c => c.status === 'pending').length,
       accepted_requests: allConsultations.filter(c => c.status === 'accepted').length,
       completed_requests: allConsultations.filter(c => c.status === 'completed').length,
       rejected_requests: allConsultations.filter(c => c.status === 'rejected').length,
-      today_sessions: allConsultations.filter(
-        c => c.status === 'accepted' && c.consultation_date === today
-      ).length,
+      today_sessions: allConsultations.filter(c => c.status === 'accepted').length, // Count all ongoing consultations
     };
     
     // Get recent consultations (first 3)

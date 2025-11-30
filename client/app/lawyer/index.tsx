@@ -47,10 +47,9 @@ const LawyerDashboard: React.FC = () => {
     router.push('/lawyer/consult');
   }, [router]);
 
-  const handleTodayConsultationsPress = useCallback(() => {
-    // Navigate to consult page filtered by today's date
-    const today = new Date().toISOString().split('T')[0];
-    router.push(`/lawyer/consult?date=${today}`);
+  const handleOngoingConsultationsPress = useCallback(() => {
+    // Navigate to consult page showing ongoing (accepted) consultations
+    router.push('/lawyer/consult?filter=accepted');
   }, [router]);
 
   const handleTotalConsultationsPress = useCallback(() => {
@@ -141,7 +140,7 @@ const LawyerDashboard: React.FC = () => {
                   key={`stat-${config.label}`}
                   config={config}
                   stats={stats}
-                  onPress={index === 0 ? handleTodayConsultationsPress : handleTotalConsultationsPress}
+                  onPress={index === 0 ? handleOngoingConsultationsPress : handleTotalConsultationsPress}
                 />
               ))}
             </View>
