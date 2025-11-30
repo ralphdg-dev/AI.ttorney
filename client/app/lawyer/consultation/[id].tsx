@@ -549,7 +549,7 @@ const ConsultationDetailPage: React.FC = () => {
                     consultation.status === 'pending'
                       ? '#FEF3C7'  // Light yellow
                       : consultation.status === 'accepted'
-                        ? '#D1FAE5'  // Light green
+                        ? '#FEF3C7'  // Light orange
                         : consultation.status === 'completed'
                           ? '#D1FAE5'  // Light green
                           : '#FEE2E2'  // Light red
@@ -563,12 +563,12 @@ const ConsultationDetailPage: React.FC = () => {
                     consultation.status === 'pending'
                       ? '#78350F'  // Dark yellow
                       : consultation.status === 'accepted'
-                        ? '#064E3B'  // Dark green
+                        ? '#78350F'  // Dark orange
                         : consultation.status === 'completed'
                           ? '#064E3B'  // Dark green
                           : '#7F1D1D'  // Dark red
                 }}>
-                  {consultation.status}
+                  {consultation.status === 'accepted' ? 'ongoing' : consultation.status}
                 </Text>
               </View>
             </View>
@@ -679,7 +679,7 @@ const ConsultationDetailPage: React.FC = () => {
                 </Button>
                 <Button 
                   className="flex-1 rounded-lg min-h-[52px]"
-                  style={{ backgroundColor: Colors.primary.blue }}
+                  style={{ backgroundColor: '#16A34A' }}
                   onPress={() => handleActionClick('accept')}
                 >
                   <ButtonText 
@@ -694,16 +694,16 @@ const ConsultationDetailPage: React.FC = () => {
             {consultation.status === 'accepted' && (
               <Button 
                 className="rounded-lg min-h-[52px]"
-                action="positive"
+                style={{ backgroundColor: Colors.primary.blue }}
                 onPress={() => handleActionClick('complete')}
               >
                 <ButtonText 
-                  className="font-semibold text-center text-lg leading-[22px]"
+                  className="font-semibold text-white text-center text-lg leading-[22px]"
                   numberOfLines={1}
                   adjustsFontSizeToFit={true}
                   minimumFontScale={0.85}
                 >
-                  Mark as Completed
+                  Finish Session
                 </ButtonText>
               </Button>
             )}
