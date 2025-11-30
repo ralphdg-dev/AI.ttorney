@@ -48,13 +48,7 @@ class ApiClient {
       } else {
         console.log(`🔄 Retry attempt ${retryAttempt}/${this.maxRetries}: ${options.method || 'GET'} ${fullUrl}`);
       }
-      
-      // Create a timeout promise with longer timeout for retries
-      const timeoutDuration = retryAttempt > 0 ? 15000 : 10000; // 15s for retries, 10s for first attempt
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error(`Request timeout after ${timeoutDuration / 1000} seconds`)), timeoutDuration);
-      });
-      
+
       const fetchPromise = fetch(fullUrl, {
         ...options,
         headers: {
@@ -62,8 +56,8 @@ class ApiClient {
           ...options.headers,
         },
       });
-      
-      const response = await Promise.race([fetchPromise, timeoutPromise]);
+
+      const response = await fetchPromise;
 
       let data: any = null;
       let text: string | null = null;

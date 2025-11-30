@@ -18,7 +18,6 @@ import { validatePostContent } from '@/utils/contentValidation';
 
 // Constants
 const OPTIMISTIC_CONFIRM_DELAY = 300; // Reduced from 500ms to 300ms for faster confirmation
-const REQUEST_TIMEOUT = 15000; // Reduced from 30s to 15s for faster timeout detection
 
 interface CreatePostPayload {
   body: string;
@@ -261,10 +260,6 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
       console.log('🚀 About to make fetch request...');
       const startTime = Date.now();
       
-      // Create an AbortController for request timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
-      
       try {
         // Performance optimization: Use priority fetch with keepalive
         const response = await fetch(`${apiUrl}/api/forum/posts`, {
@@ -277,7 +272,6 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
             ...getAuthHeaders(),
           },
           body: JSON.stringify(payload),
-          signal: controller.signal,
           // @ts-ignore - These are modern fetch options that may not be in TypeScript defs yet
           priority: 'high',                // Request prioritization
           keepalive: true,                 // Keep connection alive
@@ -286,9 +280,6 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
 
         const fetchTime = Date.now() - startTime;
         console.log(`✅ Fetch completed in ${fetchTime}ms, status: ${response.status}`);
-        
-        // Clear the timeout since request completed
-        clearTimeout(timeoutId);
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -334,8 +325,6 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
           }
         }, OPTIMISTIC_CONFIRM_DELAY);
       } catch (innerError) {
-        // Clear the timeout if there was an error
-        clearTimeout(timeoutId);
         throw innerError; // Re-throw to be caught by outer catch
       }
     } catch (error) {

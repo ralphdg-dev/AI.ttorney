@@ -647,27 +647,15 @@ const ViewPost: React.FC = () => {
 
   // Fallback to API when no cache available
   const loadFromAPI = useCallback(async (postId: string) => {
-    const fallbackTimer = setTimeout(() => {
-      setError('Request timed out. Please try again.');
-      setLoading(false);
-    }, 30000);
-    
     try {
       const headers = await getAuthHeaders();
       const apiUrl = await NetworkConfig.getBestApiUrl();
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
-      
+
       const postResponse = await fetch(`${apiUrl}/api/forum/posts/${postId}`, {
         method: 'GET',
         headers,
-        signal: controller.signal,
       });
-      
-      clearTimeout(timeoutId);
-      clearTimeout(fallbackTimer);
-      
+
       if (!postResponse.ok) {
         await postResponse.text().catch(() => 'Unknown error');
         if (postResponse.status === 403) {
@@ -724,7 +712,6 @@ const ViewPost: React.FC = () => {
           const repliesResponse = await fetch(`${apiUrl}/api/forum/posts/${postId}/replies`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json', ...headers } as HeadersInit,
-            signal: controller.signal,
           });
           
           if (repliesResponse.ok) {
@@ -769,12 +756,7 @@ const ViewPost: React.FC = () => {
         setLoading(false);
       }
     } catch (error: any) {
-      clearTimeout(fallbackTimer);
-      if (error.name === 'AbortError') {
-        setError('Request timed out. Please check your connection and try again.');
-      } else {
-        setError('Failed to load post. Please try again.');
-      }
+      setError('Failed to load post. Please try again.');
       setPostReady(true);
       setLoading(false);
     }

@@ -88,13 +88,8 @@ export default function LawyerStatusGuard({ children, requiredStatus }: LawyerSt
         return;
       }
 
-      // Fetch status with timeout
-      const statusData = await Promise.race([
-        lawyerApplicationService.getApplicationStatus(),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout')), 2000)
-        )
-      ]) as any;
+      // Fetch status without client-side timeout
+      const statusData = await lawyerApplicationService.getApplicationStatus();
 
       // If no application exists
       if (!statusData?.has_application || !statusData.application) {

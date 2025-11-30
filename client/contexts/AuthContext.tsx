@@ -97,21 +97,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { NetworkConfig } = await import('../utils/networkConfig');
       const apiUrl = await NetworkConfig.getBestApiUrl();
 
-      // Add a soft timeout so this check can never block login/navigation forever
-      const response: any = await Promise.race([
-        fetch(`${apiUrl}/api/user/moderation-status`, {
-          headers: {
-            'Authorization': `Bearer ${authState.session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-        }),
-        new Promise(resolve => setTimeout(() => resolve('timeout'), 6000)),
-      ]);
-
-      if (response === 'timeout') {
-        console.warn('⚠️ Suspension status check timed out, proceeding without suspension data');
-        return null;
-      }
+      const response: any = await fetch(`${apiUrl}/api/user/moderation-status`, {
+        headers: {
+          'Authorization': `Bearer ${authState.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
       if (response.ok) {
         const data = await response.json();
@@ -138,20 +129,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { NetworkConfig } = await import('../utils/networkConfig');
       const apiUrl = await NetworkConfig.getBestApiUrl();
 
-      const response: any = await Promise.race([
-        fetch(`${apiUrl}/api/lawyer-applications/me`, {
-          headers: {
-            'Authorization': `Bearer ${authState.session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-        }),
-        new Promise(resolve => setTimeout(() => resolve('timeout'), 7000)),
-      ]);
-
-      if (response === 'timeout') {
-        console.warn('⚠️ Lawyer application status check timed out, proceeding without application data');
-        return null;
-      }
+      const response: any = await fetch(`${apiUrl}/api/lawyer-applications/me`, {
+        headers: {
+          'Authorization': `Bearer ${authState.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
       if (response.ok) {
         const data = await response.json();
@@ -212,8 +195,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Fetch profile through server API with fallback (bypasses RLS, faster for lawyers)
         const API_URL = await NetworkConfig.getBestApiUrl();
-        const controller = new AbortController();
-        const fetchTimeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
         
         const profileFetchPromise = fetch(`${API_URL}/auth/me`, {
           method: 'GET',
@@ -221,9 +202,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-          signal: controller.signal,
         }).then(async (response) => {
-          clearTimeout(fetchTimeoutId);
           if (!response.ok) {
             const errorText = await response.text();
             console.error('Profile fetch failed:', response.status, errorText);
@@ -245,7 +224,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const profileData = data.user?.profile || data.user;
           return { data: profileData, error: null };
         }).catch(async (error) => {
-          clearTimeout(fetchTimeoutId);
           console.error('Profile fetch network error:', error);
           
           // Handle network errors with fallback to Supabase

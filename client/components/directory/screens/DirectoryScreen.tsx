@@ -297,10 +297,8 @@ export default function DirectoryScreen() {
       const { NetworkConfig } = await import('@/utils/networkConfig');
       const apiUrl = await NetworkConfig.getBestApiUrl();
       
-      // ⚡ OPTIMIZATION: Faster timeout (3s instead of 5s)
       const response = await fetch(
-        `${apiUrl}/legal-consultations/user/${user.id}/active-requests`,
-        { signal: AbortSignal.timeout(3000) }
+        `${apiUrl}/legal-consultations/user/${user.id}/active-requests`
       );
       
       if (response.ok) {

@@ -192,9 +192,6 @@ const LawyerTimeline: React.FC = React.memo(() => {
       const headers = await getAuthHeaders();
       const API_BASE_URL = await NetworkConfig.getBestApiUrl();
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
-
       if (__DEV__) {
         console.log('LawyerTimeline: Fetching all posts from database');
       }
@@ -202,10 +199,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
       const response = await fetch(`${API_BASE_URL}/api/forum/posts/recent`, {
         method: 'GET',
         headers,
-        signal: controller.signal,
       });
-
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorText = await response.text();

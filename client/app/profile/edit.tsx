@@ -40,13 +40,10 @@ interface ApiRequestOptions {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   endpoint: string;
   body?: any | FormData;
-  timeout?: number;
 }
 
 // Constants
 const DEFAULT_PROFILE_PHOTO = "";
-const DEFAULT_TIMEOUT_MS = 10000; // 10 seconds default
-const EMAIL_TIMEOUT_MS = 20000; // 20 seconds for email operations
 
 // Common styling utilities
 const cardStyle = createShadowStyle({
@@ -61,16 +58,13 @@ const sectionHeaderStyle = {
   backgroundColor: Colors.background.tertiary
 };
 
-// Helper function to make API requests with timeout
-const makeApiRequest = async ({ method, endpoint, body, timeout = DEFAULT_TIMEOUT_MS }: ApiRequestOptions): Promise<Response> => {
+// Helper function to make API requests without client-side timeout
+const makeApiRequest = async ({ method, endpoint, body }: ApiRequestOptions): Promise<Response> => {
   const { data: { session } } = await supabase.auth.getSession();
   
   if (!session?.access_token) {
     throw new Error("Authentication required");
   }
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
     const apiUrl = await NetworkConfig.getBestApiUrl();
@@ -91,16 +85,9 @@ const makeApiRequest = async ({ method, endpoint, body, timeout = DEFAULT_TIMEOU
       method,
       headers,
       body: isFormData ? body : (body ? JSON.stringify(body) : undefined),
-      signal: controller.signal,
     });
-
-    clearTimeout(timeoutId);
     return response;
   } catch (error: any) {
-    clearTimeout(timeoutId);
-    if (error.name === 'AbortError') {
-      throw new Error('Request timeout - please check your connection');
-    }
     throw error;
   }
 };
@@ -522,7 +509,6 @@ export default function EditProfileScreen() {
         method: 'POST',
         endpoint: '/api/user/send-email-change-otp',
         body: { new_email: editFormData.email },
-        timeout: EMAIL_TIMEOUT_MS
       });
 
       if (!response.ok) {
@@ -570,7 +556,6 @@ export default function EditProfileScreen() {
           new_email: newEmail,
           otp_code: otpCode 
         },
-        timeout: EMAIL_TIMEOUT_MS
       });
 
       if (!response.ok) {
