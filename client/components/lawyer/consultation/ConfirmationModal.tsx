@@ -30,13 +30,13 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       case 'accept':
         return {
           icon: CheckCircle,
-          iconColor: Colors.primary.blue,
-          iconBg: '#E8F2FF',
+          iconColor: '#16A34A',
+          iconBg: '#F0FDF4',
           title: 'Accept Consultation',
           message: `Are you sure you want to accept the consultation request from ${clientName}? This will notify the client and allow you to schedule the session.`,
           confirmText: 'Accept',
           confirmVariant: 'solid' as const,
-          confirmClass: 'bg-[#023D7B] hover:bg-[#012B5A]',
+          confirmClass: 'bg-green-600 hover:bg-green-700',
           cancelText: 'Cancel'
         };
       case 'reject':
@@ -54,13 +54,13 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       case 'complete':
         return {
           icon: CheckCircle,
-          iconColor: '#059669',
-          iconBg: '#F0FDF4',
+          iconColor: Colors.primary.blue,
+          iconBg: '#E8F2FF',
           title: 'Mark as Completed',
           message: `Are you sure you want to mark the consultation with ${clientName} as completed? This will close the consultation and update your records.`,
           confirmText: 'Complete',
           confirmVariant: 'solid' as const,
-          confirmClass: 'bg-green-600 hover:bg-green-700',
+          confirmClass: 'bg-[#023D7B] hover:bg-[#012B5A]',
           cancelText: 'Cancel'
         };
       default:

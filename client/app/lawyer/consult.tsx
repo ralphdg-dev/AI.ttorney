@@ -843,7 +843,7 @@ const LawyerConsultPage: React.FC = () => {
                         style={[
                           tw`flex-1 py-3 rounded-xl`,
                           {
-                            backgroundColor: Colors.primary.blue,
+                            backgroundColor: "#16A34A",
                             boxShadow:
                               "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
                           },
@@ -871,8 +871,9 @@ const LawyerConsultPage: React.FC = () => {
                   {request.status === "accepted" && (
                     <TouchableOpacity
                       style={[
-                        tw`py-3 mt-2 bg-green-600 rounded-xl`,
+                        tw`py-3 mt-2 rounded-xl`,
                         {
+                          backgroundColor: Colors.primary.blue,
                           boxShadow:
                             "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
                         },
@@ -891,7 +892,7 @@ const LawyerConsultPage: React.FC = () => {
                       <Text
                         style={tw`text-sm font-semibold text-center text-white`}
                       >
-                        Mark Session Completed
+                        Finish Session
                       </Text>
                     </TouchableOpacity>
                   )}
