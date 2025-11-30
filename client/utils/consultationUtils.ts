@@ -97,7 +97,7 @@ export function getStatusColor(status: ConsultationStatus) {
         bg: '#D1FAE5',
         border: '#A7F3D0',
         text: '#059669',
-        label: 'Confirmed',
+        label: 'Ongoing',
         icon: '✓'
       };
     case 'rejected':

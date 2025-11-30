@@ -45,6 +45,20 @@ const formatDateTime = (dateString: string) => {
 };
 
 
+// Parse and clean specialization data (same logic as LawyerCard/ConsultationCard)
+const parseSpecializations = (spec: string | null): string[] => {
+  if (!spec) return [];
+  try {
+    const parsed = JSON.parse(spec);
+    if (Array.isArray(parsed)) {
+      return parsed.map(s => typeof s === 'string' ? s.replace(/[\[\]"]/g, '').trim() : s).filter(s => s && s.length > 0);
+    }
+  } catch {
+    return spec.split(',').map(s => s.trim()).filter(s => s.length > 0);
+  }
+  return [spec.trim()].filter(s => s.length > 0);
+};
+
 export default function ConsultationDetailModal({
   visible,
   consultation,
@@ -53,7 +67,13 @@ export default function ConsultationDetailModal({
   onClose,
   onCancel,
 }: ConsultationDetailModalProps) {
+  const [showAllSpecialization, setShowAllSpecialization] = useState(false);
+  
   if (!consultation) return null;
+  
+  const cleanedSpecializations = parseSpecializations(consultation.lawyer_info?.specialization || null);
+  const primarySpecialization = cleanedSpecializations[0] || 'Awaiting Lawyer';
+  const additionalCount = Math.max(0, cleanedSpecializations.length - 1);
 
   const handleCancelWithWarning = () => {
     if (consultation.status === "accepted") {
@@ -155,11 +175,65 @@ export default function ConsultationDetailModal({
                     >
                       {consultation.lawyer_info?.name || "Pending Assignment"}
                     </UIText>
-                    <UIText
-                      style={{ fontSize: 13, color: Colors.text.sub, marginTop: 2 }}
-                    >
-                      {consultation.lawyer_info?.specialization || "Awaiting Lawyer"}
-                    </UIText>
+                    {/* Specialization badges - same style as Legal Directory */}
+                    <HStack className="flex-wrap items-center mt-1">
+                      <Box 
+                        className="px-2 py-0.5 rounded-full mr-1 mb-1"
+                        style={{ backgroundColor: '#E5E7EB' }}
+                      >
+                        <UIText
+                          className="font-medium"
+                          style={{ fontSize: 11, color: Colors.text.head }}
+                        >
+                          {primarySpecialization}
+                        </UIText>
+                      </Box>
+                      {additionalCount > 0 && (
+                        <UIPressable
+                          onPress={() => setShowAllSpecialization(!showAllSpecialization)}
+                          className="px-2 py-0.5 rounded-full mb-1"
+                          style={{ backgroundColor: '#E5E7EB' }}
+                        >
+                          <UIText
+                            className="font-medium"
+                            style={{ fontSize: 11, color: Colors.text.sub }}
+                          >
+                            +{additionalCount} more
+                          </UIText>
+                        </UIPressable>
+                      )}
+                    </HStack>
+                    
+                    {/* All Specializations Dropdown */}
+                    {showAllSpecialization && cleanedSpecializations.length > 1 && (
+                      <Box 
+                        className="mt-2 p-2 rounded-lg"
+                        style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB' }}
+                      >
+                        <UIText
+                          className="mb-1 font-semibold"
+                          style={{ fontSize: 11, color: Colors.text.head }}
+                        >
+                          All Specializations
+                        </UIText>
+                        <VStack space="xs">
+                          {cleanedSpecializations.map((spec, idx) => (
+                            <HStack key={idx} className="items-center">
+                              <Box
+                                className="w-1.5 h-1.5 rounded-full mr-2"
+                                style={{ backgroundColor: '#9CA3AF' }}
+                              />
+                              <UIText
+                                className="font-medium"
+                                style={{ fontSize: 11, color: Colors.text.head }}
+                              >
+                                {spec}
+                              </UIText>
+                            </HStack>
+                          ))}
+                        </VStack>
+                      </Box>
+                    )}
                   </VStack>
                   <Box
                     className="px-2.5 py-1 rounded-full"
