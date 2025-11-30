@@ -87,7 +87,7 @@ const LawyerConsultPage: React.FC = () => {
         case "pending": pending++; break;
         case "accepted": 
           accepted++;
-          if (req.consultation_date === today) todaySessions++;
+          todaySessions++; // Count all ongoing (accepted) consultations
           break;
         case "completed": completed++; break;
         case "rejected": rejected++; break;
@@ -473,7 +473,7 @@ const LawyerConsultPage: React.FC = () => {
                 </Text>
               </View>
               <Text style={tw`text-sm font-medium text-gray-600`}>
-                Today&apos;s Sessions
+                Ongoing Sessions
               </Text>
             </View>
           </View>
