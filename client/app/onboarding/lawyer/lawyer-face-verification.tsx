@@ -43,27 +43,18 @@ export default function LawyerFaceVerification() {
       try {
         let uploadResult;
         
-        // Add timeout to prevent infinite uploads
-        const uploadPromise = (async () => {
-          // Check if we're on web and have a File object
-          if (typeof window !== 'undefined' && a.file) {
-            console.log('Using web File object for upload');
-            return await lawyerApplicationService.uploadSelfie(a.file);
-          } else {
-            console.log('Using URI-based upload for native');
-            return await lawyerApplicationService.uploadSelfie({
-              uri: a.uri,
-              name: a.fileName || 'selfie.jpg',
-              type: 'image/jpeg',
-            });
-          }
-        })();
-        
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Upload timeout after 30 seconds')), 30000);
-        });
-        
-        uploadResult = await Promise.race([uploadPromise, timeoutPromise]);
+        // Upload selfie (no client-side timeout)
+        if (typeof window !== 'undefined' && a.file) {
+          console.log('Using web File object for upload');
+          uploadResult = await lawyerApplicationService.uploadSelfie(a.file);
+        } else {
+          console.log('Using URI-based upload for native');
+          uploadResult = await lawyerApplicationService.uploadSelfie({
+            uri: a.uri,
+            name: a.fileName || 'selfie.jpg',
+            type: 'image/jpeg',
+          });
+        }
         
         console.log('Selfie upload result:', uploadResult);
         

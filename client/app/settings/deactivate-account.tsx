@@ -107,8 +107,6 @@ const DeactivateAccountScreen: React.FC = () => {
       setIsDeactivating(true);
       if (!session?.access_token) throw new Error('No active session');
       const apiUrl = await NetworkConfig.getBestApiUrl();
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
       const response = await fetch(`${apiUrl}/auth/validate-email`, {
         method: 'POST',
         headers: {
@@ -116,9 +114,7 @@ const DeactivateAccountScreen: React.FC = () => {
           'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ email }),
-        signal: controller.signal,
       });
-      clearTimeout(timeoutId);
       const data = await response.json();
       if (response.ok) {
         setIsDeactivating(false);
@@ -138,31 +134,17 @@ const DeactivateAccountScreen: React.FC = () => {
         setIsDeactivating(false);
       }
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        toast.show({
-          placement: "top",
-          duration: 3000,
-          render: createSafeAreaToastRenderer(
-            'top',
-            'error',
-            'solid',
-            'Error',
-            'Request timed out. Please check your connection and try again.'
-          ),
-        });
-      } else {
-        toast.show({
-          placement: "top",
-          duration: 3000,
-          render: createSafeAreaToastRenderer(
-            'top',
-            'error',
-            'solid',
-            'Error',
-            error instanceof Error ? error.message : "An unexpected error occurred. Please try again."
-          ),
-        });
-      }
+      toast.show({
+        placement: "top",
+        duration: 3000,
+        render: createSafeAreaToastRenderer(
+          'top',
+          'error',
+          'solid',
+          'Error',
+          error instanceof Error ? error.message : "An unexpected error occurred. Please try again."
+        ),
+      });
       setIsDeactivating(false);
     }
   };

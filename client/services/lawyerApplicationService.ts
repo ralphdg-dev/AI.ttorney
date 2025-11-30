@@ -77,7 +77,6 @@ class LawyerApplicationService {
   private cachedApplicationStatus: LawyerApplicationStatus | null = null;
   private cacheTimestamp: number | null = null;
   private readonly CACHE_DURATION = 10000; // 10 seconds
-  private readonly REQUEST_TIMEOUT = 10000; // 10 seconds
   private readonly POLLING_INTERVAL = 30000; // 30 seconds
   private pendingRequests = new Map<string, Promise<any>>();
   private pollingInterval: any = null;
@@ -109,10 +108,6 @@ class LawyerApplicationService {
     const token = await this.getAuthToken();
     console.log('🔧 makeRequest: Auth token obtained:', token ? 'YES' : 'NO');
     
-    // Create abort controller for timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT);
-    
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
     };
@@ -128,31 +123,19 @@ class LawyerApplicationService {
     try {
       console.log('🔧 makeRequest: Getting API URL...');
       
-      // Add timeout to getBestApiUrl to prevent hanging
-      const apiUrlPromise = NetworkConfig.getBestApiUrl();
-      const apiUrlTimeout = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('API URL timeout')), 3000); // 3 second timeout
-      });
-      
-      const apiUrl = await Promise.race([apiUrlPromise, apiUrlTimeout]);
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       console.log('🔧 makeRequest: API URL obtained:', apiUrl);
       console.log('🔧 makeRequest: Making fetch request to:', `${apiUrl}${endpoint}`);
       
       const response = await fetch(`${apiUrl}${endpoint}`, {
         ...options,
         headers,
-        signal: controller.signal,
       });
       
       console.log('🔧 makeRequest: Fetch completed, response status:', response.status);
-      clearTimeout(timeoutId);
       return response;
     } catch (error) {
       console.log('🔧 makeRequest: Fetch failed with error:', error);
-      clearTimeout(timeoutId);
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error('Request timed out. Please check your connection and try again.');
-      }
       throw error;
     }
   }
@@ -456,8 +439,6 @@ class LawyerApplicationService {
           'Content-Type': 'application/json',
           ...(token && { 'Authorization': `Bearer ${token}` }),
         },
-        // Add a shorter timeout
-        signal: AbortSignal.timeout(8000), // 8 second timeout
       });
       
       console.log('✅ Direct API response received, status:', response.status);

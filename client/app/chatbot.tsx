@@ -1054,10 +1054,6 @@ export default function ChatbotScreen() {
         // This allows the typing indicator to show until first content arrives
         isStreamingRef.current = false;
 
-        // Create abort controller for timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
-
         // Track if this is a violation response
         let isViolation = false;
 
@@ -1185,14 +1181,12 @@ export default function ChatbotScreen() {
               isStreamingRef.current = false; // Reset streaming state on error
             },
             onFinish: () => {
-              clearTimeout(timeoutId);
               setIsTyping(false);
               setIsGenerating(false); // Reset generating state
               abortControllerRef.current = null; // Clear abort controller
             },
           });
         } catch (streamError: any) {
-          clearTimeout(timeoutId);
           console.error('❌ Streaming error:', streamError);
           console.log('🗑️ Removing streaming message due to error:', streamingMsgId);
           setMessages((prev) => prev.filter(m => m.id !== streamingMsgId));

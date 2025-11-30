@@ -94,7 +94,7 @@ export class ChatHistoryService {
       const response = await axios.post(
         `${apiUrl}/api/chat-history/sessions`,
         { title, language: 'en' },
-        { headers, timeout: 3000 } // 3 second timeout
+        { headers }
       );
 
       const sessionId = response.data.id;
@@ -165,8 +165,7 @@ export class ChatHistoryService {
       const url = `${apiUrl}/api/chat-history/sessions/${conversationId}`;
       
       const response = await axios.get(url, { 
-        headers,
-        timeout: 15000 // 15 second timeout - conversations can have many messages
+        headers
       });
       
       const loadTime = Date.now() - startTime;
@@ -227,8 +226,7 @@ export class ChatHistoryService {
             page_size: 50, // Reduced for faster response
             sort: 'updated_at', // Ensure most recent first
             order: 'desc'
-          },
-          timeout: 10000 // 10 second timeout - reasonable for fetching list
+          }
         }
       );
 
@@ -346,7 +344,7 @@ export class ChatHistoryService {
       await axios.patch(
         `${apiUrl}/api/chat-history/sessions/${conversationId}`,
         { title },
-        { headers, timeout: 5000 }
+        { headers }
       );
       
       // Invalidate cache to force refresh

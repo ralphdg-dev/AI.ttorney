@@ -405,8 +405,6 @@ export default function LawFirmsMapView({ searchQuery, cache }: LawFirmsMapViewP
       try {
         const searchLocation = { lat: location.coords.latitude, lng: location.coords.longitude };
         const apiUrl = await NetworkConfig.getBestApiUrl();
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), CONSTANTS.TIMEOUTS.API_REQUEST);
         
         const response = await fetch(`${apiUrl}/api/places/nearby`, {
           method: 'POST',
@@ -419,10 +417,7 @@ export default function LawFirmsMapView({ searchQuery, cache }: LawFirmsMapViewP
             radius: selectedRadius * 1000, // Convert km to meters
             type: 'lawyer'
           }),
-          signal: controller.signal,
         });
-        
-        clearTimeout(timeoutId);
 
         if (response.ok) {
           const data = await response.json();
@@ -481,8 +476,6 @@ export default function LawFirmsMapView({ searchQuery, cache }: LawFirmsMapViewP
         : CONSTANTS.DEFAULT_LOCATION;
 
       const apiUrl = await NetworkConfig.getBestApiUrl();
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), CONSTANTS.TIMEOUTS.API_REQUEST);
       
       const response = await fetch(`${apiUrl}/api/places/nearby`, {
         method: 'POST',
@@ -495,10 +488,7 @@ export default function LawFirmsMapView({ searchQuery, cache }: LawFirmsMapViewP
           radius: selectedRadius * 1000, // Convert km to meters
           type: 'lawyer'
         }),
-        signal: controller.signal,
       });
-      
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -530,9 +520,7 @@ export default function LawFirmsMapView({ searchQuery, cache }: LawFirmsMapViewP
       
       let errorMessage: string = ERROR_MESSAGES.NETWORK_ERROR;
       if (error instanceof Error) {
-        if (error.name === 'AbortError') {
-          errorMessage = ERROR_MESSAGES.LOADING_TIMEOUT;
-        } else if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
+        if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
           errorMessage = 'Cannot connect to server. Please check your internet connection and try again.';
         }
       }

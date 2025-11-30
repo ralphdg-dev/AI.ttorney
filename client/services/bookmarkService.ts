@@ -146,20 +146,12 @@ export class BookmarkService {
   static async toggleBookmark(postId: string, userId: string, session?: any): Promise<{ success: boolean; isBookmarked: boolean; error?: string }> {
     try {
       const headers = await this.getAuthHeaders(session);
-      
-      // Create AbortController for timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-      
       const apiUrl = await NetworkConfig.getBestApiUrl();
       const response = await fetch(`${apiUrl}/api/forum/bookmarks/toggle`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ post_id: postId }),
-        signal: controller.signal,
       });
-      
-      clearTimeout(timeoutId);
       
       if (response.ok) {
         const result = await response.json();
@@ -175,9 +167,6 @@ export class BookmarkService {
         return { success: false, isBookmarked: false, error: result.detail || 'Failed to toggle bookmark' };
       }
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        return { success: false, isBookmarked: false, error: 'Request timed out' };
-      }
       return { success: false, isBookmarked: false, error: 'Network error' };
     }
   }

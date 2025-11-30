@@ -256,9 +256,6 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       const headers = await getAuthHeaders();
       const API_BASE_URL = await NetworkConfig.getBestApiUrl();
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
-
       // Calculate page for API call
       const pageToFetch = loadMore ? currentPageRef.current + 1 : 1;
 
@@ -269,10 +266,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       const response = await fetch(`${API_BASE_URL}/api/forum/posts/recent?page=${pageToFetch}&limit=15`, {
         method: 'GET',
         headers,
-        signal: controller.signal,
       });
-
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorText = await response.text();

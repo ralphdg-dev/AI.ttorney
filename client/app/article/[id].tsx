@@ -108,22 +108,15 @@ export default function ArticleViewScreen() {
         console.log(`🌐 Fetching article from API: ${articleId}`);
       }
       
-      // Create abort controller for timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
       try {
         // Use server API (faster and more reliable)
         const apiUrl = await NetworkConfig.getBestApiUrl();
         const response = await fetch(`${apiUrl}/api/legal/articles/${articleId}`, {
-          signal: controller.signal,
           headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
           },
         });
-        
-        clearTimeout(timeoutId);
         
         if (!response.ok) {
           if (response.status === 404) {
@@ -149,13 +142,6 @@ export default function ArticleViewScreen() {
         setArticle(result.data as DbArticleRow);
         
       } catch (fetchError) {
-        clearTimeout(timeoutId);
-        
-        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-          setError('Request timed out. Please check your connection and try again.');
-          return;
-        }
-        
         console.error('API fetch failed:', fetchError);
         setError('Failed to load article. Please try again.');
       }
