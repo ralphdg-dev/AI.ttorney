@@ -1,6 +1,7 @@
 import json
 import os
 import pickle
+import logging
 import numpy as np
 from pathlib import Path
 from typing import List, Dict, Any
@@ -10,6 +11,10 @@ import time
 
                             
 load_dotenv()
+
+# Configure logging for data processing
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
                
 PROCESSED_DATA_DIR = Path(__file__).parent / "processed"
@@ -64,7 +69,7 @@ def generate_embeddings_batch(texts: List[str]) -> List[List[float]]:
         return embeddings
         
     except Exception as e:
-        print(f" Error generating embeddings: {str(e)}")
+        logger.error(f"Error generating embeddings: {str(e)}")
         raise
 
 
@@ -90,22 +95,22 @@ def generate_all_embeddings():
                               
     EMBEDDINGS_DIR.mkdir(parents=True, exist_ok=True)
     
-    print(" Starting embeddings generation for AI.ttorney Legal Chatbot")
-    print(f"📂 Input file: {INPUT_FILE}")
-    print(f"📂 Output file: {OUTPUT_FILE}")
-    print(f"🤖 Model: {EMBEDDING_MODEL}")
-    print("=" * 60)
+    logger.info("Starting embeddings generation for AI.ttorney Legal Chatbot")
+    logger.info(f"Input file: {INPUT_FILE}")
+    logger.info(f"Output file: {OUTPUT_FILE}")
+    logger.info(f"Model: {EMBEDDING_MODEL}")
+    logger.info("=" * 60)
     
                          
-    print("\n Loading processed data...")
+    logger.info("Loading processed data...")
     data = load_processed_data()
-    print(f" Loaded {len(data)} text chunks")
+    logger.info(f"Loaded {len(data)} text chunks")
     
                                              
     texts = [item['text'] for item in data]
     
                                     
-    print(f"\n Generating embeddings in batches of {BATCH_SIZE}...")
+    logger.info(f"Generating embeddings in batches of {BATCH_SIZE}...")
     all_embeddings = []
     
     for i in tqdm(range(0, len(texts), BATCH_SIZE), desc="Processing batches"):
@@ -120,11 +125,11 @@ def generate_all_embeddings():
                 time.sleep(RATE_LIMIT_DELAY)
                 
         except Exception as e:
-            print(f"\n Error processing batch {i // BATCH_SIZE + 1}: {str(e)}")
-            print("Stopping embeddings generation.")
+            logger.error(f"Error processing batch {i // BATCH_SIZE + 1}: {str(e)}")
+            logger.error("Stopping embeddings generation.")
             return
     
-    print(f"\n Generated {len(all_embeddings)} embeddings")
+    logger.info(f"Generated {len(all_embeddings)} embeddings")
     
                                                      
     embeddings_array = np.array(all_embeddings, dtype=np.float32)
@@ -142,20 +147,20 @@ def generate_all_embeddings():
     }
     
                      
-    print(f"\n Saving embeddings to {OUTPUT_FILE}...")
+    logger.info(f"Saving embeddings to {OUTPUT_FILE}...")
     with open(OUTPUT_FILE, 'wb') as f:
         pickle.dump(embeddings_data, f)
     
-    print(" Embeddings saved successfully!")
+    logger.info("Embeddings saved successfully!")
     
                    
-    print("\n" + "=" * 60)
-    print(" SUMMARY")
-    print("=" * 60)
-    print(f"Total chunks embedded: {len(data)}")
-    print(f"Embedding dimension: {len(all_embeddings[0])}")
-    print(f"Model used: {EMBEDDING_MODEL}")
-    print(f"Output file size: {OUTPUT_FILE.stat().st_size / (1024 * 1024):.2f} MB")
+    logger.info("=" * 60)
+    logger.info("SUMMARY")
+    logger.info("=" * 60)
+    logger.info(f"Total chunks embedded: {len(data)}")
+    logger.info(f"Embedding dimension: {len(all_embeddings[0])}")
+    logger.info(f"Model used: {EMBEDDING_MODEL}")
+    logger.info(f"Output file size: {OUTPUT_FILE.stat().st_size / (1024 * 1024):.2f} MB")
     
                                    
     sources = {}
@@ -163,11 +168,11 @@ def generate_all_embeddings():
         source = item['metadata']['source']
         sources[source] = sources.get(source, 0) + 1
     
-    print("\n Embeddings by source:")
+    logger.info("Embeddings by source:")
     for source, count in sources.items():
-        print(f"  - {source}: {count} chunks")
+        logger.info(f"  - {source}: {count} chunks")
     
-    print("\n Ready for retrieval! You can now use these embeddings in main.py")
+    logger.info("Ready for retrieval! You can now use these embeddings in main.py")
 
 
 def test_embeddings():
@@ -175,10 +180,10 @@ def test_embeddings():
     Test function to verify embeddings work correctly
     """
     if not OUTPUT_FILE.exists():
-        print(" Embeddings file not found. Run generate_all_embeddings() first.")
+        logger.error("Embeddings file not found. Run generate_all_embeddings() first.")
         return
     
-    print("\n🧪 Testing embeddings...")
+    logger.info("Testing embeddings...")
     
     with open(OUTPUT_FILE, 'rb') as f:
         embeddings_data = pickle.load(f)
@@ -186,12 +191,12 @@ def test_embeddings():
     embeddings = embeddings_data['embeddings']
     documents = embeddings_data['documents']
     
-    print(f" Loaded {len(embeddings)} embeddings")
-    print(f" Embedding dimension: {embeddings.shape[1]}")
+    logger.info(f"Loaded {len(embeddings)} embeddings")
+    logger.info(f"Embedding dimension: {embeddings.shape[1]}")
     
                 
     test_query = "What are consumer rights?"
-    print(f"\n Test query: '{test_query}'")
+    logger.info(f"Test query: '{test_query}'")
     
                               
     client = openai.OpenAI(api_key=OPENAI_API_KEY)
@@ -211,15 +216,15 @@ def test_embeddings():
     similarities.sort(key=lambda x: x[1], reverse=True)
     top_results = similarities[:3]
     
-    print("\n Top 3 most relevant chunks:")
+    logger.info("Top 3 most relevant chunks:")
     for rank, (idx, score) in enumerate(top_results, 1):
         doc = documents[idx]
-        print(f"\n{rank}. Score: {score:.4f}")
-        print(f"   Source: {doc['metadata']['source']}")
-        print(f"   Article: {doc['metadata'].get('article_number', 'N/A')}")
-        print(f"   Text preview: {doc['text'][:150]}...")
+        logger.info(f"{rank}. Score: {score:.4f}")
+        logger.info(f"   Source: {doc['metadata']['source']}")
+        logger.info(f"   Article: {doc['metadata'].get('article_number', 'N/A')}")
+        logger.info(f"   Text preview: {doc['text'][:150]}...")
     
-    print("\n Embeddings test complete!")
+    logger.info("Embeddings test complete!")
 
 
 if __name__ == "__main__":

@@ -27,7 +27,7 @@ try:
     from config.guardrails_config import get_guardrails_instance, is_guardrails_enabled
     GUARDRAILS_AVAILABLE = True
 except ImportError:
-    print("  Guardrails AI not available - running without security validation")
+    logger.warning("Guardrails AI not available - running without security validation")
     GUARDRAILS_AVAILABLE = False
 
                                                                                             
@@ -64,7 +64,7 @@ async def get_optional_current_user(credentials: Optional[HTTPAuthorizationCrede
         user_data = await AuthService.get_user(token)
         return user_data
     except Exception as e:
-        print(f"  Optional auth failed: {e}")
+        logger.debug(f"Optional auth failed: {e}")
         return None
 
                                      
@@ -191,7 +191,7 @@ except Exception as e:
 
                                                                     
 if not OPENAI_API_KEY:
-    print(" ERROR: OPENAI_API_KEY is not set!")
+    logger.error("OPENAI_API_KEY is not set!")
 
                                                                         
 try:
@@ -1266,7 +1266,7 @@ Note: No specific context was retrieved from the vector database. Proceed with t
                     "Response generation failed")
         
     except Exception as e:
-        print(f" Error generating answer: {e}")
+        logger.error(f"Error generating answer: {e}")
                                                              
         return ("I apologize, but I encountered an error while processing your question. Please try again.", 
                 "low", 
@@ -1280,8 +1280,8 @@ Note: No specific context was retrieved from the vector database. Proceed with t
         logger.warning(f"Question: {question[:100]}")
         logger.warning(f"Original response: {answer[:200]}...")
         
-        print(f"  Response validation failed: {validation_reason}")
-        print(f"    Original response: {answer[:200]}...")
+        logger.warning(f"Response validation failed: {validation_reason}")
+        logger.debug(f"Original response: {answer[:200]}...")
                                                                     
                                          
         if language == "tagalog":
@@ -1361,7 +1361,7 @@ Note: No specific context was retrieved from the vector database. Proceed with t
         follow_up_questions = follow_up_questions[:3]
         
     except Exception as e:
-        print(f"    Error extracting follow-up questions: {e}")
+        logger.error(f"Error extracting follow-up questions: {e}")
         follow_up_questions = []
     
     return answer, confidence, simplified_summary, follow_up_questions
@@ -1539,7 +1539,7 @@ Gawing varied at natural, hindi robotic."""
         return result.strip() if result else fallbacks[response_type]
         
     except Exception as e:
-        print(f"Error generating {response_type} response: {e}")
+        logger.error(f"Error generating {response_type} response: {e}")
         return fallbacks[response_type]
 
 def create_chat_response(
@@ -1590,11 +1590,11 @@ async def save_chat_interaction(
     - Backend is source of truth for session existence
     """
     if not effective_user_id:
-        print(f"ℹ  No user_id available - skipping chat history save")
+        logger.debug(f"No user_id available - skipping chat history save")
         return (None, None, None)
     
     try:
-        print(f" Saving chat history for user {effective_user_id}")
+        logger.info(f"Saving chat history for user {effective_user_id}")
         
                                                          
         session_exists = False
@@ -1603,18 +1603,18 @@ async def save_chat_interaction(
                 existing_session = await chat_service.get_session(UUID(session_id))
                 session_exists = existing_session is not None
                 if session_exists:
-                    print(f"    Using existing session: {session_id}")
+                    logger.debug(f"Using existing session: {session_id}")
                 else:
-                    print(f"     Session {session_id} not found, creating new one")
+                    logger.debug(f"Session {session_id} not found, creating new one")
                     session_id = None                                 
             except Exception as e:
-                print(f"     Error checking session: {e}, creating new one")
+                logger.warning(f"Error checking session: {e}, creating new one")
                 session_id = None
         
                                                                         
         if not session_id:
             title = question[:50] if len(question) > 50 else question
-            print(f"   Creating new session: {title}")
+            logger.debug(f"Creating new session: {title}")
                                                              
             db_language = 'en' if language in ['english', 'en'] else 'fil'
             session = await chat_service.create_session(
@@ -1623,10 +1623,10 @@ async def save_chat_interaction(
                 language=db_language
             )
             session_id = str(session.id)
-            print(f"    Session created: {session_id}")
+            logger.debug(f"Session created: {session_id}")
         
                            
-        print(f"   Saving user message...")
+        logger.debug("Saving user message...")
         user_msg = await chat_service.add_message(
             session_id=UUID(session_id),
             user_id=UUID(effective_user_id),
@@ -1635,10 +1635,10 @@ async def save_chat_interaction(
             metadata={}
         )
         user_message_id = str(user_msg.id)
-        print(f"    User message saved: {user_message_id}")
+        logger.debug(f"User message saved: {user_message_id}")
         
                                 
-        print(f"   Saving assistant message...")
+        logger.debug("Saving assistant message...")
         assistant_msg = await chat_service.add_message(
             session_id=UUID(session_id),
             user_id=UUID(effective_user_id),
@@ -1647,15 +1647,15 @@ async def save_chat_interaction(
             metadata=metadata or {}
         )
         assistant_message_id = str(assistant_msg.id)
-        print(f"    Assistant message saved: {assistant_message_id}")
-        print(f" Chat history saved successfully!")
+        logger.debug(f"Assistant message saved: {assistant_message_id}")
+        logger.debug("Chat history saved successfully!")
         
         return (session_id, user_message_id, assistant_message_id)
         
     except Exception as e:
         import traceback
-        print(f"  Failed to save chat history: {e}")
-        print(f"   Traceback: {traceback.format_exc()}")
+        logger.error(f"Failed to save chat history: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return (session_id, None, None)
 
 
@@ -1672,7 +1672,7 @@ async def get_conversation_history_from_db(
         return []
     
     try:
-        print(f" Retrieving conversation history from session: {session_id}")
+        logger.debug(f"Retrieving conversation history from session: {session_id}")
         
                                                                                
         messages = await chat_service.get_session_messages(
@@ -1681,7 +1681,7 @@ async def get_conversation_history_from_db(
         )
         
         if not messages:
-            print(f"   ℹ No previous messages found in session")
+            logger.debug("No previous messages found in session")
             return []
         
                                                                                        
@@ -1692,11 +1692,11 @@ async def get_conversation_history_from_db(
                 "content": msg.content[:800]                                               
             })
         
-        print(f"    Retrieved {len(conversation_history)} messages from database")
+        logger.debug(f"Retrieved {len(conversation_history)} messages from database")
         return conversation_history
         
     except Exception as e:
-        print(f"    Error retrieving conversation history: {e}")
+        logger.error(f"Error retrieving conversation history: {e}")
         return []
 
 
@@ -1747,13 +1747,13 @@ async def ask_legal_question_legacy(
     authenticated_user_id = None
     if current_user and "user" in current_user:
         authenticated_user_id = current_user["user"]["id"]
-        print(f" Authenticated user ID: {authenticated_user_id}")
+        logger.debug(f"Authenticated user ID: {authenticated_user_id}")
     else:
-        print(f"  No authenticated user found. current_user: {current_user}")
+        logger.debug(f"No authenticated user found. current_user: {current_user}")
     
                                                                                        
     effective_user_id = authenticated_user_id or request.user_id
-    print(f" Effective user ID for chat history: {effective_user_id}")
+    logger.debug(f"Effective user ID for chat history: {effective_user_id}")
     
                                                                             
                                         
@@ -1784,13 +1784,13 @@ async def ask_legal_question_legacy(
                                              
         if guardrails_instance:
             try:
-                print(f"\n Validating user input with Guardrails AI...")
+                logger.debug("Validating user input with Guardrails AI...")
                 input_validation_result = guardrails_instance.validate_input(request.question)
                 
                 if not input_validation_result.get('is_valid', True):
                                                             
                     error_message = input_validation_result.get('error', 'Input validation failed')
-                    print(f" Input validation failed: {error_message}")
+                    logger.warning(f"Input validation failed: {error_message}")
                     
                     return create_chat_response(
                         answer=error_message,
@@ -1804,17 +1804,17 @@ async def ask_legal_question_legacy(
                         }
                     )
                 else:
-                    print(f" Input validation passed")
+                    logger.debug("Input validation passed")
                                                     
                     if 'cleaned_input' in input_validation_result:
                         request.question = input_validation_result['cleaned_input']
             except Exception as e:
-                print(f"  Guardrails input validation error: {e}")
+                logger.error(f"Guardrails input validation error: {e}")
                                                          
         
                                                                
         if request.question and is_simple_greeting(request.question):
-            print(f" Detected as greeting: {request.question}")
+            logger.debug(f"Detected as greeting: {request.question}")
                                                              
             language = detect_language(request.question)
             greeting_response = generate_ai_response(request.question, language, 'greeting')
@@ -1840,13 +1840,13 @@ async def ask_legal_question_legacy(
         
                                                                              
         if is_conversation_context_question(request.question):
-            print(f"\n [CONVERSATION CONTEXT] Detected conversation context question")
+            logger.debug("Detected conversation context question")
             
                                                                          
             past_conversations_summary = ""
             if effective_user_id:
                 try:
-                    print(f"    Retrieving past conversations for user {effective_user_id[:8]}...")
+                    logger.debug(f"Retrieving past conversations for user {effective_user_id[:8]}...")
                     
                                                                      
                     user_sessions = await chat_service.get_user_sessions(
@@ -1857,7 +1857,7 @@ async def ask_legal_question_legacy(
                     )
                     
                     if user_sessions and user_sessions.sessions:
-                        print(f"    Found {len(user_sessions.sessions)} recent conversations")
+                        logger.debug(f"Found {len(user_sessions.sessions)} recent conversations")
                         
                                                                       
                         conversation_summaries = []
@@ -1924,10 +1924,10 @@ async def ask_legal_question_legacy(
                             else:
                                 past_conversations_summary = f"\n\n**Recent Legal Research Sessions:**\n" + "\n".join(conversation_summaries)
                     else:
-                        print(f"   ℹ No past conversations found for user")
+                        logger.debug("No past conversations found for user")
                         
                 except Exception as e:
-                    print(f"    Error retrieving past conversations: {e}")
+                    logger.error(f"Error retrieving past conversations: {e}")
                     logger.error(f"Error retrieving past conversations: {e}")
             
                                                                              
@@ -2157,7 +2157,7 @@ async def ask_legal_question_legacy(
                                                                          
                                                                 
         if effective_user_id:
-            print(f"\n  Prompt injection detection...")
+            logger.debug("Prompt injection detection...")
             injection_detector = get_prompt_injection_detector()
             violation_service = get_violation_tracking_service()
             
@@ -2175,7 +2175,7 @@ async def ask_legal_question_legacy(
                     
                                                            
                     try:
-                        print(f" Recording prompt injection violation for lawyer: {effective_user_id}")
+                        logger.info(f"Recording prompt injection violation for lawyer: {effective_user_id}")
                         violation_result = await violation_service.record_violation(
                             user_id=effective_user_id,
                             violation_type=ViolationType.CHATBOT_PROMPT,                                                   
@@ -2183,7 +2183,7 @@ async def ask_legal_question_legacy(
                             moderation_result=injection_result,                                                        
                             content_id=None
                         )
-                        print(f" Prompt injection violation recorded: {violation_result}")
+                        logger.debug(f"Prompt injection violation recorded: {violation_result}")
                         
                                                                                      
                         violation_message = (
@@ -2205,7 +2205,7 @@ async def ask_legal_question_legacy(
                     except Exception as violation_error:
                         logger.error(f" Failed to record prompt injection violation: {str(violation_error)}")
                         import traceback
-                        print(f"Violation error traceback: {traceback.format_exc()}")
+                        logger.error(f"Violation error traceback: {traceback.format_exc()}")
                         
                                                                                    
                         return create_chat_response(
@@ -2213,7 +2213,7 @@ async def ask_legal_question_legacy(
                             simplified_summary="Prompt injection blocked"
                         )
                 else:
-                    print(f" No prompt injection detected")
+                    logger.debug("No prompt injection detected")
                     
             except Exception as e:
                 logger.error(f" Prompt injection detection error: {str(e)}")
@@ -2222,7 +2222,7 @@ async def ask_legal_question_legacy(
                                                                 
                                                                                           
                                                                     
-        print(f"\n Content moderation check...")
+        logger.debug("Content moderation check...")
         moderation_service = get_moderation_service()
         violation_service = get_violation_tracking_service()
         
@@ -2238,7 +2238,7 @@ async def ask_legal_question_legacy(
                 violation_result = None
                 if effective_user_id:
                     try:
-                        print(f" Recording violation for user: {effective_user_id}")
+                        logger.info(f"Recording violation for user: {effective_user_id}")
                         violation_result = await violation_service.record_violation(
                             user_id=effective_user_id,
                             violation_type=ViolationType.CHATBOT_PROMPT,
@@ -2246,11 +2246,11 @@ async def ask_legal_question_legacy(
                             moderation_result=moderation_result,
                             content_id=None                                              
                         )
-                        print(f" Violation recorded: {violation_result}")
+                        logger.debug(f"Violation recorded: {violation_result}")
                     except Exception as violation_error:
                         logger.error(f" Failed to record violation: {str(violation_error)}")
                         import traceback
-                        print(f"Violation error traceback: {traceback.format_exc()}")
+                        logger.error(f"Violation error traceback: {traceback.format_exc()}")
                                                                           
                         violation_result = None
                 
@@ -2285,12 +2285,12 @@ async def ask_legal_question_legacy(
                     simplified_summary="Content moderation violation detected"
                 )
             else:
-                print(f" Content moderation passed")
+                logger.debug("Content moderation passed")
                 
         except Exception as e:
             logger.error(f" Content moderation error: {str(e)}")
                                                                      
-            print(f"  Content moderation failed, continuing without moderation: {e}")
+            logger.warning(f"Content moderation failed, continuing without moderation: {e}")
         
                                                                                 
         if not is_legal_question(request.question):
@@ -2368,7 +2368,7 @@ async def ask_legal_question_legacy(
             confidence = "medium"
         
                                                                                        
-        print(f"\n [STEP 8.5] Retrieving conversation history from database...")
+        logger.debug("Retrieving conversation history from database...")
         db_conversation_history = await get_conversation_history_from_db(
             chat_service=chat_service,
             session_id=request.session_id,
@@ -2381,7 +2381,7 @@ async def ask_legal_question_legacy(
                                                          
         has_reference, reference_type = extract_conversation_reference(request.question)
         if has_reference:
-            print(f"\n🔗 [CONVERSATION REFERENCE] Detected reference to past conversation: {reference_type}")
+            logger.debug(f"Detected reference to past conversation: {reference_type}")
                                                                      
             if len(conversation_history) < 12 and effective_user_id:
                                                                                          
@@ -2392,10 +2392,10 @@ async def ask_legal_question_legacy(
                 )
                 if extended_history and len(extended_history) > len(conversation_history):
                     conversation_history = extended_history
-                    print(f"    Extended conversation history to {len(conversation_history)} messages for better reference context")
+                    logger.debug(f"Extended conversation history to {len(conversation_history)} messages for better reference context")
         
                                                           
-        print(f"    Using {len(conversation_history)} messages for context (from {'database' if db_conversation_history else 'client'})")
+        logger.debug(f"Using {len(conversation_history)} messages for context (from {'database' if db_conversation_history else 'client'})")
         answer, _, simplified_summary, follow_up_questions = generate_answer(
             request.question,
             context,
@@ -2447,10 +2447,6 @@ async def ask_legal_question_legacy(
             logger.warning(f"Question: {request.question}")
             logger.warning(f"Matches: {out_of_scope_matches}")
             
-            print(f"  SAFETY CHECK TRIGGERED: Answer contains {detected_topic} content")
-            print(f"    Question: {request.question}")
-            print(f"    Matches: {out_of_scope_matches}")
-            
                                              
             decline_response = generate_ai_response(
                 request.question,
@@ -2481,7 +2477,7 @@ async def ask_legal_question_legacy(
                                               
         if guardrails_instance:
             try:
-                print(f"\n Validating AI output with Guardrails AI...")
+                logger.debug("Validating AI output with Guardrails AI...")
                 output_validation_result = guardrails_instance.validate_output(
                     response=answer,
                     context=context
@@ -2490,7 +2486,7 @@ async def ask_legal_question_legacy(
                 if not output_validation_result.get('is_valid', True):
                                                              
                     error_message = output_validation_result.get('error', 'Output validation failed')
-                    print(f" Output validation failed: {error_message}")
+                    logger.warning(f"Output validation failed: {error_message}")
                     
                     return create_chat_response(
                         answer="I apologize, but I cannot provide a response that meets our safety standards. Please rephrase your question or consult with a licensed lawyer.",
@@ -2504,12 +2500,12 @@ async def ask_legal_question_legacy(
                         }
                     )
                 else:
-                    print(f" Output validation passed")
+                    logger.debug("Output validation passed")
                                                      
                     if 'cleaned_output' in output_validation_result:
                         answer = output_validation_result['cleaned_output']
             except Exception as e:
-                print(f"  Guardrails output validation error: {e}")
+                logger.error(f"Guardrails output validation error: {e}")
                                                          
         
                                   
@@ -2521,7 +2517,7 @@ async def ask_legal_question_legacy(
                     output_validation_result or {}
                 )
             except Exception as e:
-                print(f"  Failed to generate security report: {e}")
+                logger.error(f"Failed to generate security report: {e}")
         
         
         

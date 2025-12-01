@@ -33,10 +33,9 @@ async def block_permanently_banned_users(
         HTTPException: 403 with PERMANENTLY_BANNED error if user is banned
     """
     try:
-                                               
         profile = current_user.get("profile")
         if not profile:
-            logger.error("🚫 User profile missing in permanent ban check")
+            logger.error("User profile missing in permanent ban check")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="User profile not found"
@@ -45,9 +44,8 @@ async def block_permanently_banned_users(
         account_status = profile.get("account_status")
         user_id = profile.get("id", "unknown")
         
-                                               
         if account_status == "banned":
-            logger.warning(f"🚫 PERMANENTLY_BANNED user blocked: {user_id[:8]}...")
+            logger.warning(f"PERMANENTLY_BANNED user blocked: {user_id[:8]}...")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={
@@ -56,13 +54,13 @@ async def block_permanently_banned_users(
                 }
             )
         
-        logger.debug(f" User {user_id[:8]}... passed permanent ban check (status: {account_status})")
+        logger.debug(f"User {user_id[:8]}... passed permanent ban check (status: {account_status})")
         return current_user
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"🚫 Permanent ban check failed: {str(e)}", exc_info=True)
+        logger.error(f"Permanent ban check failed: {str(e)}", exc_info=True)
                                                                                       
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

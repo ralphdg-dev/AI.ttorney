@@ -6,6 +6,7 @@ import jwt
 import os
 import sys
 import os
+import logging
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from auth.service import AuthService
@@ -13,6 +14,7 @@ from services.supabase_service import SupabaseService
 
 router = APIRouter()
 security = HTTPBearer()
+logger = logging.getLogger(__name__)
 
 class RouteValidationRequest(BaseModel):
     path: str
@@ -133,7 +135,7 @@ async def validate_route_access(
                 )
         
                                    
-        print(f"[ROUTE_VALIDATION] SUCCESS: {user.get('email')} -> {request.path}")
+        logger.info(f"Route validation success: {user.get('email')} -> {request.path}")
         
         return RouteValidationResponse(valid=True)
         
@@ -150,7 +152,7 @@ async def validate_route_access(
             redirectTo="/login"
         )
     except Exception as e:
-        print(f"[ROUTE_VALIDATION] ERROR: {str(e)}")
+        logger.error(f"Route validation error: {str(e)}")
         return RouteValidationResponse(
             valid=False,
             error="Server validation error",
@@ -182,11 +184,11 @@ async def log_route_access(request: dict):
         if result.data:
             return {"success": True, "message": "Audit log recorded"}
         else:
-            print(f"Failed to insert audit log: {result}")
+            logger.error(f"Failed to insert audit log: {result}")
             return {"success": False, "message": "Failed to record audit log"}
             
     except Exception as e:
-        print(f"Audit logging error: {str(e)}")
+        logger.error(f"Audit logging error: {str(e)}")
         return {"success": False, "message": "Audit logging failed"}
 
 @router.post("/errors/route")
@@ -214,5 +216,5 @@ async def log_route_error(request: dict):
             return {"success": False, "message": "Failed to log error"}
             
     except Exception as e:
-        print(f"Error logging failed: {str(e)}")
+        logger.error(f"Error logging failed: {str(e)}")
         return {"success": False, "message": "Error logging failed"}

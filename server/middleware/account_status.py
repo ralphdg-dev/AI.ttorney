@@ -35,12 +35,11 @@ async def check_account_status(
     try:
         user_id = current_user["user"]["id"]
         
-                           
         violation_service = get_violation_tracking_service()
         user_status = await violation_service.check_user_status(user_id)
         
         if not user_status["is_allowed"]:
-            logger.warning(f"🚫 Blocked access for {user_status['account_status']} user {user_id[:8]}...")
+            logger.warning(f"Blocked access for {user_status['account_status']} user {user_id[:8]}...")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=user_status["reason"]

@@ -2,10 +2,13 @@ import time
 import uuid
 import os
 import sys
+import logging
 from typing import Dict, Optional
 from datetime import datetime
 from fastapi import Request
 from collections import defaultdict
+
+logger = logging.getLogger(__name__)
 
                                                  
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -122,9 +125,8 @@ class GuestRateLimiter:
                                       
         session_data = GUEST_SESSIONS.get(session_id)
         if not session_data:
-                                                             
-                                                               
-            print(f" Session {session_id} not found (server restart). Creating new session.")
+            # Session not found (server restart) - create new session
+            logger.info(f"Guest session {session_id} not found, creating new session")
             new_session_id = GuestRateLimiter.generate_session_id()
             GUEST_SESSIONS[new_session_id] = {
                 "count": 0,
@@ -199,7 +201,7 @@ class GuestRateLimiter:
         for session_id in expired:
             del GUEST_SESSIONS[session_id]
         
-        print(f"🧹 Cleaned up {len(expired)} expired guest sessions")
+        logger.info(f"Cleaned up {len(expired)} expired guest sessions")
         return len(expired)
     
     @staticmethod
@@ -253,7 +255,7 @@ def setup_cleanup_task():
                 GuestRateLimiter.cleanup_expired_sessions()
                 await asyncio.sleep(3600)              
             except Exception as e:
-                print(f" Cleanup error: {e}")
+                logger.error(f"Guest session cleanup error: {e}")
                 await asyncio.sleep(60)                        
     
     return cleanup_loop

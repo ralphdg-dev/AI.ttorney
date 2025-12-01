@@ -1,0 +1,473 @@
+import requests
+import logging
+from bs4 import BeautifulSoup
+import json
+import re
+from datetime import datetime
+from typing import List, Dict, Optional
+import time
+from urllib.parse import urljoin
+from pathlib import Path
+
+# Configure logging for script
+logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
+logger = logging.getLogger(__name__)
+
+
+class RevisedPenalCodeScraper:
+    """
+    Comprehensive scraper for Philippine Revised Penal Code articles
+    with focus on criminal law provisions for AI training datasets.
+    """
+    
+    def __init__(self, base_url: str = "https://elibrary.judiciary.gov.ph/thebookshelf/showdocs/28/20426"):
+        self.base_url = base_url
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        })
+        
+                                         
+        self.target_articles = None                                  
+        
+                                        
+        self.penalty_patterns = [
+            r'reclusion\s+perpetua',
+            r'reclusion\s+temporal',
+            r'prision\s+mayor',
+            r'prision\s+correccional',
+            r'arresto\s+mayor',
+            r'arresto\s+menor',
+            r'destierro',
+            r'fine[s]?\s+of\s+(?:not\s+)?(?:less\s+than\s+|more\s+than\s+)?(?:P|₱)?\s*\d+(?:,\d{3})*(?:\.\d{2})?',
+            r'fine[s]?\s+(?:ranging\s+)?from\s+(?:P|₱)?\s*\d+(?:,\d{3})*\s+to\s+(?:P|₱)?\s*\d+(?:,\d{3})*',
+            r'imprisonment\s+(?:of\s+)?(?:not\s+)?(?:less\s+than\s+|more\s+than\s+)?\d+\s+(?:years?|months?|days?)',
+            r'death',
+            r'life\s+imprisonment'
+        ]
+        
+        self.scraped_data = []
+        
+    def fetch_content(self, url: str, retries: int = 3) -> Optional[BeautifulSoup]:
+        """
+        Fetch webpage content with retry mechanism and error handling.
+        
+        Args:
+            url: Target URL to scrape
+            retries: Number of retry attempts
+            
+        Returns:
+            BeautifulSoup object or None if failed
+        """
+        for attempt in range(retries):
+            try:
+                logger.info(f"Fetching content (attempt {attempt + 1})...")
+                response = self.session.get(url, timeout=30)
+                response.raise_for_status()
+                
+                                           
+                if len(response.text) < 1000:
+                    logger.warning(f"Short content ({len(response.text)} chars)")
+                
+                soup = BeautifulSoup(response.text, 'html.parser')
+                logger.info(f"Successfully fetched content ({len(response.text)} chars)")
+                return soup
+                
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Request failed (attempt {attempt + 1}): {e}")
+                if attempt < retries - 1:
+                    time.sleep(2 ** attempt)                       
+                    
+        logger.error(f"Failed to fetch content after {retries} attempts")
+        return None
+    
+    def extract_articles(self, soup: BeautifulSoup) -> List[Dict]:
+        """
+        Extract and parse articles from the webpage content.
+        
+        Args:
+            soup: BeautifulSoup object containing the webpage
+            
+        Returns:
+            List of dictionaries containing article data
+        """
+        if not soup:
+            logger.error("No soup object provided")
+            return []
+        
+                              
+        text_content = " ".join(soup.stripped_strings)
+        text_content = re.sub(r'\s+', ' ', text_content)
+        
+        logger.info(f"Processing text content ({len(text_content)} characters)")
+        
+                                                   
+        article_patterns = [
+            r'(ART\.\s+\d+\.)',
+            r'(Art\.\s+\d+\.)',
+            r'(ARTICLE\s+\d+\.)',
+            r'(Article\s+\d+\.)'
+        ]
+        
+        articles_found = []
+        
+        for pattern in article_patterns:
+            splits = re.split(pattern, text_content, flags=re.IGNORECASE)
+            if len(splits) > 1:
+                articles_found = splits
+                logger.info(f"Found articles using pattern: {pattern}")
+                break
+        
+        if not articles_found:
+            logger.warning("No articles found with any pattern")
+            return []
+        
+        extracted_articles = []
+        
+                                                  
+        for i in range(1, len(articles_found), 2):
+            if i + 1 >= len(articles_found):
+                break
+                
+            article_header = articles_found[i].strip()
+            article_content = articles_found[i + 1].strip()
+            
+                                                
+            article_num_match = re.search(r'(\d+)', article_header)
+            if not article_num_match:
+                continue
+                
+            article_num = int(article_num_match.group(1))
+            
+                                                                         
+                                                                         
+            full_article_text = f"{article_header} {article_content}".strip()
+            
+                                                                               
+            cleaned_content = self._clean_article_content(full_article_text)
+            
+                                                
+            if not cleaned_content or len(cleaned_content) < 30:
+                logger.warning(f"Article {article_num} has insufficient content")
+                continue
+            
+                                                        
+            penalties = self._extract_penalties(cleaned_content)
+            
+                                                                             
+            title = self._extract_article_title_from_full_text(cleaned_content, article_num)
+            
+                                                                               
+                                                                     
+            content_without_header = self._remove_article_header(cleaned_content, article_num)
+            
+            article_data = {
+                'article_number': article_num,
+                'article_title': title,
+                'article_text': content_without_header,
+                'penalties': penalties,
+                'word_count': len(content_without_header.split()),
+                'character_count': len(content_without_header),
+                'source_url': self.base_url,
+                'scraped_at': datetime.now().isoformat(),
+                'category': self._categorize_article(article_num)
+            }
+            
+            extracted_articles.append(article_data)
+            logger.info(f"Extracted Article {article_num}: {title[:50]}...")
+        
+        logger.info(f"Successfully extracted {len(extracted_articles)} articles")
+        return extracted_articles
+    
+    def _clean_article_content(self, content: str) -> str:
+        """Clean and normalize article content while preserving accuracy."""
+                                                                      
+        content = re.sub(r'\s+', ' ', content)
+        
+                                              
+        content = re.sub(r'^\s*[-–—]\s*', '', content)
+        content = re.sub(r'\s*[-–—]\s*$', '', content)
+        
+                                                                      
+        content = content.replace(''', "'").replace(''', "'")
+        content = content.replace('"', '"').replace('"', '"')
+        content = content.replace('–', '-').replace('—', '-')
+        
+                                                                
+        content = content.replace('â', '')
+        content = content.replace('Â', '')
+        content = content.replace('Ã', '')
+        content = content.replace('¢', '')
+        content = content.replace('€', '')
+        content = content.replace('Â€', '')
+        
+                                                                           
+        content = re.sub(r'[^\x00-\x7F]+', '', content)
+        
+                                                                 
+        content = re.sub(r'\s+', ' ', content)
+        
+                                        
+        content = re.sub(r'\.([A-Z])', r'. \1', content)
+        
+                                                                     
+        content = re.sub(r'\.+$', '.', content)
+        
+        return content.strip()
+    
+    def _extract_penalties(self, content: str) -> str:
+        """Extract penalty information from article content."""
+        penalties_found = []
+        
+        for pattern in self.penalty_patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            penalties_found.extend(matches)
+        
+                                                  
+        unique_penalties = []
+        for penalty in penalties_found:
+            if penalty.lower() not in [p.lower() for p in unique_penalties]:
+                unique_penalties.append(penalty)
+        
+        return "; ".join(unique_penalties) if unique_penalties else "No specific penalty mentioned"
+    
+    def _extract_article_title_from_full_text(self, content: str, article_num: int) -> str:
+        """Extract proper article title from the complete article text including header."""
+                                                                              
+                                                               
+        
+                                                                   
+        pattern1 = rf'ART\.\s*{article_num}\.\s*([^.—]+(?:\s+[^.—]+)*)\s*[.—]'
+        match1 = re.search(pattern1, content, re.IGNORECASE)
+        if match1:
+            title = match1.group(1).strip()
+            if len(title) >= 5 and len(title) <= 100:
+                return title
+        
+                                                                           
+        pattern2 = rf'ART\.\s*{article_num}\.\s*([^—]+)—'
+        match2 = re.search(pattern2, content, re.IGNORECASE)
+        if match2:
+            title = match2.group(1).strip()
+                                
+            title = re.sub(r'\s+', ' ', title)
+            if len(title) >= 5 and len(title) <= 100:
+                return title
+        
+                                                                 
+        pattern3 = rf'ART\.\s*{article_num}\.\s*([^.]+\.)'
+        match3 = re.search(pattern3, content, re.IGNORECASE)
+        if match3:
+            title = match3.group(1).strip()
+            if 5 <= len(title) <= 150:
+                return title
+        
+                                                         
+        words = content.split()
+                                                               
+        title_start = 0
+        for i, word in enumerate(words):
+            if word.upper() == 'ART.' or word.isdigit():
+                continue
+            else:
+                title_start = i
+                break
+        
+        if title_start < len(words):
+            title_words = []
+            for i in range(title_start, min(title_start + 12, len(words))):
+                title_words.append(words[i])
+                if words[i].endswith('.') and len(title_words) >= 3:
+                    break
+            
+            title = ' '.join(title_words)
+            if not title.endswith('.'):
+                title = title.rstrip('.,;:') + '.'
+            return title
+        
+        return f"Article {article_num}"
+    
+    def _remove_article_header(self, content: str, article_num: int) -> str:
+        """Remove the ART. [number] and title from content, keeping only the article body."""
+                                                                          
+        patterns_to_remove = [
+            rf'^ART\.\s*{article_num}\.\s*[^.—]*[.—]\s*',                                                   
+            rf'^Art\.\s*{article_num}\.\s*[^.—]*[.—]\s*',                                                    
+            rf'^ARTICLE\s*{article_num}\.\s*[^.—]*[.—]\s*'                                                         
+        ]
+        
+        for pattern in patterns_to_remove:
+            content = re.sub(pattern, '', content, flags=re.IGNORECASE)
+        
+                                                                              
+                                                  
+        title_patterns = [
+            r'^[A-Z][^.]*\.\s*',                                           
+            r'^[^.]{5,100}\.\s*'                                           
+        ]
+        
+        for pattern in title_patterns:
+                                                                         
+            match = re.match(pattern, content)
+            if match and len(match.group(0).strip()) < 150:                           
+                content = re.sub(pattern, '', content, count=1)
+                break
+        
+        return content.strip()
+    
+    def _categorize_article(self, article_num: int) -> str:
+        """Categorize articles by their legal focus."""
+        if article_num == 11:
+            return "Self-Defense"
+        elif 293 <= article_num <= 302:
+            return "Robbery"
+        elif 303 <= article_num <= 312:
+            return "Theft"
+        elif article_num == 315:
+            return "Estafa"
+        else:
+            return "Other Criminal Law"
+    
+    def validate_data(self, articles: List[Dict]) -> List[Dict]:
+        """Validate extracted data for completeness and accuracy."""
+        validated_articles = []
+        
+        for article in articles:
+                                   
+            if not all(key in article for key in ['article_number', 'article_text']):
+                logger.warning(f"Article missing required fields: {article.get('article_number', 'Unknown')}")
+                continue
+            
+                                   
+            if len(article['article_text']) < 50:
+                logger.warning(f"Article {article['article_number']} has insufficient content")
+                continue
+            
+                                                   
+            validated_articles.append(article)
+        
+        logger.info(f"Validated {len(validated_articles)} out of {len(articles)} articles")
+        return validated_articles
+    
+    def export_data(self, articles: List[Dict], base_filename: str = "revised_penal_code"):
+        """Export data as JSON and MD."""
+        if not articles:
+            logger.warning("No articles to export")
+            return
+        
+                                          
+        output_dir = Path(__file__).parent.parent / "data" / "raw"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+                        
+        json_filename = f"{base_filename}.json"
+        json_path = output_dir / json_filename
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(articles, f, indent=2, ensure_ascii=False)
+        logger.info(f"Exported JSON: {json_path}")
+        
+                            
+        md_filename = f"{base_filename}.md"
+        md_path = output_dir / md_filename
+        with open(md_path, 'w', encoding='utf-8') as f:
+            f.write("# REVISED PENAL CODE OF THE PHILIPPINES\n\n")
+            f.write("**Source:** Supreme Court E-Library\n\n")
+            f.write("---\n\n")
+            
+                               
+            by_category = {}
+            for article in articles:
+                category = article.get('category', 'General')
+                if category not in by_category:
+                    by_category[category] = []
+                by_category[category].append(article)
+            
+                                        
+            for category, cat_articles in sorted(by_category.items()):
+                f.write(f"## {category}\n\n")
+                
+                for article in sorted(cat_articles, key=lambda x: x.get('article_number', 0)):
+                    article_num = article.get('article_number', 'Unknown')
+                    article_title = article.get('article_title', '')
+                    article_text = article.get('article_text', '')
+                    penalties = article.get('penalties', '')
+                    
+                    f.write(f"### Article {article_num}\n")
+                    if article_title:
+                        f.write(f"**{article_title}**\n\n")
+                    f.write(f"{article_text}\n\n")
+                    if penalties and penalties != "No specific penalty mentioned":
+                        f.write(f"*Penalties:* {penalties}\n\n")
+                    f.write("---\n\n")
+            
+            f.write(f"\n**Scraped:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        
+        logger.info(f"Exported MD: {md_path}")
+        
+        return str(json_path), str(md_path)
+    
+    
+    def scrape(self) -> List[Dict]:
+        """Main scraping method that orchestrates the entire process."""
+        logger.info("Starting Revised Penal Code scraping process")
+        
+                       
+        soup = self.fetch_content(self.base_url)
+        if not soup:
+            logger.error("Failed to fetch content")
+            return []
+        
+                          
+        articles = self.extract_articles(soup)
+        if not articles:
+            logger.warning("No articles extracted")
+            return []
+        
+                       
+        validated_articles = self.validate_data(articles)
+        
+                             
+        self.scraped_data = validated_articles
+        
+        logger.info(f"Scraping completed successfully. {len(validated_articles)} articles extracted.")
+        return validated_articles
+
+
+def main():
+    """Main execution function."""
+    logger.info("AIRTIGHT LEGAL SCRAPER - REVISED PENAL CODE")
+    logger.info("=" * 60)
+    logger.info("Target Articles: 11 (Self-Defense), 293-312 (Robbery & Theft), 315 (Estafa)")
+    logger.info("Source: Supreme Court E-Library")
+    
+                        
+    scraper = RevisedPenalCodeScraper()
+    
+                      
+    articles = scraper.scrape()
+    
+    if articles:
+                     
+        json_file = scraper.export_data(articles)
+        
+        logger.info("SCRAPING COMPLETED SUCCESSFULLY")
+        logger.info(f"Articles extracted: {len(articles)}")
+        logger.info(f"JSON file: {json_file}")
+        
+                         
+        categories = {}
+        for article in articles:
+            cat = article['category']
+            categories[cat] = categories.get(cat, 0) + 1
+        
+        logger.info("ARTICLES BY CATEGORY:")
+        for category, count in categories.items():
+            logger.info(f"   {category}: {count} articles")
+        
+    else:
+        logger.error("SCRAPING FAILED")
+        logger.error("Check the log files for detailed error information.")
+
+
+if __name__ == "__main__":
+    main()

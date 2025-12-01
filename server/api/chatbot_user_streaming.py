@@ -137,7 +137,7 @@ async def ask_legal_question(
             new_session_id = None
             if not effective_user_id and rate_limit_result.get("session_id") != request.guest_session_id:
                 new_session_id = rate_limit_result.get("session_id")
-                print(f" Guest session refreshed: {request.guest_session_id} -> {new_session_id}")
+                logger.debug(f"Guest session refreshed: {request.guest_session_id} -> {new_session_id}")
             
             yield format_sse({
                 'type': 'metadata', 
@@ -195,7 +195,7 @@ async def ask_legal_question(
                         
                                                                
                         try:
-                            print(f" Recording violation for user: {effective_user_id}")
+                            logger.info(f"Recording violation for user: {effective_user_id}")
                             violation_result = await violation_service.record_violation(
                                 user_id=effective_user_id,
                                 violation_type=ViolationType.CHATBOT_PROMPT,
@@ -203,11 +203,11 @@ async def ask_legal_question(
                                 moderation_result=moderation_result,
                                 content_id=None
                             )
-                            print(f" Violation recorded: {violation_result}")
+                            logger.debug(f"Violation recorded: {violation_result}")
                         except Exception as violation_error:
                             logger.error(f" Failed to record violation: {str(violation_error)}")
                             import traceback
-                            print(f"Violation error traceback: {traceback.format_exc()}")
+                            logger.error(f"Violation error traceback: {traceback.format_exc()}")
                                                                               
                             violation_result = {
                                 "action_taken": "error",
@@ -320,7 +320,7 @@ async def ask_legal_question(
                                                                               
                                                                                             
             if is_simple_greeting(request.question):
-                print(f" Detected as greeting: {request.question}")
+                logger.debug(f"Detected as greeting: {request.question}")
                 greeting_response = generate_ai_response(request.question, language, 'greeting')
                 
                                                            
@@ -360,7 +360,7 @@ async def ask_legal_question(
             
                                                                              
             if is_app_information_question(request.question):
-                print(f"\n📱 [APP INFO] Detected app information question: {request.question}")
+                logger.debug(f"Detected app information question: {request.question}")
                 
                                                                  
                 if language == "tagalog":
@@ -438,7 +438,7 @@ async def ask_legal_question(
             
                                                            
             if is_translation_request(request.question):
-                print(f"\n [TRANSLATION] Detected translation/repeat request: {request.question}")
+                logger.debug(f"Detected translation/repeat request: {request.question}")
                 
                                         
                 text_lower = request.question.lower()
@@ -472,7 +472,7 @@ async def ask_legal_question(
                                         last_response = msg.get('content', '')
                                         break
                         except Exception as e:
-                            print(f"Failed to get recent messages for translation: {e}")
+                            logger.error(f"Failed to get recent messages for translation: {e}")
                 
                 if last_response:
                                                           
@@ -553,7 +553,7 @@ async def ask_legal_question(
             
                                                                                        
             if is_legal_category_request(request.question):
-                print(f"\n⚖ [LEGAL CATEGORY] Detected legal category request: {request.question}")
+                logger.debug(f"Detected legal category request: {request.question}")
                 
                                                                 
                 category_response, category_followups = get_legal_category_response(request.question, language)
@@ -594,13 +594,13 @@ async def ask_legal_question(
             
                                                                                  
             if is_conversation_context_question(request.question):
-                print(f"\n [CONVERSATION CONTEXT] Detected conversation context question")
+                logger.debug("Detected conversation context question")
                 
                                                                              
                 past_conversations_summary = ""
                 if effective_user_id:
                     try:
-                        print(f"    Retrieving past conversations for user {effective_user_id[:8]}...")
+                        logger.debug(f"Retrieving past conversations for user {effective_user_id[:8]}...")
                         
                                                       
                         user_sessions = await chat_service.get_user_sessions(
@@ -611,7 +611,7 @@ async def ask_legal_question(
                         )
                         
                         if user_sessions and user_sessions.sessions:
-                            print(f"    Found {len(user_sessions.sessions)} recent conversations")
+                            logger.debug(f"Found {len(user_sessions.sessions)} recent conversations")
                             
                                                                  
                             conversation_summaries = []
@@ -638,10 +638,9 @@ async def ask_legal_question(
                                 else:
                                     past_conversations_summary = f"\n\n**Our Recent Conversations:**\n" + "\n".join(conversation_summaries)
                         else:
-                            print(f"   ℹ No past conversations found for user")
+                            logger.debug("No past conversations found for user")
                             
                     except Exception as e:
-                        print(f"    Error retrieving past conversations: {e}")
                         logger.error(f"Error retrieving past conversations: {e}")
                 
                                                                                 
@@ -865,7 +864,7 @@ async def ask_legal_question(
                         metadata={"sources": source_citations, "streaming": True}
                     )
                 except Exception as e:
-                    print(f"Failed to save: {e}")
+                    logger.error(f"Failed to save: {e}")
             
                                                                                                 
             metadata_response = {

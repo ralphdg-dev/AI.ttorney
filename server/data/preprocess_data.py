@@ -1,9 +1,14 @@
 import json
 import os
 import re
+import logging
 from pathlib import Path
 from typing import List, Dict, Any
 from datetime import datetime
+
+# Configure logging for data processing
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
                
 RAW_DATA_DIR = Path(__file__).parent / "raw"
@@ -61,15 +66,15 @@ def process_consumer_act(data: Dict[str, Any], source_file: str) -> List[Dict[st
     topics = data.get('topics', {})
     total_articles = sum(len(articles) for articles in topics.values())
     
-    print(f"    Found {total_articles} articles to process")
+    logger.info(f"Found {total_articles} articles to process")
     article_count = 0
     
     for topic_name, articles in topics.items():
-        print(f"   📁 Processing topic: {topic_name} ({len(articles)} articles)")
+        logger.info(f"Processing topic: {topic_name} ({len(articles)} articles)")
         for article in articles:
             article_count += 1
             if article_count % 20 == 0 or article_count == 1:
-                print(f"   ⏳ Progress: {article_count}/{total_articles} articles...")
+                logger.info(f"Progress: {article_count}/{total_articles} articles...")
             article_number = article.get('number', 'Unknown')
             article_title = article.get('title', '')
             content = article.get('content', '')
@@ -119,11 +124,11 @@ def process_revised_penal_code(data: Dict[str, Any], source_file: str) -> List[D
     articles = data if isinstance(data, list) else []
     total_articles = len(articles)
     
-    print(f"    Found {total_articles} articles to process")
+    logger.info(f"Found {total_articles} articles to process")
     
     for idx, article in enumerate(articles, 1):
         if idx % 5 == 0 or idx == 1:
-            print(f"   ⏳ Progress: {idx}/{total_articles} articles...")
+            logger.info(f"Progress: {idx}/{total_articles} articles...")
         article_number = str(article.get('article_number', 'Unknown'))
         article_title = article.get('article_title', '')
         content = article.get('article_text', '')
@@ -177,15 +182,15 @@ def process_family_law(data: Dict[str, Any], source_file: str) -> List[Dict[str,
     topics = data.get('topics', {})
     total_articles = sum(len(articles) for articles in topics.values())
     
-    print(f"    Found {total_articles} articles to process")
+    logger.info(f"Found {total_articles} articles to process")
     article_count = 0
     
     for topic_name, articles in topics.items():
-        print(f"   📁 Processing topic: {topic_name} ({len(articles)} articles)")
+        logger.info(f"Processing topic: {topic_name} ({len(articles)} articles)")
         for article in articles:
             article_count += 1
             if article_count % 20 == 0 or article_count == 1:
-                print(f"   ⏳ Progress: {article_count}/{total_articles} articles...")
+                logger.info(f"Progress: {article_count}/{total_articles} articles...")
             article_number = article.get('number', 'Unknown')
             article_title = article.get('title', '')
             content = article.get('content', '')
@@ -234,15 +239,15 @@ def process_labor_code(data: Dict[str, Any], source_file: str) -> List[Dict[str,
     topics = data.get('topics', {})
     total_articles = sum(len(articles) for articles in topics.values())
     
-    print(f"    Found {total_articles} articles to process")
+    logger.info(f"Found {total_articles} articles to process")
     article_count = 0
     
     for topic_name, articles in topics.items():
-        print(f"   📁 Processing topic: {topic_name} ({len(articles)} articles)")
+        logger.info(f"Processing topic: {topic_name} ({len(articles)} articles)")
         for article in articles:
             article_count += 1
             if article_count % 20 == 0 or article_count == 1:
-                print(f"   ⏳ Progress: {article_count}/{total_articles} articles...")
+                logger.info(f"Progress: {article_count}/{total_articles} articles...")
             article_number = article.get('number', 'Unknown')
             article_title = article.get('title', '')
             content = article.get('content', '')
@@ -291,7 +296,7 @@ def process_civil_code(data: Dict[str, Any], source_file: str) -> List[Dict[str,
     sections = data.get('sections', [])
     total_sections = len(sections)
     
-    print(f"    Found {total_sections} sections to process")
+    logger.info(f"Found {total_sections} sections to process")
     
     for section_idx, section in enumerate(sections, 1):
         section_heading = section.get('heading', 'General')
@@ -299,10 +304,10 @@ def process_civil_code(data: Dict[str, Any], source_file: str) -> List[Dict[str,
         
                                          
         if section_idx % 10 == 0 or section_idx == 1:
-            print(f"   ⏳ Progress: {section_idx}/{total_sections} sections - {section_heading[:40]}...")
+            logger.info(f"Progress: {section_idx}/{total_sections} sections - {section_heading[:40]}...")
         
         if section_idx % 50 == 0:
-            print(f"    Processed {section_idx} sections so far...")
+            logger.info(f"Processed {section_idx} sections so far...")
         
         for article in articles:
             article_number = article.get('article_number', 'Unknown')
@@ -359,7 +364,7 @@ def process_all_files():
     PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
     
     if not RAW_DATA_DIR.exists():
-        print(f" Raw data directory not found: {RAW_DATA_DIR}")
+        logger.error(f"Raw data directory not found: {RAW_DATA_DIR}")
         return
     
     all_processed_items = []
@@ -368,17 +373,17 @@ def process_all_files():
     json_files = list(RAW_DATA_DIR.glob("*.json"))
     
     if not json_files:
-        print(f" No JSON files found in {RAW_DATA_DIR}")
-        print("Please run the scraper scripts first to generate raw data.")
+        logger.error(f"No JSON files found in {RAW_DATA_DIR}")
+        logger.error("Please run the scraper scripts first to generate raw data.")
         return
     
                                                                    
     json_files.sort(key=lambda f: (f.name == 'civil_code.json', f.name))
     
-    print(f"📂 Found {len(json_files)} JSON files to process")
+    logger.info(f"Found {len(json_files)} JSON files to process")
     
     for json_file in json_files:
-        print(f"\n📄 Processing: {json_file.name}")
+        logger.info(f"Processing: {json_file.name}")
         
         try:
             with open(json_file, 'r', encoding='utf-8') as f:
@@ -399,26 +404,25 @@ def process_all_files():
                 items = process_civil_code(data, source_name)
             else:
                                                        
-                print(f" Unknown format for {source_name}, skipping...")
+                logger.warning(f"Unknown format for {source_name}, skipping...")
                 continue
             
             all_processed_items.extend(items)
-            print(f" Processed {len(items)} chunks from {json_file.name}")
+            logger.info(f"Processed {len(items)} chunks from {json_file.name}")
             
         except Exception as e:
-            print(f" Error processing {json_file.name}: {str(e)}")
+            logger.error(f"Error processing {json_file.name}: {str(e)}")
             continue
     
-                                                     
-    print(f"\n Saving {len(all_processed_items)} processed chunks to {OUTPUT_FILE}")
+    logger.info(f"Saving {len(all_processed_items)} processed chunks to {OUTPUT_FILE}")
     
     with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
         for item in all_processed_items:
             f.write(json.dumps(item, ensure_ascii=False) + '\n')
     
-    print(f" Preprocessing complete!")
-    print(f" Total chunks created: {len(all_processed_items)}")
-    print(f"📁 Output file: {OUTPUT_FILE}")
+    logger.info("Preprocessing complete!")
+    logger.info(f"Total chunks created: {len(all_processed_items)}")
+    logger.info(f"Output file: {OUTPUT_FILE}")
     
                                  
     sources = {}
@@ -426,15 +430,15 @@ def process_all_files():
         source = item['metadata']['source']
         sources[source] = sources.get(source, 0) + 1
     
-    print("\n Summary by source:")
+    logger.info("Summary by source:")
     for source, count in sources.items():
-        print(f"  - {source}: {count} chunks")
+        logger.info(f"  - {source}: {count} chunks")
 
 
 if __name__ == "__main__":
-    print(" Starting data preprocessing for AI.ttorney Legal Chatbot")
-    print(f"📂 Raw data directory: {RAW_DATA_DIR}")
-    print(f"📂 Output directory: {PROCESSED_DATA_DIR}")
-    print("=" * 60)
+    logger.info("Starting data preprocessing for AI.ttorney Legal Chatbot")
+    logger.info(f"Raw data directory: {RAW_DATA_DIR}")
+    logger.info(f"Output directory: {PROCESSED_DATA_DIR}")
+    logger.info("=" * 60)
     
     process_all_files()

@@ -12,7 +12,7 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     """Get current authenticated user"""
     try:
         if not credentials:
-            logger.error(" No credentials provided - Authorization header missing")
+            logger.error("No credentials provided - Authorization header missing")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Authorization header missing",
@@ -20,13 +20,13 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
             )
         
         token = credentials.credentials
-        logger.info(f" Authenticating user with token: {token[:20]}...")
+        logger.info(f"Authenticating user with token: {token[:20]}...")
         user_data = await AuthService.get_user(token)
         
-        logger.info(f" User data received: {user_data}")
+        logger.debug(f"User data received: {user_data}")
         
         if not user_data:
-            logger.warning(" No user data returned from AuthService")
+            logger.warning("No user data returned from AuthService")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid authentication credentials",
@@ -37,7 +37,7 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f" Authentication error: {str(e)}", exc_info=True)
+        logger.error(f"Authentication error: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",

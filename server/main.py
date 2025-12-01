@@ -47,7 +47,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("🚀 AI.ttorney API starting up...")
+    logger.info("AI.ttorney API starting up...")
     
     # Production startup checks
     try:
@@ -56,39 +56,72 @@ async def lifespan(app: FastAPI):
         connection_test = await supabase_service.test_connection()
         
         if connection_test["success"]:
-            logger.info("✅ Supabase connection established")
+            logger.info("Supabase connection established")
         else:
-            logger.error(f"❌ Supabase connection issue: {connection_test['error']}")
+            logger.error(f"Supabase connection issue: {connection_test['error']}")
             raise Exception("Database connection failed")
             
-        # Validate critical environment variables
-        required_vars = [
-            "SUPABASE_URL", 
-            "SUPABASE_ANON_KEY", 
-            "OPENAI_API_KEY",
-            "SUPABASE_SERVICE_ROLE_KEY"
-        ]
-        missing_vars = [var for var in required_vars if not os.getenv(var)]
-        if missing_vars:
-            raise Exception(f"Missing required environment variables: {missing_vars}")
+        # Validate critical environment variables with detailed checks
+        critical_vars = {
+            "SUPABASE_URL": {"required": True, "description": "Supabase database URL"},
+            "SUPABASE_ANON_KEY": {"required": True, "description": "Supabase anonymous key"},
+            "SUPABASE_SERVICE_ROLE_KEY": {"required": True, "description": "Supabase service role key"},
+            "OPENAI_API_KEY": {"required": True, "description": "OpenAI API key for chatbot functionality"},
+            "QDRANT_URL": {"required": True, "description": "Qdrant vector database URL"},
+            "QDRANT_API_KEY": {"required": True, "description": "Qdrant API key"}
+        }
+        
+        # Check required variables
+        missing_critical = []
+        invalid_vars = []
+        
+        for var_name, config in critical_vars.items():
+            value = os.getenv(var_name)
+            if not value:
+                missing_critical.append(f"{var_name} ({config['description']})")
+            elif var_name.endswith("_KEY") or var_name.endswith("_SECRET"):
+                # Basic validation for keys/secrets
+                if len(value) < 10:
+                    invalid_vars.append(f"{var_name} appears to be too short")
+        
+        if missing_critical:
+            error_msg = "CRITICAL: Missing required environment variables:\n" + "\n".join(f"  - {var}" for var in missing_critical)
+            logger.error(error_msg)
+            raise Exception(f"Application startup failed: {len(missing_critical)} required environment variables missing")
+        
+        if invalid_vars:
+            logger.warning(f"Environment variables may be invalid:\n" + "\n".join(f"  - {var}" for var in invalid_vars))
         
         # Warn about recommended production variables
         if os.getenv("NODE_ENV") == "production":
-            recommended_vars = ["ALLOWED_ORIGINS", "ALLOWED_HOSTS"]
-            missing_recommended = [var for var in recommended_vars if not os.getenv(var)]
-            if missing_recommended:
-                logger.warning(f"⚠️  Recommended production vars not set: {missing_recommended}")
+            production_vars = {
+                "ALLOWED_ORIGINS": {"description": "CORS allowed origins for security"},
+                "ALLOWED_HOSTS": {"description": "Allowed hostnames for security"},
+                "LOG_LEVEL": {"description": "Logging level (INFO/WARNING/ERROR)"},
+                "REDIS_URL": {"description": "Redis URL for caching/session storage"}
+            }
             
-        logger.info("✅ All startup checks passed")
+            missing_production = []
+            for var_name, config in production_vars.items():
+                if not os.getenv(var_name):
+                    missing_production.append(f"{var_name} ({config['description']})")
+            
+            if missing_production:
+                warning_msg = "Recommended production variables not set:\n" + "\n".join(f"  - {var}" for var in missing_production)
+                logger.warning(warning_msg)
+        
+        logger.info("Environment variable validation completed")
+            
+        logger.info("All startup checks passed")
         
     except Exception as e:
-        logger.error(f"❌ Startup failed: {str(e)}")
+        logger.error(f"Startup failed: {str(e)}")
         raise
     
     yield
     
     # Graceful shutdown
-    logger.info("🛑 AI.ttorney API shutting down...")
+    logger.info("AI.ttorney API shutting down...")
     # Cleanup connections, close file handles, etc.
     await asyncio.sleep(1)  # Allow in-flight requests to complete
 
@@ -129,15 +162,15 @@ async def request_logging_middleware(request: Request, call_next):
     
     # Log basic info, not headers in production
     if os.getenv("NODE_ENV") == "development":
-        logger.info(f" {request.method} {request.url.path}")
-        logger.info(f" Headers: {dict(request.headers)}")
+        logger.info(f"Request: {request.method} {request.url.path}")
+        logger.info(f"Headers: {dict(request.headers)}")
     else:
-        logger.info(f" {request.method} {request.url.path}")
+        logger.info(f"Request: {request.method} {request.url.path}")
     
     response = await call_next(request)
     
     process_time = time.time() - start_time
-    logger.info(f"  Response: {response.status_code} in {process_time:.3f}s")
+    logger.info(f"Response: {response.status_code} in {process_time:.3f}s")
     
     response.headers["X-Process-Time"] = str(process_time)
     return response
@@ -170,20 +203,24 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """Production-grade error handling"""
-    logger.error(f"💥 Global exception handler caught error")
-    logger.error(f"💥 Request: {request.method} {request.url.path}")
-    logger.error(f"💥 Exception type: {type(exc).__name__}")
-    logger.error(f"💥 Exception message: {str(exc)}")
-    logger.error(f"💥 Full traceback:", exc_info=True)
+    """Production-grade error handling with security"""
+    logger.error(f"Global exception: {request.method} {request.url.path}")
+    logger.error(f"Exception type: {type(exc).__name__}")
+    logger.error(f"Exception message: {str(exc)}")
     
-    # Always show detailed errors for debugging - even in production for now
+    # Only show full traceback in development
+    if os.getenv("NODE_ENV") == "development":
+        logger.error(f"Full traceback:", exc_info=True)
+    
+    # Production-safe error response
+    is_dev = os.getenv("NODE_ENV") == "development"
+    
     return JSONResponse(
         status_code=500,
         content={
             "detail": "Internal server error",
-            "error": str(exc),
-            "type": type(exc).__name__,
+            "error": str(exc) if is_dev else "An unexpected error occurred",
+            "type": type(exc).__name__ if is_dev else "InternalServerError",
             "path": request.url.path
         }
     )
@@ -227,14 +264,105 @@ app.include_router(lawyer_chatbot_streaming_router)
 from routes.chat_history import router as chat_history_router
 app.include_router(chat_history_router)
 
+# Health check endpoints for production monitoring
+@app.get("/health")
+async def health_check():
+    """Simple health check - returns 200 if service is running"""
+    return {
+        "status": "healthy",
+        "timestamp": time.time(),
+        "service": "AI.ttorney API",
+        "version": "1.0.0"
+    }
 
-                                            
-from routes.admin_moderation import router as admin_moderation_router
-app.include_router(admin_moderation_router, prefix="/api")
+@app.get("/ready")
+async def readiness_check():
+    """Readiness check - verifies all critical dependencies are available"""
+    try:
+        # Check database connection
+        from services.supabase_service import SupabaseService
+        supabase_service = SupabaseService()
+        db_test = await supabase_service.test_connection()
+        
+        if not db_test["success"]:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "not_ready",
+                    "reason": "database_connection_failed",
+                    "details": db_test.get("error", "Unknown database error")
+                }
+            )
+        
+        # Check OpenAI API key
+        openai_key = os.getenv("OPENAI_API_KEY")
+        if not openai_key:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "not_ready",
+                    "reason": "missing_openai_key",
+                    "details": "OpenAI API key not configured"
+                }
+            )
+        
+        # Check Qdrant connection
+        qdrant_url = os.getenv("QDRANT_URL")
+        if not qdrant_url:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "not_ready",
+                    "reason": "missing_qdrant_url",
+                    "details": "Qdrant vector database URL not configured"
+                }
+            )
+        
+        return {
+            "status": "ready",
+            "timestamp": time.time(),
+            "dependencies": {
+                "database": "connected",
+                "openai": "configured",
+                "qdrant": "configured"
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Readiness check failed: {str(e)}")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "not_ready",
+                "reason": "health_check_error",
+                "details": str(e)
+            }
+        )
 
-                                           
-from routes.user_moderation import router as user_moderation_router
-app.include_router(user_moderation_router, prefix="/api")
+@app.get("/api/test/supabase")
+async def test_supabase_connection():
+    """Test Supabase connection endpoint"""
+    try:
+        from services.supabase_service import SupabaseService
+        supabase_service = SupabaseService()
+        result = await supabase_service.test_connection()
+        
+        if result["success"]:
+            return {
+                "status": "success",
+                "message": "Supabase connection successful",
+            }
+        else:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Supabase connection failed: {result['error']}"
+            )
+    except Exception as e:
+        logger.error(f"Supabase test failed: {str(e)}")
+        raise HTTPException(
+            status_code=503,
+            detail="Database connection test failed"
+        )
 
                                               
 from routes.suspension_appeals import user_router as appeals_user_router, admin_router as appeals_admin_router

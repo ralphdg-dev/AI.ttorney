@@ -1,5 +1,6 @@
 import os
 import sys
+import logging
 from pathlib import Path
 
                               
@@ -10,62 +11,65 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Configure logging for script
+logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
+logger = logging.getLogger(__name__)
+
 def setup_tables():
     """Check if tables exist and provide setup instructions"""
     
-    print(" Checking chat history tables...")
+    logger.info("Checking chat history tables...")
     
     supabase = SupabaseService()
     
     try:
                                           
         response = supabase.supabase.table("chat_sessions").select("id").limit(1).execute()
-        print(" chat_sessions table exists")
-        print(f"   Found {len(response.data)} sessions")
+        logger.info("chat_sessions table exists")
+        logger.info(f"Found {len(response.data)} sessions")
     except Exception as e:
-        print(f" chat_sessions table does NOT exist")
-        print(f"   Error: {str(e)}")
-        print("\n TO FIX:")
-        print("   1. Go to your Supabase project dashboard")
-        print("   2. Navigate to SQL Editor")
-        print("   3. Run the SQL file: server/database/chat_history_schema.sql")
+        logger.error("chat_sessions table does NOT exist")
+        logger.error(f"Error: {str(e)}")
+        logger.error("\n TO FIX:")
+        logger.error("   1. Go to your Supabase project dashboard")
+        logger.error("   2. Navigate to SQL Editor")
+        logger.error("   3. Run the SQL file: server/database/chat_history_schema.sql")
         return False
     
     try:
                                           
         response = supabase.supabase.table("chat_messages").select("id").limit(1).execute()
-        print(" chat_messages table exists")
-        print(f"   Found {len(response.data)} messages")
+        logger.info("chat_messages table exists")
+        logger.info(f"Found {len(response.data)} messages")
     except Exception as e:
-        print(f" chat_messages table does NOT exist")
-        print(f"   Error: {str(e)}")
-        print("\n TO FIX:")
-        print("   1. Go to your Supabase project dashboard")
-        print("   2. Navigate to SQL Editor")
-        print("   3. Run the SQL file: server/database/chat_history_schema.sql")
+        logger.error("chat_messages table does NOT exist")
+        logger.error(f"Error: {str(e)}")
+        logger.error("\n TO FIX:")
+        logger.error("   1. Go to your Supabase project dashboard")
+        logger.error("   2. Navigate to SQL Editor")
+        logger.error("   3. Run the SQL file: server/database/chat_history_schema.sql")
         return False
     
-    print("\n All tables exist! Chat history system is ready.")
+    logger.info("All tables exist! Chat history system is ready.")
     return True
 
 if __name__ == "__main__":
-    print("=" * 60)
-    print("Chat History Database Setup Checker")
-    print("=" * 60)
-    print()
+    logger.info("=" * 60)
+    logger.info("Chat History Database Setup Checker")
+    logger.info("=" * 60)
     
     success = setup_tables()
     
     if not success:
-        print("\n" + "=" * 60)
-        print("  SETUP REQUIRED")
-        print("=" * 60)
-        print("\nThe chat history tables need to be created in Supabase.")
-        print("Follow the instructions above to set them up.")
+        logger.error("=" * 60)
+        logger.error("SETUP REQUIRED")
+        logger.error("=" * 60)
+        logger.error("The chat history tables need to be created in Supabase.")
+        logger.error("Follow the instructions above to set them up.")
         sys.exit(1)
     else:
-        print("\n" + "=" * 60)
-        print(" SETUP COMPLETE")
-        print("=" * 60)
-        print("\nYour chat history system is ready to use!")
+        logger.info("=" * 60)
+        logger.info("SETUP COMPLETE")
+        logger.info("=" * 60)
+        logger.info("Your chat history system is ready to use!")
         sys.exit(0)

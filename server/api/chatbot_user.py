@@ -36,7 +36,7 @@ try:
     from config.guardrails_config import get_guardrails_instance, is_guardrails_enabled
     GUARDRAILS_AVAILABLE = True
 except ImportError:
-    print("  Guardrails AI not available - running without security validation")
+    logger.warning("Guardrails AI not available - running without security validation")
     GUARDRAILS_AVAILABLE = False
 
                                      
@@ -76,7 +76,7 @@ async def get_optional_current_user(credentials: Optional[HTTPAuthorizationCrede
         user_data = await AuthService.get_user(token)
         return user_data
     except Exception as e:
-        print(f"  Optional auth failed: {e}")
+        logger.debug(f"Optional auth failed: {e}")
         return None
 
                                      
@@ -228,7 +228,7 @@ except Exception as e:
 
                                                                     
 if not OPENAI_API_KEY:
-    print(" ERROR: OPENAI_API_KEY is not set!")
+    logger.error("OPENAI_API_KEY is not set!")
 
                                                                         
 try:
@@ -283,7 +283,7 @@ class ChatRequest(BaseModel):
         if is_guest:
                                                                    
             if len(conversation_history) > 10:
-                print(f" Guest user: Trimming conversation history from {len(conversation_history)} to 10 messages")
+                logger.debug(f"Guest user: Trimming conversation history from {len(conversation_history)} to 10 messages")
                                                                    
                 self.conversation_history = conversation_history[-10:]
                                                                       
@@ -1535,13 +1535,13 @@ def is_complex_query(text: str) -> bool:
 def get_embedding(text: str) -> List[float]:
     """Generate embedding for user question"""
     embed_start = time.time()
-    print(f"      📡 Calling OpenAI Embeddings API...")
+    logger.debug(f"Calling OpenAI Embeddings API...")
     response = openai_client.embeddings.create(
         model=EMBEDDING_MODEL,
         input=text
     )
     embed_time = time.time() - embed_start
-    print(f"      ⏱  Embedding API call: {embed_time:.2f}s")
+    logger.debug(f"Embedding API call: {embed_time:.2f}s")
     return response.data[0].embedding
 
 
@@ -1742,7 +1742,7 @@ If you lack sufficient information, clearly state that and focus on the recommen
                     [])
         
     except Exception as e:
-        print(f" Error generating answer: {e}")
+        logger.error(f"Error generating answer: {e}")
                                                              
         return ("I apologize, but I encountered an error while processing your question. Please try again.", 
                 "low", 
@@ -1757,8 +1757,8 @@ If you lack sufficient information, clearly state that and focus on the recommen
         logger.warning(f"Question: {question[:100]}")
         logger.warning(f"Original response: {answer[:200]}...")
         
-        print(f"  Response validation failed: {validation_reason}")
-        print(f"   Original response: {answer[:200]}...")
+        logger.warning(f"Response validation failed: {validation_reason}")
+        logger.debug(f"Original response: {answer[:200]}...")
                                                                     
                                          
         if language == "tagalog":
@@ -2030,7 +2030,7 @@ Gawing varied at natural, hindi robotic."""
         return result.strip() if result else fallbacks[response_type]
         
     except Exception as e:
-        print(f"Error generating {response_type} response: {e}")
+        logger.error(f"Error generating {response_type} response: {e}")
         return fallbacks[response_type]
 
 
@@ -2143,7 +2143,7 @@ def get_legal_disclaimer(language: str, question: str = "", answer: str = "", us
     # AI.ttorney is not liable for any decisions made based on this information
     
     # DEBUG: Log what user_type we're generating disclaimer for
-    print(f"🔍 DISCLAIMER DEBUG: Generating disclaimer for user_type='{user_type}', language='{language}'")
+    logger.debug(f"Generating disclaimer for user_type='{user_type}', language='{language}'")
     
     # Guest disclaimers - simple prompt to sign in
     if user_type == "guest":
@@ -2168,7 +2168,7 @@ def get_legal_disclaimer(language: str, question: str = "", answer: str = "", us
         }
     
     disclaimer_text = disclaimers.get(language, disclaimers["english"])
-    print(f"🔍 DISCLAIMER DEBUG: Returning disclaimer: {disclaimer_text[:100]}...")
+    logger.debug(f"Returning disclaimer: {disclaimer_text[:100]}...")
     return disclaimer_text
 
 
@@ -2278,11 +2278,11 @@ async def save_chat_interaction(
     - Backend is source of truth for session existence
     """
     if not effective_user_id:
-        print(f"ℹ  No user_id available - skipping chat history save")
+        logger.debug(f"No user_id available - skipping chat history save")
         return (None, None, None)
     
     try:
-        print(f" Saving chat history for user {effective_user_id}")
+        logger.info(f"Saving chat history for user {effective_user_id}")
         
                                                          
         session_exists = False
@@ -2291,18 +2291,18 @@ async def save_chat_interaction(
                 existing_session = await chat_service.get_session(UUID(session_id))
                 session_exists = existing_session is not None
                 if session_exists:
-                    print(f"    Using existing session: {session_id}")
+                    logger.debug(f"Using existing session: {session_id}")
                 else:
-                    print(f"     Session {session_id} not found, creating new one")
+                    logger.debug(f"Session {session_id} not found, creating new one")
                     session_id = None                                 
             except Exception as e:
-                print(f"     Error checking session: {e}, creating new one")
+                logger.warning(f"Error checking session: {e}, creating new one")
                 session_id = None
         
                                                                         
         if not session_id:
             title = question[:50] if len(question) > 50 else question
-            print(f"   Creating new session: {title}")
+            logger.debug(f"Creating new session: {title}")
                                                              
             db_language = 'en' if language in ['english', 'en'] else 'fil'
             session = await chat_service.create_session(
@@ -2311,10 +2311,10 @@ async def save_chat_interaction(
                 language=db_language
             )
             session_id = str(session.id)
-            print(f"    Session created: {session_id}")
+            logger.debug(f"Session created: {session_id}")
         
                            
-        print(f"   Saving user message...")
+        logger.debug(f"Saving user message...")
         user_msg = await chat_service.add_message(
             session_id=UUID(session_id),
             user_id=UUID(effective_user_id),
@@ -2323,10 +2323,10 @@ async def save_chat_interaction(
             metadata={}
         )
         user_message_id = str(user_msg.id)
-        print(f"    User message saved: {user_message_id}")
+        logger.debug(f"User message saved: {user_message_id}")
         
                                 
-        print(f"   Saving assistant message...")
+        logger.debug(f"Saving assistant message...")
         assistant_msg = await chat_service.add_message(
             session_id=UUID(session_id),
             user_id=UUID(effective_user_id),
@@ -2335,15 +2335,15 @@ async def save_chat_interaction(
             metadata=metadata or {}
         )
         assistant_message_id = str(assistant_msg.id)
-        print(f"    Assistant message saved: {assistant_message_id}")
-        print(f" Chat history saved successfully!")
+        logger.debug(f"Assistant message saved: {assistant_message_id}")
+        logger.info(f"Chat history saved successfully!")
         
         return (session_id, user_message_id, assistant_message_id)
         
     except Exception as e:
         import traceback
-        print(f"  Failed to save chat history: {e}")
-        print(f"   Traceback: {traceback.format_exc()}")
+        logger.error(f"Failed to save chat history: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return (session_id, None, None)
 
 
@@ -2398,7 +2398,7 @@ async def get_conversation_history_from_db(chat_service, session_id: str, limit:
         return []
     
     try:
-        print(f" Retrieving conversation history from session: {session_id}")
+        logger.debug(f"Retrieving conversation history from session: {session_id}")
         
                                                                                
         messages = await chat_service.get_session_messages(
@@ -2407,7 +2407,7 @@ async def get_conversation_history_from_db(chat_service, session_id: str, limit:
         )
         
         if not messages:
-            print(f"   ℹ No previous messages found in session")
+            logger.debug(f"No previous messages found in session")
             return []
         
                                                                                        
@@ -2418,11 +2418,11 @@ async def get_conversation_history_from_db(chat_service, session_id: str, limit:
                 "content": msg.content[:500]                                       
             })
         
-        print(f"    Retrieved {len(conversation_history)} messages from database")
+        logger.debug(f"Retrieved {len(conversation_history)} messages from database")
         return conversation_history
         
     except Exception as e:
-        print(f"    Error retrieving conversation history: {e}")
+        logger.error(f"Error retrieving conversation history: {e}")
         return []
 
 
@@ -2457,28 +2457,26 @@ async def ask_legal_question(
     request_start_time = datetime.now()
     perf_start = time.time()
     
-    print("\n" + "="*80)
-    print(f"⏱  PERFORMANCE TRACKING STARTED")
-    print(f" Question: {request.question[:100]}...")
-    print("="*80)
+    logger.debug(f"PERFORMANCE TRACKING STARTED")
+    logger.debug(f"Question: {request.question[:100]}...")
     
-                                                      
+                                                    
     authenticated_user_id = None
     if current_user and "user" in current_user:
         authenticated_user_id = current_user["user"]["id"]
-        print(f" Authenticated user ID: {authenticated_user_id}")
+        logger.debug(f"Authenticated user ID: {authenticated_user_id}")
     else:
-        print(f"  No authenticated user found. current_user: {current_user}")
+        logger.debug(f"No authenticated user found. current_user: {current_user}")
     
                                                                                        
     effective_user_id = authenticated_user_id or request.user_id
-    print(f" Effective user ID for chat history: {effective_user_id}")
+    logger.debug(f"Effective user ID for chat history: {effective_user_id}")
     
                                                                    
     # Determine user type: guest session has guest_session_id but no user_id
     is_guest_session = request.guest_session_id and not effective_user_id
     user_type = "guest" if is_guest_session else "registered"
-    print(f" User type for disclaimer: {user_type} (guest_session_id: {request.guest_session_id}, effective_user_id: {effective_user_id})")
+    logger.debug(f"User type for disclaimer: {user_type} (guest_session_id: {request.guest_session_id}, effective_user_id: {effective_user_id})")
     
                                                                                   
                                                              
@@ -2486,7 +2484,7 @@ async def ask_legal_question(
                                                       
                                                                   
     if not effective_user_id:                                  
-        print("\n  [GUEST SECURITY] Validating guest rate limit...")
+        logger.debug("Validating guest rate limit...")
         
                                                                 
         rate_limit_result = await GuestRateLimiter.validate_guest_request(
@@ -2513,10 +2511,10 @@ async def ask_legal_question(
             )
         
                                                    
-        print(f" Guest rate limit check passed")
-        print(f"   Server count: {rate_limit_result['server_count']}/{15}")
-        print(f"   Remaining: {rate_limit_result['remaining']}")
-        print(f"   Session ID: {rate_limit_result.get('session_id', 'N/A')[:16]}...")
+        logger.info(f"Guest rate limit check passed")
+        logger.debug(f"Server count: {rate_limit_result['server_count']}/{15}")
+        logger.debug(f"Remaining: {rate_limit_result['remaining']}")
+        logger.debug(f"Session ID: {rate_limit_result.get('session_id', 'N/A')[:16]}...")
         
                                                                             
         guest_session_token = rate_limit_result.get("session_id")
@@ -2554,15 +2552,15 @@ async def ask_legal_question(
         if guardrails_instance:
             try:
                 step_start = time.time()
-                print(f"\n [STEP 1] Guardrails input validation...")
+                logger.debug("Guardrails input validation...")
                 input_validation_result = guardrails_instance.validate_input(request.question)
                 step_time = time.time() - step_start
-                print(f"⏱  Guardrails validation took: {step_time:.2f}s")
+                logger.debug(f"Guardrails validation took: {step_time:.2f}s")
                 
                 if not input_validation_result.get('is_valid', True):
                                                             
                     error_message = input_validation_result.get('error', 'Input validation failed')
-                    print(f" Input validation failed: {error_message}")
+                    logger.warning(f"Input validation failed: {error_message}")
                     
                     return create_chat_response(
                         answer=error_message,
@@ -2576,17 +2574,17 @@ async def ask_legal_question(
                         }
                     )
                 else:
-                    print(f" Input validation passed")
+                    logger.debug("Input validation passed")
                                                     
                     if 'cleaned_input' in input_validation_result:
                         request.question = input_validation_result['cleaned_input']
             except Exception as e:
-                print(f"  Guardrails input validation error: {e}")
+                logger.error(f"Guardrails input validation error: {e}")
                                                          
         
                                                                                     
         if is_app_information_question(request.question):
-            print(f"\n📱 [APP INFO] Detected app information question: {request.question}")
+            logger.debug(f"Detected app information question: {request.question}")
             
                                                       
             language = detect_language(request.question)
@@ -2665,7 +2663,7 @@ async def ask_legal_question(
         
                                                        
         if is_translation_request(request.question):
-            print(f"\n [TRANSLATION] Detected translation/repeat request: {request.question}")
+            logger.debug(f"Detected translation/repeat request: {request.question}")
             
                                     
             text_lower = request.question.lower()
@@ -2699,7 +2697,7 @@ async def ask_legal_question(
                                     last_response = msg.get('content', '')
                                     break
                     except Exception as e:
-                        print(f"Failed to get recent messages for translation: {e}")
+                        logger.error(f"Failed to get recent messages for translation: {e}")
             
             if last_response:
                                                       
@@ -2801,7 +2799,7 @@ async def ask_legal_question(
         
                                                                                    
         if is_legal_category_request(request.question):
-            print(f"\n⚖ [LEGAL CATEGORY] Detected legal category request: {request.question}")
+            logger.debug(f"Detected legal category request: {request.question}")
             
                                                       
             language = detect_language(request.question)
@@ -2832,11 +2830,11 @@ async def ask_legal_question(
                                                                
         step_start = time.time()
         if request.question and is_simple_greeting(request.question):
-            print(f"\n [STEP 2] Detected as greeting: {request.question}")
+            logger.debug(f"Detected as greeting: {request.question}")
                                                              
             language = detect_language(request.question)
             step_time = time.time() - step_start
-            print(f"⏱  Greeting detection took: {step_time:.2f}s")
+            logger.debug(f"Greeting detection took: {step_time:.2f}s")
             greeting_response = generate_ai_response(request.question, language, 'greeting')
             
                                                        
@@ -2866,10 +2864,10 @@ async def ask_legal_question(
         
                                                                                
         step_start = time.time()
-        print(f"\n🚫 [STEP 4] Prohibited input check...")
+        logger.debug("Prohibited input check...")
         is_prohibited, prohibition_reason = detect_prohibited_input(request.question)
         step_time = time.time() - step_start
-        print(f"⏱  Prohibited check took: {step_time:.2f}s")
+        logger.debug(f"Prohibited check took: {step_time:.2f}s")
         if is_prohibited:
             raise HTTPException(status_code=400, detail=prohibition_reason)
         
@@ -2877,13 +2875,13 @@ async def ask_legal_question(
                                                                          
                                                                                                
         step_start = time.time()
-        print(f"\n  [STEP 4.3] Prompt injection detection...")
+        logger.debug("Prompt injection detection...")
         injection_detector = get_prompt_injection_detector()
         
         try:
             injection_result = injection_detector.detect(request.question.strip())
             step_time = time.time() - step_start
-            print(f"⏱  Injection detection took: {step_time:.2f}s")
+            logger.debug(f"Injection detection took: {step_time:.2f}s")
             
                                                              
             if injection_result["is_injection"]:
@@ -2898,7 +2896,7 @@ async def ask_legal_question(
                 if effective_user_id:
                     violation_service = get_violation_tracking_service()
                     try:
-                        print(f" Recording prompt injection violation for user: {effective_user_id}")
+                        logger.info(f"Recording prompt injection violation for user: {effective_user_id}")
                         violation_result = await violation_service.record_violation(
                             user_id=effective_user_id,
                             violation_type=ViolationType.CHATBOT_PROMPT,
@@ -2906,7 +2904,7 @@ async def ask_legal_question(
                             moderation_result=injection_result,
                             content_id=None
                         )
-                        print(f" Prompt injection violation recorded: {violation_result}")
+                        logger.debug(f"Prompt injection violation recorded: {violation_result}")
                         
                                                                   
                         language = detect_language(request.question)
@@ -2931,7 +2929,7 @@ async def ask_legal_question(
                     except Exception as violation_error:
                         logger.error(f" Failed to record prompt injection violation: {str(violation_error)}")
                         import traceback
-                        print(f"Violation error traceback: {traceback.format_exc()}")
+                        logger.error(f"Violation error traceback: {traceback.format_exc()}")
                 
                                                                                            
                 return create_chat_response(
@@ -2939,7 +2937,7 @@ async def ask_legal_question(
                     simplified_summary="Prompt injection blocked"
                 )
             else:
-                print(f" No prompt injection detected")
+                logger.debug("No prompt injection detected")
                     
         except Exception as e:
             logger.error(f" Prompt injection detection error: {str(e)}")
@@ -2950,11 +2948,11 @@ async def ask_legal_question(
         
                          
         step_start = time.time()
-        print(f"\n [STEP 5] Language detection...")
+        logger.debug("Language detection...")
         language = detect_language(request.question)
         step_time = time.time() - step_start
-        print(f"⏱  Language detection took: {step_time:.2f}s")
-        print(f"   Detected language: {language}")
+        logger.debug(f"Language detection took: {step_time:.2f}s")
+        logger.debug(f"Detected language: {language}")
         
                                                                          
         if language not in ["english", "tagalog", "taglish"]:
@@ -3025,14 +3023,14 @@ async def ask_legal_question(
         violation_detected = False
         if effective_user_id:
             step_start = time.time()
-            print(f"\n [STEP 4.5] Content moderation check...")
+            logger.debug("Content moderation check...")
             moderation_service = get_moderation_service()
             violation_service = get_violation_tracking_service()
             
             try:
                 moderation_result = await moderation_service.moderate_content(request.question.strip())
                 step_time = time.time() - step_start
-                print(f"⏱  Content moderation took: {step_time:.2f}s")
+                logger.debug(f"Content moderation took: {step_time:.2f}s")
                 
                                                                                  
                 if not moderation_service.is_content_safe(moderation_result):
@@ -3041,7 +3039,7 @@ async def ask_legal_question(
                     
                                                            
                     try:
-                        print(f" Recording violation for user: {effective_user_id}")
+                        logger.info(f"Recording violation for user: {effective_user_id}")
                         violation_result = await violation_service.record_violation(
                             user_id=effective_user_id,
                             violation_type=ViolationType.CHATBOT_PROMPT,
@@ -3049,30 +3047,30 @@ async def ask_legal_question(
                             moderation_result=moderation_result,
                             content_id=None                                              
                         )
-                        print(f" Violation recorded: {violation_result}")
-                        print(f"  Violation recorded, continuing to process question...")
+                        logger.debug(f"Violation recorded: {violation_result}")
+                        logger.debug(f"Violation recorded, continuing to process question...")
                     except Exception as violation_error:
                         logger.error(f" Failed to record violation: {str(violation_error)}")
                         import traceback
-                        print(f"Violation error traceback: {traceback.format_exc()}")
+                        logger.error(f"Violation error traceback: {traceback.format_exc()}")
                                                                                
                 else:
-                    print(f" Content moderation passed")
+                    logger.debug("Content moderation passed")
                     
             except Exception as e:
                 logger.error(f" Content moderation error: {str(e)}")
                                                                          
-                print(f"  Content moderation failed, continuing without moderation: {e}")
+                logger.warning(f"Content moderation failed, continuing without moderation: {e}")
         
                                                                              
         if is_conversation_context_question(request.question):
-            print(f"\n [CONVERSATION CONTEXT] Detected conversation context question")
+            logger.debug("Detected conversation context question")
             
                                                                          
             past_conversations_summary = ""
             if effective_user_id:
                 try:
-                    print(f"    Retrieving past conversations for user {effective_user_id[:8]}...")
+                    logger.debug(f"Retrieving past conversations for user {effective_user_id[:8]}...")
                     
                                                                      
                     user_sessions = await chat_history_service.get_user_sessions(
@@ -3083,7 +3081,7 @@ async def ask_legal_question(
                     )
                     
                     if user_sessions and user_sessions.sessions:
-                        print(f"    Found {len(user_sessions.sessions)} recent conversations")
+                        logger.debug(f"Found {len(user_sessions.sessions)} recent conversations")
                         
                                                                       
                         conversation_summaries = []
@@ -3141,10 +3139,10 @@ async def ask_legal_question(
                             else:
                                 past_conversations_summary = f"\n\n**Our Recent Conversations:**\n" + "\n".join(conversation_summaries)
                     else:
-                        print(f"   ℹ No past conversations found for user")
+                        logger.debug("No past conversations found for user")
                         
                 except Exception as e:
-                    print(f"    Error retrieving past conversations: {e}")
+                    logger.error(f"Error retrieving past conversations: {e}")
                     logger.error(f"Error retrieving past conversations: {e}")
             
                                                                             
@@ -3278,7 +3276,7 @@ async def ask_legal_question(
                                                          
         needs_clarify, clarification_type = needs_clarification(request.question)
         if needs_clarify:
-            print(f"\n❓ [CLARIFICATION] Question needs clarification: {clarification_type}")
+            logger.debug(f"Question needs clarification: {clarification_type}")
             
                                                      
             if language == "tagalog":
@@ -3371,7 +3369,7 @@ async def ask_legal_question(
                                                                     
                                                                                             
         step_start = time.time()
-        print(f"\n [STEP 6] Query normalization check...")
+        logger.debug("Query normalization check...")
         search_query = request.question
         
                                                                                           
@@ -3380,21 +3378,21 @@ async def ask_legal_question(
         
         if needs_normalization:
             norm_start = time.time()
-            print(f"   🤖 Normalizing emotional query with OpenAI...")
+            logger.debug(f"Normalizing emotional query with OpenAI...")
             logger.info("Query needs normalization - using AI to improve search")
             search_query = normalize_emotional_query(request.question, language)
             norm_time = time.time() - norm_start
-            print(f"   ⏱  OpenAI normalization API call: {norm_time:.2f}s")
+            logger.debug(f"OpenAI normalization API call: {norm_time:.2f}s")
         else:
             logger.info("Query is clear - skipping normalization for speed")
-            print(f"    Skipping normalization (query is clear)")
+            logger.debug("Skipping normalization (query is clear)")
         step_time = time.time() - step_start
-        print(f"⏱  Query normalization step took: {step_time:.2f}s")
+        logger.debug(f"Query normalization step took: {step_time:.2f}s")
         
                        
         search_start = time.time()
-        print(f"\n [STEP 7] Enhanced RAG with web search...")
-        print(f"   📡 Connecting to Qdrant Cloud...")
+        logger.debug("Enhanced RAG with web search...")
+        logger.debug("Connecting to Qdrant Cloud...")
         context, sources, rag_metadata = retrieve_relevant_context_with_web_search(
             question=search_query,
             qdrant_client=qdrant_client,
@@ -3406,13 +3404,13 @@ async def ask_legal_question(
             enable_web_search=True                                  
         )
         search_time = time.time() - search_start
-        print(f"⏱  Search took: {search_time:.2f}s")
-        print(f"   Found {len(sources)} relevant sources")
+        logger.debug(f"Search took: {search_time:.2f}s")
+        logger.debug(f"Found {len(sources)} relevant sources")
         
                           
         if rag_metadata.get("web_search_triggered"):
-            print(f"    Web search triggered: {rag_metadata['search_strategy']}")
-            print(f"    Qdrant: {rag_metadata['qdrant_results']}, Web: {rag_metadata['web_results']}")
+            logger.debug(f"Web search triggered: {rag_metadata['search_strategy']}")
+            logger.debug(f"Qdrant: {rag_metadata['qdrant_results']}, Web: {rag_metadata['web_results']}")
         
                                              
         if not sources or len(sources) == 0:
@@ -3434,11 +3432,11 @@ async def ask_legal_question(
         
                                                                                          
         step_start = time.time()
-        print(f"\n🧠 [STEP 8] Complexity analysis...")
+        logger.debug("Complexity analysis...")
         is_complex = is_complex_query(request.question)
         step_time = time.time() - step_start
-        print(f"⏱  Complexity check took: {step_time:.2f}s")
-        print(f"   Is complex: {is_complex}")
+        logger.debug(f"Complexity check took: {step_time:.2f}s")
+        logger.debug(f"Is complex: {is_complex}")
         
                                                                
         if sources and len(sources) > 0:
@@ -3457,7 +3455,7 @@ async def ask_legal_question(
             confidence = "medium"
         
                                                                         
-        print(f"\n [STEP 8.5] Retrieving conversation history from database...")
+        logger.debug("Retrieving conversation history from database...")
         db_conversation_history = await get_conversation_history_from_db(
             chat_service=chat_history_service,
             session_id=request.session_id,
@@ -3470,7 +3468,7 @@ async def ask_legal_question(
                                                          
         has_reference, reference_type = extract_conversation_reference(request.question)
         if has_reference:
-            print(f"\n🔗 [CONVERSATION REFERENCE] Detected reference to past conversation: {reference_type}")
+            logger.debug(f"Detected reference to past conversation: {reference_type}")
                                                                      
             if len(conversation_history) < 8 and effective_user_id:
                                                                                          
@@ -3481,14 +3479,14 @@ async def ask_legal_question(
                 )
                 if extended_history and len(extended_history) > len(conversation_history):
                     conversation_history = extended_history
-                    print(f"    Extended conversation history to {len(conversation_history)} messages for better reference context")
+                    logger.debug(f"Extended conversation history to {len(conversation_history)} messages for better reference context")
         
                                                           
         gen_start = time.time()
-        print(f"\n🤖 [STEP 9] Generating AI answer with OpenAI...")
-        print(f"   📡 Calling OpenAI API (model: {CHAT_MODEL})...")
-        print(f"   Max tokens: {request.max_tokens}")
-        print(f"   Conversation history: {len(conversation_history)} messages (from {'database' if db_conversation_history else 'client'})")
+        logger.debug("Generating AI answer with OpenAI...")
+        logger.debug(f"Calling OpenAI API (model: {CHAT_MODEL})...")
+        logger.debug(f"Max tokens: {request.max_tokens}")
+        logger.debug(f"Conversation history: {len(conversation_history)} messages (from {'database' if db_conversation_history else 'client'})")
         answer, _, simplified_summary, follow_up_questions = generate_answer(
             request.question,
             context,
@@ -3498,8 +3496,8 @@ async def ask_legal_question(
             is_complex=is_complex                                                  
         )
         gen_time = time.time() - gen_start
-        print(f"⏱  OpenAI answer generation took: {gen_time:.2f}s")
-        print(f"   Answer length: {len(answer)} characters")
+        logger.debug(f"OpenAI answer generation took: {gen_time:.2f}s")
+        logger.debug(f"Answer length: {len(answer)} characters")
         
                                                                                     
                                                                         
@@ -3530,7 +3528,7 @@ async def ask_legal_question(
                     output_validation_result or {}
                 )
             except Exception as e:
-                print(f"  Failed to generate security report: {e}")
+                logger.error(f"Failed to generate security report: {e}")
         
                                                          
         legal_disclaimer = get_legal_disclaimer(language, request.question, answer, user_type=user_type)
@@ -3540,7 +3538,7 @@ async def ask_legal_question(
         
                                                              
         save_start = time.time()
-        print(f"\n [STEP 10] Saving to database...")
+        logger.debug("Saving to database...")
         session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
             chat_service=chat_history_service,
             effective_user_id=effective_user_id,
@@ -3557,31 +3555,19 @@ async def ask_legal_question(
             }
         )
         save_time = time.time() - save_start
-        print(f"⏱  Database save took: {save_time:.2f}s")
+        logger.debug(f"Database save took: {save_time:.2f}s")
         
                                             
         total_time = time.time() - perf_start
         request_duration = (datetime.now() - request_start_time).total_seconds()
         
-        print("\n" + "="*80)
-        print(f" REQUEST COMPLETED")
-        print(f"⏱  TOTAL TIME: {total_time:.2f}s")
-        print("="*80)
-        print(f"\n PERFORMANCE BREAKDOWN:")
-        print(f"   • Total request time: {total_time:.2f}s")
-        print(f"   • Answer length: {len(answer)} characters")
-        print(f"   • Sources found: {len(source_citations)}")
-        print(f"   • Confidence: {confidence}")
-        print("\n💡 BOTTLENECK ANALYSIS:")
-        if total_time > 5:
-            print(f"     Response took {total_time:.2f}s (target: <5s)")
-            print(f"   Check the step timings above to identify bottlenecks:")
-            print(f"   - If 'OpenAI' steps are slow → Internet/OpenAI API issue")
-            print(f"   - If 'Qdrant' step is slow → Internet/Qdrant Cloud issue")
-            print(f"   - If 'Database' step is slow → Database connection issue")
-        else:
-            print(f"    Response time is good ({total_time:.2f}s)")
-        print("="*80 + "\n")
+        logger.debug(f"REQUEST COMPLETED")
+        logger.debug(f"TOTAL TIME: {total_time:.2f}s")
+        logger.debug(f"PERFORMANCE BREAKDOWN:")
+        logger.debug(f"Total request time: {total_time:.2f}s")
+        logger.debug(f"Answer length: {len(answer)} characters")
+        logger.debug(f"Sources found: {len(source_citations)}")
+        logger.debug(f"Confidence: {confidence}")
         
         logger.info(f"Request completed - duration={request_duration:.2f}s, answer_length={len(answer)}, sources={len(source_citations)}")
         

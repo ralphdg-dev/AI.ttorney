@@ -1,4 +1,5 @@
 import os
+import logging
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
 from tqdm import tqdm
@@ -6,6 +7,10 @@ import time
 
                             
 load_dotenv()
+
+# Configure logging for data processing
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
                
 COLLECTION_NAME = "legal_knowledge"
@@ -23,7 +28,7 @@ SOURCE_URLS = {
 
 def connect_to_qdrant():
     """Connect to Qdrant Cloud"""
-    print(f"🗄  Connecting to Qdrant Cloud...")
+    logger.info("Connecting to Qdrant Cloud...")
     
     if not QDRANT_URL or not QDRANT_API_KEY:
         raise ValueError("QDRANT_URL and QDRANT_API_KEY must be set in .env file")
@@ -33,18 +38,18 @@ def connect_to_qdrant():
         api_key=QDRANT_API_KEY,
     )
     
-    print(f" Connected to Qdrant Cloud")
+    logger.info("Connected to Qdrant Cloud")
     return client
 
 
 def get_all_points(client: QdrantClient):
     """Retrieve all points from the collection"""
-    print(f"\n Retrieving all points from collection '{COLLECTION_NAME}'...")
+    logger.info(f"Retrieving all points from collection '{COLLECTION_NAME}'...")
     
                          
     collection_info = client.get_collection(collection_name=COLLECTION_NAME)
     total_points = collection_info.points_count
-    print(f" Total points in collection: {total_points}")
+    logger.info(f"Total points in collection: {total_points}")
     
                                
     all_points = []
@@ -74,13 +79,13 @@ def get_all_points(client: QdrantClient):
             
             offset = next_offset
     
-    print(f" Retrieved {len(all_points)} points")
+    logger.info(f"Retrieved {len(all_points)} points")
     return all_points
 
 
 def update_metadata_with_urls(client: QdrantClient, points):
     """Update each point's metadata to include source URL"""
-    print(f"\n Updating metadata with source URLs...")
+    logger.info("Updating metadata with source URLs...")
     
     updated_count = 0
     skipped_count = 0
@@ -123,22 +128,22 @@ def update_metadata_with_urls(client: QdrantClient, points):
                     )
                     updated_count += 1
                 except Exception as e:
-                    print(f"\n  Failed to update point {point_id}: {str(e)}")
+                    logger.error(f"Failed to update point {point_id}: {str(e)}")
         
                                           
         time.sleep(0.1)
     
-    print(f"\n Updated {updated_count} points with source URLs")
-    print(f"    VAWC articles: {vawc_count}")
-    print(f"    Other articles: {updated_count - vawc_count}")
-    print(f"⏭  Skipped {skipped_count} points (already had URLs)")
+    logger.info(f"Updated {updated_count} points with source URLs")
+    logger.info(f"VAWC articles: {vawc_count}")
+    logger.info(f"Other articles: {updated_count - vawc_count}")
+    logger.info(f"Skipped {skipped_count} points (already had URLs)")
     
     return updated_count
 
 
 def verify_updates(client: QdrantClient):
     """Verify that URLs were added successfully"""
-    print(f"\n Verifying updates...")
+    logger.info("Verifying updates...")
     
                              
     result = client.scroll(
@@ -150,21 +155,21 @@ def verify_updates(client: QdrantClient):
     
     points, _ = result
     
-    print(f"\n Sample points with URLs:")
+    logger.info("Sample points with URLs:")
     for i, point in enumerate(points, 1):
         payload = point.payload
-        print(f"\n{i}. Source: {payload.get('source', 'Unknown')}")
-        print(f"   Article: {payload.get('article_number', 'N/A')}")
-        print(f"   URL: {payload.get('source_url', 'NO URL FOUND ')}")
-        print(f"   Text preview: {payload.get('text', '')[:80]}...")
+        logger.info(f"{i}. Source: {payload.get('source', 'Unknown')}")
+        logger.info(f"   Article: {payload.get('article_number', 'N/A')}")
+        logger.info(f"   URL: {payload.get('source_url', 'NO URL FOUND ')}")
+        logger.info(f"   Text preview: {payload.get('text', '')[:80]}...")
 
 
 def main():
     """Main execution function"""
-    print(" Starting Qdrant Metadata Update Process")
-    print("=" * 60)
-    print("This will add source URLs to existing points WITHOUT regenerating embeddings")
-    print("=" * 60)
+    logger.info("Starting Qdrant Metadata Update Process")
+    logger.info("=" * 60)
+    logger.info("This will add source URLs to existing points WITHOUT regenerating embeddings")
+    logger.info("=" * 60)
     
                        
     client = connect_to_qdrant()
@@ -177,17 +182,17 @@ def main():
     
                                     
     if updated_count > 0:
-        print(f"\n⏳ Waiting for Qdrant to index updates...")
+        logger.info("Waiting for Qdrant to index updates...")
         time.sleep(5)
     
                     
     verify_updates(client)
     
-    print("\n" + "=" * 60)
-    print(" Metadata update complete!")
-    print(f" Total points updated: {updated_count}")
-    print("💰 Credits saved: No embeddings regenerated!")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("Metadata update complete!")
+    logger.info(f"Total points updated: {updated_count}")
+    logger.info("Credits saved: No embeddings regenerated!")
+    logger.info("=" * 60)
 
 
 if __name__ == "__main__":

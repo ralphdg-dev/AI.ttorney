@@ -1,4 +1,5 @@
 import pickle
+import logging
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 from pathlib import Path
@@ -10,6 +11,10 @@ from dotenv import load_dotenv
                             
 load_dotenv()
 
+# Configure logging for data processing
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
                
 EMBEDDINGS_FILE = Path(__file__).parent / "embeddings" / "embeddings.pkl"
 COLLECTION_NAME = "legal_knowledge"
@@ -19,7 +24,7 @@ VECTOR_SIZE = 1536
 
 def load_embeddings() -> tuple[List[str], List[List[float]], List[str], List[Dict[str, Any]]]:
     """Load embeddings from pickle file"""
-    print(f" Loading embeddings from {EMBEDDINGS_FILE}")
+    logger.info(f"Loading embeddings from {EMBEDDINGS_FILE}")
     
     with open(EMBEDDINGS_FILE, 'rb') as f:
         data = pickle.load(f)
@@ -37,13 +42,13 @@ def load_embeddings() -> tuple[List[str], List[List[float]], List[str], List[Dic
     if hasattr(embeddings, 'tolist'):
         embeddings = embeddings.tolist()
     
-    print(f" Loaded {len(ids)} embeddings")
+    logger.info(f"Loaded {len(ids)} embeddings")
     return ids, embeddings, texts, metadatas
 
 
 def create_qdrant_collection():
     """Create or recreate Qdrant collection"""
-    print(f"\n🗄  Connecting to Qdrant Cloud...")
+    logger.info("Connecting to Qdrant Cloud...")
     
     if not QDRANT_URL or not QDRANT_API_KEY:
         raise ValueError("QDRANT_URL and QDRANT_API_KEY must be set in .env file")
@@ -54,12 +59,12 @@ def create_qdrant_collection():
         api_key=QDRANT_API_KEY,
     )
     
-    print(f" Connected to Qdrant Cloud")
+    logger.info("Connected to Qdrant Cloud")
     
                                                                 
     try:
         client.delete_collection(collection_name=COLLECTION_NAME)
-        print(f"🗑  Deleted existing collection: {COLLECTION_NAME}")
+        logger.info(f"Deleted existing collection: {COLLECTION_NAME}")
     except:
         pass
     
@@ -69,7 +74,7 @@ def create_qdrant_collection():
         vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
     )
     
-    print(f" Created collection: {COLLECTION_NAME}")
+    logger.info(f"Created collection: {COLLECTION_NAME}")
     return client
 
 
@@ -78,8 +83,8 @@ def upload_to_qdrant(client: QdrantClient, ids: List[str], embeddings: List[List
     """Upload embeddings to Qdrant Cloud in batches"""
     import time
     
-    print(f"\n Uploading {len(ids)} embeddings to Qdrant Cloud...")
-    print(f"  Using small batches for reliability. This will take a few minutes...")
+    logger.info(f"Uploading {len(ids)} embeddings to Qdrant Cloud...")
+    logger.info("Using small batches for reliability. This will take a few minutes...")
     
                                                          
     BATCH_SIZE = 25                                        
@@ -116,28 +121,28 @@ def upload_to_qdrant(client: QdrantClient, ids: List[str], embeddings: List[List
                 break                            
             except Exception as e:
                 if retry < MAX_RETRIES - 1:
-                    print(f"\n  Batch {i//BATCH_SIZE + 1} failed, retrying ({retry + 1}/{MAX_RETRIES})...")
+                    logger.warning(f"Batch {i//BATCH_SIZE + 1} failed, retrying ({retry + 1}/{MAX_RETRIES})...")
                     time.sleep(3)                            
                 else:
-                    print(f"\n Batch {i//BATCH_SIZE + 1} failed after {MAX_RETRIES} retries: {str(e)}")
+                    logger.error(f"Batch {i//BATCH_SIZE + 1} failed after {MAX_RETRIES} retries: {str(e)}")
                     raise
         
                                                           
         time.sleep(DELAY_BETWEEN_BATCHES)
     
-    print(f" Successfully uploaded all embeddings!")
-    print(f"⏳ Waiting for Qdrant to finish indexing...")
+    logger.info("Successfully uploaded all embeddings!")
+    logger.info("Waiting for Qdrant to finish indexing...")
     time.sleep(5)                             
 
 
 def verify_upload(client: QdrantClient, sample_embedding: List[float]):
     """Verify the upload was successful"""
-    print(f"\n Verifying upload...")
+    logger.info("Verifying upload...")
     
                          
     collection_info = client.get_collection(collection_name=COLLECTION_NAME)
     count = collection_info.points_count
-    print(f" Collection contains {count} documents")
+    logger.info(f"Collection contains {count} documents")
     
                                       
     results = client.search(
@@ -146,19 +151,19 @@ def verify_upload(client: QdrantClient, sample_embedding: List[float]):
         limit=3
     )
     
-    print(f"\n Sample query results:")
+    logger.info("Sample query results:")
     for i, result in enumerate(results, 1):
         payload = result.payload
-        print(f"\n{i}. Source: {payload.get('source', 'Unknown')}")
-        print(f"   Article: {payload.get('article_number', 'N/A')}")
-        print(f"   Score: {result.score:.4f}")
-        print(f"   Preview: {payload.get('text', '')[:100]}...")
+        logger.info(f"{i}. Source: {payload.get('source', 'Unknown')}")
+        logger.info(f"   Article: {payload.get('article_number', 'N/A')}")
+        logger.info(f"   Score: {result.score:.4f}")
+        logger.info(f"   Preview: {payload.get('text', '')[:100]}...")
 
 
 def main():
     """Main execution function"""
-    print(" Starting Qdrant Cloud Upload Process")
-    print("=" * 60)
+    logger.info("Starting Qdrant Cloud Upload Process")
+    logger.info("=" * 60)
     
                      
     ids, embeddings, texts, metadatas = load_embeddings()
@@ -172,11 +177,11 @@ def main():
                                                    
     verify_upload(client, embeddings[0])
     
-    print("\n" + "=" * 60)
-    print(" Qdrant Cloud upload complete!")
-    print(f" Qdrant URL: {QDRANT_URL}")
-    print(f" Collection name: {COLLECTION_NAME}")
-    print(f" Total documents: {len(ids)}")
+    logger.info("=" * 60)
+    logger.info("Qdrant Cloud upload complete!")
+    logger.info(f"Qdrant URL: {QDRANT_URL}")
+    logger.info(f"Collection name: {COLLECTION_NAME}")
+    logger.info(f"Total documents: {len(ids)}")
 
 
 if __name__ == "__main__":

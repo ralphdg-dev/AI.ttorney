@@ -99,12 +99,12 @@ async def ask_legal_question(
             authenticated_user_id = None
             if current_user and "user" in current_user:
                 authenticated_user_id = current_user["user"]["id"]
-                print(f" Authenticated user ID: {authenticated_user_id}")
+                logger.debug(f"Authenticated user ID: {authenticated_user_id}")
             else:
-                print(f"  No authenticated user found. current_user: {current_user}")
+                logger.debug(f"No authenticated user found. current_user: {current_user}")
             
             effective_user_id = authenticated_user_id or request.user_id
-            print(f" Effective user ID for chat history: {effective_user_id}")
+            logger.debug(f"Effective user ID for chat history: {effective_user_id}")
             
                                 
             logger.info(f"Streaming request - user_id={effective_user_id}, session_id={request.session_id}, question_length={len(request.question)}")
@@ -162,7 +162,7 @@ async def ask_legal_question(
                                                                                      
                                                                     
             if effective_user_id:
-                print(f"\n [STEP 1] Prompt injection detection (streaming)...")
+                logger.debug("Prompt injection detection (streaming)...")
                 injection_detector = get_prompt_injection_detector()
                 violation_service = get_violation_tracking_service()
                 
@@ -180,7 +180,7 @@ async def ask_legal_question(
                         
                                                                
                         try:
-                            print(f" Recording prompt injection violation for lawyer: {effective_user_id}")
+                            logger.info(f"Recording prompt injection violation for lawyer: {effective_user_id}")
                             violation_result = await violation_service.record_violation(
                                 user_id=effective_user_id,
                                 violation_type=ViolationType.CHATBOT_PROMPT,  
@@ -188,7 +188,7 @@ async def ask_legal_question(
                                 moderation_result=injection_result,  
                                 content_id=None
                             )
-                            print(f" Prompt injection violation recorded: {violation_result}")
+                            logger.debug(f"Prompt injection violation recorded: {violation_result}")
                             
                                                                                          
                             violation_message = (
@@ -208,13 +208,13 @@ async def ask_legal_question(
                         except Exception as violation_error:
                             logger.error(f" Failed to record prompt injection violation: {str(violation_error)}")
                             import traceback
-                            print(f"Violation error traceback: {traceback.format_exc()}")
+                            logger.error(f"Violation error traceback: {traceback.format_exc()}")
                             
                                                                                        
                             yield format_sse({'content': 'Your query was flagged for attempting to manipulate the system. This violates our usage policy. Please use this service for legitimate legal research only.', 'done': True})
                             return
                     else:
-                        print(f" No prompt injection detected (streaming)")
+                        logger.debug("No prompt injection detected (streaming)")
                         
                 except Exception as e:
                     logger.error(f" Prompt injection detection error: {str(e)}")
@@ -222,7 +222,7 @@ async def ask_legal_question(
             
                                                                             
                                                                            
-            print(f"\n [STEP 2] Content moderation check (streaming)...")
+            logger.debug("Content moderation check (streaming)...")
             moderation_service = get_moderation_service()
             violation_service = get_violation_tracking_service()
             
@@ -238,7 +238,7 @@ async def ask_legal_question(
                     violation_result = None
                     if effective_user_id:
                         try:
-                            print(f" Recording violation for user: {effective_user_id}")
+                            logger.info(f"Recording violation for user: {effective_user_id}")
                             violation_result = await violation_service.record_violation(
                                 user_id=effective_user_id,
                                 violation_type=ViolationType.CHATBOT_PROMPT,
@@ -246,7 +246,7 @@ async def ask_legal_question(
                                 moderation_result=moderation_result,
                                 content_id=None
                             )
-                            print(f" Violation recorded: {violation_result}")
+                            logger.debug(f"Violation recorded: {violation_result}")
                         except Exception as violation_error:
                             logger.error(f" Failed to record violation: {str(violation_error)}")
                             violation_result = None
@@ -358,12 +358,12 @@ async def ask_legal_question(
                     yield format_sse({'done': True})
                     return
                 else:
-                    print(f" Content moderation passed (streaming)")
+                    logger.debug("Content moderation passed (streaming)")
                     
             except Exception as e:
                 logger.error(f" Content moderation error: {str(e)}")
                                                                          
-                print(f"  Content moderation failed, continuing without moderation: {e}")
+                logger.warning(f"Content moderation failed, continuing without moderation: {e}")
             
                                         
             is_prohibited, prohibition_reason = detect_prohibited_input(request.question)
