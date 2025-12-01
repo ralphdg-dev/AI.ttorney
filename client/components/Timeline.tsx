@@ -7,6 +7,7 @@ import Colors from '../constants/Colors';
 // eslint-disable-next-line import/no-named-as-default
 import apiClient from '@/lib/api-client';
 import { useFocusEffect } from '@react-navigation/native';
+import { supabase } from '@/lib/supabase';
 
 interface PostData {
   id: string;
@@ -59,7 +60,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     return `${diffYear}y`;
   };
 
-  const mapApiToPost = (row: any): PostData => {
+  const mapApiToPost = useCallback((row: any): PostData => {
     const isAnon = !!row?.is_anonymous;
     const created = row?.created_at || '';
     const userData = row?.users || {};
@@ -79,7 +80,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       content: row?.body || '',
       comments: Number(row?.reply_count || row?.replies?.length || row?.forum_replies?.length || 0),
     };
-  };
+  }, []);
 
   // Load first page of posts from API (server-side pagination)
   const loadPosts = useCallback(async () => {
@@ -147,7 +148,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     } finally {
       setLoadingMore(false);
     }
-  }, [currentPage, hasMore, loadingMore]);
+  }, [currentPage, hasMore, loadingMore, mapApiToPost]);
 
   useEffect(() => {
     loadPosts();
@@ -159,6 +160,82 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       loadPosts();
     }, [loadPosts])
   );
+
+  // Real-time subscription for comment count updates (optimized with debouncing)
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('📡 Timeline: Setting up real-time subscription for forum replies');
+    }
+    
+    // Debounce timer to batch rapid updates for better performance
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const pendingUpdates = new Map<string, number>();
+    
+    const applyPendingUpdates = () => {
+      if (pendingUpdates.size === 0) return;
+      
+      // Use requestAnimationFrame for smoother UI updates
+      requestAnimationFrame(() => {
+        setPosts(prevPosts => {
+          return prevPosts.map(post => {
+            const newCount = pendingUpdates.get(post.id);
+            if (newCount !== undefined) {
+              return { ...post, comments: newCount };
+            }
+            return post;
+          });
+        });
+        
+        pendingUpdates.clear();
+      });
+    };
+    
+    const channel = supabase
+      .channel('forum_replies_user_timeline')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'forum_replies'
+        },
+        (payload) => {
+          const postId = (payload.new as any)?.post_id || (payload.old as any)?.post_id;
+          
+          if (postId) {
+            const postIdStr = String(postId);
+            
+            // Find current count and calculate new count
+            setPosts(prevPosts => {
+              const post = prevPosts.find(p => p.id === postIdStr);
+              if (post) {
+                let newCount = post.comments;
+                
+                if (payload.eventType === 'INSERT') {
+                  newCount = post.comments + 1;
+                } else if (payload.eventType === 'DELETE') {
+                  newCount = Math.max(0, post.comments - 1);
+                }
+                
+                // Store update instead of applying immediately
+                pendingUpdates.set(postIdStr, newCount);
+                
+                // Debounce: apply updates after 100ms of no new events
+                if (debounceTimer) clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(applyPendingUpdates, 100);
+              }
+              return prevPosts; // Don't update yet
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   // Lightweight polling for near real-time updates
   useEffect(() => {

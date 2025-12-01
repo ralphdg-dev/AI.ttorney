@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { usePostBookmarks } from '../../contexts/PostBookmarksContext';
 import { getResponsiveValue } from '@/constants/LayoutConstants';
 import FadeInView from '../ui/FadeInView';
+import AnimatedCounter from '../ui/AnimatedCounter';
  
 import { VerifiedLawyerBadge } from '../common/VerifiedLawyerBadge';
 
@@ -488,9 +489,22 @@ const Post: React.FC<PostProps> = React.memo(({
         {/* Engagement Actions */}
         <View style={styles.actions}>
           <View style={styles.actionsLeft}>
-            <TouchableOpacity style={styles.actionButton} onPress={handleCommentPress}>
-              <MessageCircle size={18} color="#536471" />
-              <Text style={styles.actionCount}>{comments}</Text>
+            <TouchableOpacity 
+              style={styles.actionButton} 
+              onPress={handleCommentPress}
+              disabled={isLoading}
+            >
+              <MessageCircle size={18} color={isLoading ? "#9CA3AF" : "#536471"} />
+              {isLoading ? (
+                <View style={[styles.actionCount, { 
+                  backgroundColor: '#E5E7EB', 
+                  borderRadius: 4, 
+                  width: 20, 
+                  height: 14 
+                }]} />
+              ) : (
+                <AnimatedCounter count={comments} style={styles.actionCount} duration={250} />
+              )}
             </TouchableOpacity>
           </View>
           <TouchableOpacity style={styles.viewMoreButton} onPress={handlePostPress}>
