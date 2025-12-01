@@ -5,6 +5,8 @@ from datetime import datetime
 from middleware.auth import require_role
 from services.supabase_service import SupabaseService
 from models.violation_types import ViolationType
+from config.timeout_config import get_timeout, create_httpx_timeout, get_timeout_bundle
+
 import httpx
 import logging
 
@@ -128,7 +130,7 @@ async def get_suspended_users(
         elif status_filter == "all" or status_filter is None:
             params["account_status"] = "in.(suspended,banned)"
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
             response = await client.get(
                 f"{supabase.rest_url}/users",
                 params=params,
@@ -218,7 +220,7 @@ async def get_violations(
         if action_taken:
             params["action_taken"] = f"eq.{action_taken}"
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
             response = await client.get(
                 f"{supabase.rest_url}/user_violations",
                 params=params,
@@ -297,7 +299,7 @@ async def get_suspensions(
         if status_filter:
             params["status"] = f"eq.{status_filter}"
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
             response = await client.get(
                 f"{supabase.rest_url}/user_suspensions",
                 params=params,
@@ -358,7 +360,7 @@ async def get_moderation_stats(
     try:
         supabase = SupabaseService()
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
                                   
             violations_response = await client.get(
                 f"{supabase.rest_url}/user_violations",
@@ -485,7 +487,7 @@ async def lift_suspension(
         admin_id = current_user["user"]["id"]
         supabase = SupabaseService()
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
                                                  
             user_response = await client.get(
                 f"{supabase.rest_url}/users",
@@ -580,7 +582,7 @@ async def lift_ban(
         admin_id = current_user["user"]["id"]
         supabase = SupabaseService()
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
                                               
             user_response = await client.get(
                 f"{supabase.rest_url}/users",

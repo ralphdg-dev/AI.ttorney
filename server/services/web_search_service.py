@@ -1,5 +1,7 @@
 import os
 import logging
+from config.timeout_config import get_timeout, create_httpx_timeout, get_timeout_bundle
+
 import requests
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
@@ -343,7 +345,7 @@ class WebSearchService:
             }
             
                               
-            response = requests.get(url, params=params, timeout=10)
+            response = requests.get(url, params=params, timeout=get_timeout("web_search"))
             response.raise_for_status()
             
             data = response.json()
@@ -496,7 +498,7 @@ class WebSearchService:
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
-            response = requests.get(url, headers=headers, timeout=10)
+            response = requests.get(url, headers=headers, timeout=get_timeout("web_search"))
             response.raise_for_status()
             
                         

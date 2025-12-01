@@ -5,6 +5,8 @@ import json
 import time
 import logging
 
+from config.timeout_config import get_timeout, create_httpx_timeout, get_timeout_bundle
+
 logger = logging.getLogger(__name__)
 from datetime import datetime
 
@@ -574,7 +576,7 @@ Note: No specific context was retrieved from the vector database. Proceed with t
                 presence_penalty=0.1,
                 frequency_penalty=0.1,
                 stream=True,                     
-                timeout=90.0  # Increased timeout for complex legal analysis
+                timeout=get_timeout("chatbot_openai")  # Use centralized timeout config
             )
             
                                           

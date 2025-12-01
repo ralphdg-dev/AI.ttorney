@@ -75,9 +75,6 @@ const LawyerConsultPage: React.FC = () => {
 
   // Memoized stats calculation - only recalculate when consultations change
   const stats = useMemo(() => {
-    const now = new Date();
-    const today = now.toISOString().split("T")[0];
-
     let total = 0, pending = 0, accepted = 0, completed = 0, rejected = 0, todaySessions = 0;
     
     // Single pass through array for better performance

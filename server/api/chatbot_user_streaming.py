@@ -808,7 +808,7 @@ async def ask_legal_question(
                 temperature=0.1,  # Ultra-low for fastest, most deterministic responses
                 top_p=0.7,  # Focused sampling for speed
                 stream=True,                     
-                timeout=STREAMING_TIMEOUT_SECONDS
+                timeout=get_timeout("chatbot_openai")
             )
             
                                                                    

@@ -4,6 +4,8 @@ import string
 import hashlib
 from typing import Dict, Any, Optional
 import logging
+from config.timeout_config import get_timeout, create_httpx_timeout, get_timeout_bundle
+
 import smtplib
 import ssl
 from email.mime.text import MIMEText
@@ -371,7 +373,7 @@ class OTPService:
                 context.check_hostname = False
                 context.verify_mode = ssl.CERT_NONE
                 
-                with smtplib.SMTP_SSL(self.smtp_server, 465, context=context, timeout=15) as server:
+                with smtplib.SMTP_SSL(self.smtp_server, 465, context=context, timeout=get_timeout("smtp")) as server:
                     server.login(self.smtp_username, self.smtp_password)
                     server.sendmail(self.from_email, [email], text)
                     
@@ -401,7 +403,7 @@ class OTPService:
                 context.verify_mode = ssl.CERT_NONE
                 context.minimum_version = ssl.TLSVersion.TLSv1_2
                 
-                with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=15) as server:
+                with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=get_timeout("smtp")) as server:
                     server.starttls(context=context)
                     server.login(self.smtp_username, self.smtp_password)
                     server.sendmail(self.from_email, [email], text)
@@ -433,7 +435,7 @@ class OTPService:
                 context.set_ciphers('DEFAULT@SECLEVEL=1')
                 context.minimum_version = ssl.TLSVersion.TLSv1
                 
-                with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=15) as server:
+                with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=get_timeout("smtp")) as server:
                     server.ehlo()
                     server.starttls(context=context)
                     server.ehlo()

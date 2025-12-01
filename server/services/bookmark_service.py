@@ -1,4 +1,6 @@
 from typing import Dict, Any, List, Optional
+from config.timeout_config import get_timeout, create_httpx_timeout, get_timeout_bundle
+
 import httpx
 import logging
 from .supabase_service import SupabaseService
@@ -133,7 +135,7 @@ class BookmarkService:
             logger.info(f"📚 Getting bookmarks for user: {user_id}")
             
             # Query all bookmarks for this user (select * to avoid column name issues)
-            async with httpx.AsyncClient(timeout=20.0) as client:
+            async with httpx.AsyncClient(timeout=get_timeout("bookmark_service")) as client:
                 bookmarks_response = await client.get(
                     f"{self.supabase.rest_url}/user_forum_bookmarks?select=*&user_id=eq.{user_id}",
                     headers=self.supabase._get_headers(use_service_key=True)
@@ -168,7 +170,7 @@ class BookmarkService:
             posts_url = f"{self.supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&id=in.({ids_param})"
             logger.info(f"📚 Posts URL: {posts_url}")
             
-            async with httpx.AsyncClient(timeout=20.0) as client:
+            async with httpx.AsyncClient(timeout=get_timeout("bookmark_service")) as client:
                 posts_response = await client.get(
                     posts_url,
                     headers=self.supabase._get_headers(use_service_key=True)
@@ -186,7 +188,7 @@ class BookmarkService:
                                            
             if posts:
                 try:
-                    async with httpx.AsyncClient(timeout=15.0) as client:
+                    async with httpx.AsyncClient(timeout=get_timeout("http_quick")) as client:
                         replies_response = await client.get(
                             f"{self.supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role)&post_id=in.({ids_param})&order=created_at.asc",
                             headers=self.supabase._get_headers(use_service_key=True)

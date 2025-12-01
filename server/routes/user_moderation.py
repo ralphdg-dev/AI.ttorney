@@ -3,6 +3,8 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from middleware.auth import get_current_user
 from services.supabase_service import SupabaseService
+from config.timeout_config import get_timeout, create_httpx_timeout, get_timeout_bundle
+
 import httpx
 import logging
 
@@ -37,7 +39,7 @@ async def get_moderation_status(
         user_id = current_user["user"]["id"]
         supabase = SupabaseService()
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
                            
             response = await client.get(
                 f"{supabase.rest_url}/users",
@@ -141,7 +143,7 @@ async def acknowledge_suspension_lifted(
         user_id = current_user["user"]["id"]
         supabase = SupabaseService()
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
                                             
             suspension_response = await client.get(
                 f"{supabase.rest_url}/user_suspensions",

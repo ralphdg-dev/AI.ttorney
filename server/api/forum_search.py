@@ -3,6 +3,8 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from middleware.auth import get_current_user
 from services.supabase_service import SupabaseService
+from config.timeout_config import get_timeout, create_httpx_timeout, get_timeout_bundle
+
 import httpx
 import logging
 import re
@@ -182,7 +184,7 @@ class ForumSearchAPI:
                                                                         
             search_filter = "or=(" + ",".join(search_conditions) + ")"
             
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=get_timeout("http_quick")) as client:
                 response = await client.get(
                     f"{self.supabase.rest_url}/forum_posts?"
                     f"select=*,users(id,username,full_name,role)"
@@ -232,7 +234,7 @@ class ForumSearchAPI:
             if not username:
                 return []
             
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=get_timeout("http_quick")) as client:
                                     
                 username_response = await client.get(
                     f"{self.supabase.rest_url}/forum_posts?"
@@ -301,7 +303,7 @@ class ForumSearchAPI:
                                           
             actual_category = category_mapping.get(query_lower, query.strip())
             
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=get_timeout("http_quick")) as client:
                                        
                 response = await client.get(
                     f"{self.supabase.rest_url}/forum_posts?"
@@ -547,7 +549,7 @@ async def get_search_suggestions(
             if len(username_query) >= 2:
                 try:
                     supabase = SupabaseService()
-                    async with httpx.AsyncClient(timeout=10.0) as client:
+                    async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
                         response = await client.get(
                             f"{supabase.rest_url}/users?"
                             f"select=username,full_name"

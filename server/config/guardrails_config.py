@@ -20,7 +20,7 @@ GUARDRAILS_CONFIG = {
     "strict_mode": _ENV_BOOL("GUARDRAILS_STRICT_MODE", "false"),
     "log_security_events": _ENV_BOOL("LOG_SECURITY_EVENTS", "false"),
     "max_retries": _ENV_INT("GUARDRAILS_MAX_RETRIES", "1"),
-    "timeout_seconds": _ENV_INT("GUARDRAILS_TIMEOUT", "20"),
+    "timeout_seconds": get_timeout("guardrails"),
     "silent_mode": _ENV_BOOL("GUARDRAILS_SILENT_MODE", "true")
 }
 

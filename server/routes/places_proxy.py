@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from config.timeout_config import get_timeout, create_httpx_timeout, get_timeout_bundle
+
 import httpx
 import os
 import logging
@@ -453,7 +455,7 @@ async def autocomplete_places(request: AutocompleteRequest):
         logger.info(f"Autocomplete search for: {input_text}")
         
                                                                   
-        timeout = httpx.Timeout(5.0)                    
+        timeout = httpx.Timeout(get_timeout("places_proxy"))                    
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.get(url, params=params)
             

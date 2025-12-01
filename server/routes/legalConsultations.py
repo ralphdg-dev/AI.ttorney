@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException, Query
 from services.supabase_service import SupabaseService
 from typing import List, Optional
 import logging
+from config.timeout_config import get_timeout, create_httpx_timeout, get_timeout_bundle
+
 import httpx
 from pydantic import BaseModel
 from datetime import datetime
@@ -117,7 +119,7 @@ async def fetch_lawyers_from_db(supabase_service):
     """Fetch lawyers from database with optimized query - HTTP first for speed"""
     try:
                                                       
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
             url = f"{supabase_service.rest_url}/lawyer_info"
             response = await client.get(
                 url,

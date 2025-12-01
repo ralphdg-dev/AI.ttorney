@@ -1,6 +1,8 @@
 import logging
 from typing import Dict, Any, Optional, List, Union
 from datetime import datetime, timedelta
+from config.timeout_config import get_timeout, create_httpx_timeout, get_timeout_bundle
+
 import httpx
 from services.supabase_service import SupabaseService
 from models.violation_types import ViolationType, SuspensionType, AccountStatus
@@ -249,7 +251,7 @@ class ViolationTrackingService:
             List of violation records
         """
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
                 response = await client.get(
                     f"{self.supabase.rest_url}/user_violations",
                     params={
@@ -275,7 +277,7 @@ class ViolationTrackingService:
     async def _get_user_status(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get user's current moderation status."""
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
                 response = await client.get(
                     f"{self.supabase.rest_url}/users",
                     params={
@@ -321,7 +323,7 @@ class ViolationTrackingService:
             if account_status_str == AccountStatus.BANNED.value:
                 update_data["banned_at"] = datetime.utcnow().isoformat()
             
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
                 response = await client.patch(
                     f"{self.supabase.rest_url}/users",
                     params={"id": f"eq.{user_id}"},
@@ -361,7 +363,7 @@ class ViolationTrackingService:
                                                                                        
             }
             
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
                 headers = self.supabase._get_headers(use_service_key=True)
                 headers["Prefer"] = "return=representation"
                 
@@ -410,7 +412,7 @@ class ViolationTrackingService:
                 "status": "active"
             }
             
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
                 response = await client.post(
                     f"{self.supabase.rest_url}/user_suspensions",
                     json=suspension_data,

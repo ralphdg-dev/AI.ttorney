@@ -24,10 +24,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+from config.timeout_config import get_timeout, create_httpx_timeout, get_timeout_bundle
+
 # Ultra-aggressive streaming settings for maximum speed
 STREAMING_TOKEN_BATCH_SIZE = 1  # Send every single token immediately for fastest response
 STREAMING_MAX_INTERVAL_MS = 5  # Ultra-fast 5ms interval for near-instant delivery
-STREAMING_TIMEOUT_SECONDS = 90.0  # Increased timeout for complex queries while maintaining speed                                         
+STREAMING_TIMEOUT_SECONDS = get_timeout("chatbot_streaming")  # Use centralized timeout config                                         
 
                                                  
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -1039,7 +1041,7 @@ Remember: Include legal terms that would appear in Philippine legal codes to imp
             max_tokens=100,
             temperature=0.2,                                                           
             top_p=0.9,
-            timeout=5.0,                                                      
+            timeout=get_timeout("http_quick"),                                                      
         )
         
         normalized = response.choices[0].message.content.strip()
@@ -1728,7 +1730,7 @@ If you lack sufficient information, clearly state that and focus on the recommen
             top_p=0.9,                                            
             presence_penalty=0.1,                                                  
             frequency_penalty=0.1,                                       
-            timeout=15.0,                                            
+            timeout=get_timeout("http_default"),                                            
         )
         
         answer = response.choices[0].message.content
@@ -2023,7 +2025,7 @@ Gawing varied at natural, hindi robotic."""
             max_tokens=max_tokens,
             temperature=0.7,                                                  
             top_p=0.9,
-            timeout=10.0,                                                     
+            timeout=get_timeout("http_default"),                                                     
         )
         
         result = response.choices[0].message.content

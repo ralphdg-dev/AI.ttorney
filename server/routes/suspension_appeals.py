@@ -4,6 +4,8 @@ from typing import Optional, Dict, Any, List, Literal
 from datetime import datetime
 from middleware.auth import get_current_user, require_role
 from services.supabase_service import SupabaseService
+from config.timeout_config import get_timeout, create_httpx_timeout, get_timeout_bundle
+
 import httpx
 import logging
 
@@ -77,7 +79,7 @@ async def submit_appeal(
         user_id = current_user["user"]["id"]
         supabase = SupabaseService()
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
                                         
             user_response = await client.get(
                 f"{supabase.rest_url}/users",
@@ -197,7 +199,7 @@ async def get_my_appeals(
         user_id = current_user["user"]["id"]
         supabase = SupabaseService()
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
             response = await client.get(
                 f"{supabase.rest_url}/suspension_appeals",
                 params={
@@ -255,7 +257,7 @@ async def get_appeal(
         user_id = current_user["user"]["id"]
         supabase = SupabaseService()
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
             response = await client.get(
                 f"{supabase.rest_url}/suspension_appeals",
                 params={
@@ -321,7 +323,7 @@ async def get_all_appeals(
         if status_filter:
             params["status"] = f"eq.{status_filter}"
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
             response = await client.get(
                 f"{supabase.rest_url}/suspension_appeals",
                 params=params,
@@ -405,7 +407,7 @@ async def review_appeal(
         admin_id = current_user["user"]["id"]
         supabase = SupabaseService()
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
                                 
             appeal_response = await client.get(
                 f"{supabase.rest_url}/suspension_appeals",
@@ -540,7 +542,7 @@ async def get_appeal_stats(
     try:
         supabase = SupabaseService()
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
                                         
             stats = {}
             

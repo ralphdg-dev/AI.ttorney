@@ -10,6 +10,8 @@ from services.violation_tracking_service import get_violation_tracking_service
 from services.notification_service import NotificationService
 from services.promotional_content_validator import get_promotional_validator
 from models.violation_types import ViolationType
+from config.timeout_config import get_timeout, create_httpx_timeout, get_timeout_bundle
+
 import httpx
 import logging
 from middleware.auth import require_role
@@ -69,7 +71,7 @@ async def _get_cached_bookmarks(user_id: str, post_ids: list) -> set:
     try:
         supabase = SupabaseService()
         ids_param = ",".join(post_ids)
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
             response = await client.get(
                 f"{supabase.rest_url}/user_forum_bookmarks?select=post_id&post_id=in.({ids_param})&user_id=eq.{user_id}",
                 headers=supabase._get_headers(use_service_key=True)
@@ -111,7 +113,7 @@ async def _get_cached_reply_counts(post_ids: list) -> dict:
     try:
         supabase = SupabaseService()
         ids_param = ",".join(post_ids)
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
             response = await client.get(
                 f"{supabase.rest_url}/forum_replies?select=post_id&post_id=in.({ids_param})&hidden=eq.false",
                 headers=supabase._get_headers(use_service_key=True)
@@ -380,14 +382,14 @@ async def debug_replies_count():
         supabase = SupabaseService()
         
                                     
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
             count_response = await client.get(
                 f"{supabase.rest_url}/forum_replies?select=count",
                 headers=supabase._get_headers(use_service_key=True)
             )
         
                             
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
             sample_response = await client.get(
                 f"{supabase.rest_url}/forum_replies?select=*&limit=5",
                 headers=supabase._get_headers(use_service_key=True)
@@ -420,7 +422,7 @@ async def create_test_reply(current_user: Dict[str, Any] = Depends(get_current_u
         user_id = current_user["user"]["id"]
         
                                                   
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
             posts_response = await client.get(
                 f"{supabase.rest_url}/forum_posts?select=id&limit=1",
                 headers=supabase._get_headers(use_service_key=True)
@@ -440,7 +442,7 @@ async def create_test_reply(current_user: Dict[str, Any] = Depends(get_current_u
             "is_flagged": False
         }
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
             reply_response = await client.post(
                 f"{supabase.rest_url}/forum_replies",
                 json=test_reply,
@@ -510,7 +512,7 @@ async def list_recent_posts(
                                                                                   
         if base_posts is None:
             supabase = SupabaseService()
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=get_timeout("http_quick")) as client:
                 posts_headers = supabase._get_headers(use_service_key=True).copy()
                 # We don't need an exact total count anymore; avoiding count=exact
                 # keeps the query lighter and reduces chances of Supabase errors
@@ -561,7 +563,7 @@ async def list_recent_posts(
                         
                         logger.info(f" Fetching replies with URL: {replies_url}")
                         
-                        async with httpx.AsyncClient(timeout=10.0) as client:
+                        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
                             replies_response = await client.get(
                                 replies_url,
                                 headers=supabase._get_headers(use_service_key=True)
@@ -577,7 +579,7 @@ async def list_recent_posts(
                             fallback_url = f"{supabase.rest_url}/forum_replies?select=id,reply_body,created_at,user_id,is_anonymous,post_id&post_id=in.({ids_param})&hidden=eq.false&order=created_at.asc"
                             logger.info(f" Fallback URL: {fallback_url}")
                             
-                            async with httpx.AsyncClient(timeout=10.0) as client:
+                            async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
                                 fallback_response = await client.get(
                                     fallback_url,
                                     headers=supabase._get_headers(use_service_key=True)
@@ -684,7 +686,7 @@ async def get_post(post_id: str, current_user: Dict[str, Any] = Depends(get_curr
     try:
         supabase = SupabaseService()
                                                   
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_upload")) as client:
             response = await client.get(
                 f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&id=eq.{post_id}&is_flagged=eq.false",
                 headers=supabase._get_headers(use_service_key=True)
@@ -733,7 +735,7 @@ async def list_replies(post_id: str, current_user: Dict[str, Any] = Depends(get_
         replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&post_id=eq.{post_id}&hidden=eq.false&order=created_at.desc"
         logger.info(f" Individual replies URL: {replies_url}")
         
-        async with httpx.AsyncClient(timeout=20.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_upload")) as client:
             response = await client.get(
                 replies_url,
                 headers=supabase._get_headers(use_service_key=True)
@@ -763,7 +765,7 @@ async def list_replies(post_id: str, current_user: Dict[str, Any] = Depends(get_
             fallback_url = f"{supabase.rest_url}/forum_replies?select=*&post_id=eq.{post_id}&hidden=eq.false&order=created_at.desc"
             logger.info(f" Fallback individual replies URL: {fallback_url}")
             
-            async with httpx.AsyncClient(timeout=20.0) as client:
+            async with httpx.AsyncClient(timeout=get_timeout("http_upload")) as client:
                 fallback_response = await client.get(
                     fallback_url,
                     headers=supabase._get_headers(use_service_key=True)
@@ -1368,7 +1370,7 @@ async def search_forum_posts(
         if query.startswith('@'):
                                                              
             username = query[1:].lower()
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=get_timeout("http_quick")) as client:
                                                                   
                 username_response = await client.get(
                     f"{supabase.rest_url}/forum_posts?"
@@ -1411,7 +1413,7 @@ async def search_forum_posts(
                     logger.error(f"Full name search failed: {fullname_response.text}")
         else:
                             
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=get_timeout("http_quick")) as client:
                                                                    
                 content_response = await client.get(
                     f"{supabase.rest_url}/forum_posts?"
@@ -1554,7 +1556,7 @@ async def get_search_suggestions(
                                                          
         if query.startswith('@'):
             username_query = query[1:]
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
                 response = await client.get(
                     f"{supabase.rest_url}/users?"
                     f"select=username,full_name"
@@ -1618,7 +1620,7 @@ async def debug_search_test():
         supabase = SupabaseService()
         
                                             
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
             all_posts_response = await client.get(
                 f"{supabase.rest_url}/forum_posts?select=*&limit=5",
                 headers=supabase._get_headers(use_service_key=True)

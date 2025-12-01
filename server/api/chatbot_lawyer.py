@@ -13,6 +13,8 @@ import logging
 # Import cached clients instead of creating new instances
 from services.client_cache import get_qdrant_client, get_openai_client
 
+from config.timeout_config import get_timeout, create_httpx_timeout, get_timeout_bundle
+
                                                                    
 logging.basicConfig(
     level=logging.INFO,
@@ -650,7 +652,7 @@ Remember: Include legal terms that would appear in Philippine legal codes to imp
             max_tokens=150,
             temperature=0.2,                                                           
             top_p=0.9,
-            timeout=10.0,                                                 
+            timeout=get_timeout("http_quick"),                                                 
         )
         
         normalized = response.choices[0].message.content.strip()
@@ -1253,7 +1255,7 @@ Note: No specific context was retrieved from the vector database. Proceed with t
             top_p=0.9,
             presence_penalty=0.1,
             frequency_penalty=0.1,
-            timeout=60.0,                                               
+            timeout=get_timeout("chatbot_openai"),                                               
         )
         
         answer = response.choices[0].message.content
@@ -1532,7 +1534,7 @@ Gawing varied at natural, hindi robotic."""
             max_tokens=max_tokens,
             temperature=0.7,                                                  
             top_p=0.9,
-            timeout=10.0,                                                     
+            timeout=get_timeout("http_quick"),                                                     
         )
         
         result = response.choices[0].message.content
