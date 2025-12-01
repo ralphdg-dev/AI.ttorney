@@ -118,6 +118,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const { consultationsCount } = useConsultations();
 
   const [showSignoutModal, setShowSignoutModal] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
 
   // Helper function to get initials from name
@@ -352,6 +353,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const confirmLogout = async () => {
     try {
       console.log('🚪 Sidebar logout initiated');
+      setIsSigningOut(true);
+      
       // Close sidebar immediately to prevent UI conflicts
       onClose();
       // Wait a moment for sidebar animation to start
@@ -361,6 +364,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       console.log('✅ Sidebar logout completed');
     } catch (error) {
       console.error("❌ Sidebar logout error:", error);
+    } finally {
+      setIsSigningOut(false);
     }
   };
 
@@ -460,6 +465,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         message="Are you sure you want to sign out? You will need to login again to access your account."
         confirmText="Sign Out"
         type="warning"
+        isLoading={isSigningOut}
       />
     </View>
   );
