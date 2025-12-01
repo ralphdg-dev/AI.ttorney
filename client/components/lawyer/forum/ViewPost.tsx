@@ -79,9 +79,9 @@ interface Reply {
 const ViewPost: React.FC = () => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { postId, from, query } = useLocalSearchParams<{ postId?: string; from?: string; query?: string }>();
+  const { postId } = useLocalSearchParams<{ postId?: string; from?: string; query?: string }>();
   const { user: currentUser, session } = useAuth();
-  const { getCachedPost, getCachedPostFromForum, prefetchPost, updatePostCommentCount } = useForumCache();
+  const { getCachedPost, setCachedPost, getCachedPostFromForum, prefetchPost, isPostCacheValid, updatePostCommentCount } = useForumCache();
   const { refreshStatus } = useModerationStatus();
   const toast = useToast();
   
@@ -220,6 +220,40 @@ const ViewPost: React.FC = () => {
   
   // Check if current user is a lawyer
   const isLawyer = currentUser?.role === 'verified_lawyer';
+
+  // Type adapter functions - MUST be declared before any useCallback that uses them
+  const mapCachedToViewPost = useCallback((cached: any) => {
+    return {
+      ...cached,
+      body: cached.body || '',
+    };
+  }, []);
+
+  const mapCachedRepliesToViewPost = useCallback((cachedReplies: any[]) => {
+    return cachedReplies.map(reply => ({
+      ...reply,
+      is_anonymous: reply.is_anonymous ?? undefined,
+    }));
+  }, []);
+
+  const mapViewPostToCache = useCallback((post: PostData, replies: Reply[]) => {
+    return {
+      ...post,
+      user: post.user || { name: 'Anonymous', username: 'anonymous', avatar: '' },
+      timestamp: post.timestamp || '',
+      category: post.category || '',
+      content: post.content || '',
+      comments: post.comments || 0,
+      domain: post.domain || undefined,
+      created_at: post.created_at || undefined,
+      user_id: post.user_id || undefined,
+      replies: replies.map(reply => ({
+        ...reply,
+        is_anonymous: reply.is_anonymous ?? null,
+      })),
+      commentsLoaded: true,
+    };
+  }, []);
 
   // Helper function to get initials from name
   const getInitials = (name: string) => {
@@ -630,7 +664,7 @@ const ViewPost: React.FC = () => {
       animatedOpacity,
     };
 
-    setOptimisticReplies(prev => [...prev, optimisticReply]);
+    setOptimisticReplies(prev => [optimisticReply, ...prev]);
     
     Animated.timing(animatedOpacity, {
       toValue: 0.8,
@@ -641,9 +675,24 @@ const ViewPost: React.FC = () => {
     return optimisticReply.id;
   }, [currentUser]);
 
-  // Fallback to API when no cache available
+  
+  // Load post and replies with caching
   const loadFromAPI = useCallback(async (postId: string) => {
     try {
+      // Check cache first
+      const cachedPost = getCachedPost(postId);
+      if (cachedPost && isPostCacheValid(postId) && cachedPost.commentsLoaded) {
+        setPost(mapCachedToViewPost(cachedPost));
+        setReplies(mapCachedRepliesToViewPost(cachedPost.replies));
+        setPostReady(true);
+        setLoading(false);
+        setRepliesLoading(false);
+        if (__DEV__) {
+          console.log(`📦 ViewPost: Loaded post ${postId} from cache with ${cachedPost.replies.length} replies`);
+        }
+        return;
+      }
+
       const headers = await getAuthHeaders();
       const apiUrl = await NetworkConfig.getBestApiUrl();
 
@@ -737,10 +786,20 @@ const ViewPost: React.FC = () => {
                 };
               });
               
-              setReplies(mappedReplies.sort((a, b) => 
+              const sortedReplies = mappedReplies.sort((a, b) => 
                 new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-              ));
+              );
+              setReplies(sortedReplies);
               setRepliesLoading(false);
+              
+              // Save to cache
+              if (post) {
+                const postWithReplies = mapViewPostToCache(post, sortedReplies) as any;
+                setCachedPost(postId, postWithReplies);
+                if (__DEV__) {
+                  console.log(`💾 ViewPost: Cached post ${postId} with ${sortedReplies.length} replies`);
+                }
+              }
             }
           }
         } catch {
@@ -757,7 +816,7 @@ const ViewPost: React.FC = () => {
       setLoading(false);
       console.error('Error loading post:', error);
     }
-  }, [getAuthHeaders]);
+  }, [getAuthHeaders, mapCachedToViewPost, mapCachedRepliesToViewPost, mapViewPostToCache, getCachedPost, isPostCacheValid, setCachedPost]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Function to confirm/promote optimistic reply (no flicker)
   const confirmOptimisticReply = useCallback(
@@ -777,6 +836,17 @@ const ViewPost: React.FC = () => {
             duration: 150,
             useNativeDriver: shouldUseNativeDriver('opacity'),
           }).start();
+        }
+
+        // Remove optimistic reply entirely to prevent duplicates
+        // The real reply will arrive via normal data flow (cache/API)
+        // This prevents React key conflicts and double counting
+        if (opts?.replyId && !opts?.backgroundRefresh) {
+          const next = prev.filter(r => r.id !== optimisticId);
+          if (__DEV__) {
+            console.log(`🗑️ ViewPost: Removed optimistic reply ${optimisticId} to prevent duplicates`);
+          }
+          return next;
         }
 
         // Remove optimistic reply - it will be replaced by server data from background refresh
@@ -840,8 +910,19 @@ const ViewPost: React.FC = () => {
         } catch {
           // JSON parsing failed, continue with empty replyId
         }
-        // Promote without full reload to prevent flicker
-        confirmOptimisticReply(optimisticId, { replyId, backgroundRefresh: true });
+        // Convert optimistic reply to real reply using server replyId
+        // This prevents flicker while keeping the comment visible
+        confirmOptimisticReply(optimisticId, { replyId, backgroundRefresh: false });
+        
+        // Invalidate post cache to ensure fresh load on return
+        // This prevents the user's own comment from disappearing
+        if (postId) {
+          // Clear the cached post so it reloads fresh on next visit
+          setCachedPost(postId, null as any);
+          if (__DEV__) {
+            console.log(`🗑️ ViewPost: Cleared cache for post ${postId} to ensure fresh load`);
+          }
+        }
       } else {
         const errorText = await response.text();
         removeOptimisticReply(optimisticId);
@@ -906,7 +987,7 @@ const ViewPost: React.FC = () => {
     } finally {
       setIsReplying(false);
     }
-  }, [replyText, postId, addOptimisticReply, confirmOptimisticReply, removeOptimisticReply, getAuthHeaders, refreshStatus, toast]);
+  }, [replyText, postId, addOptimisticReply, confirmOptimisticReply, removeOptimisticReply, getAuthHeaders, refreshStatus, toast, setCachedPost]);
 
   // Replies are now loaded with the post in loadPost and loadFromAPI
   // No separate loadReplies function needed
@@ -1007,39 +1088,36 @@ const ViewPost: React.FC = () => {
         title="Post"
         showBackButton={true}
         onBackPress={() => {
-          // Update cache asynchronously (non-blocking) for instant navigation
+          // Update cache with current reply count to ensure timeline shows correct count
+          // Real-time subscription is filtered for user's own comments, so we need explicit cache update
           if (postId) {
-            // Use setTimeout to make cache update non-blocking
-            setTimeout(() => {
-              try {
-                // Quick count - just use array lengths for speed
-                const totalReplies = replies.length + optimisticReplies.length;
+            try {
+              // Calculate total replies including optimistic ones
+              const totalReplies = replies.length + optimisticReplies.length;
+              // Get the cached post to compare counts
+              const cachedPost = getCachedPost(postId);
+              const cachedCount = cachedPost?.replies?.length || 0;
+              
+              // Only update cache if count actually changed to prevent unnecessary updates
+              if (totalReplies !== cachedCount) {
                 updatePostCommentCount(postId, totalReplies);
                 if (__DEV__) {
-                  console.log(`📊 ViewPost: Updated cache for post ${postId} with ${totalReplies} replies`);
+                  console.log(`📊 ViewPost: Updated cache count from ${cachedCount} to ${totalReplies} for post ${postId}`);
                 }
-              } catch (error) {
-                // Silently fail - cache update is not critical for navigation
+              } else {
                 if (__DEV__) {
-                  console.warn('Cache update failed:', error);
+                  console.log(`📊 ViewPost: Cache count unchanged (${totalReplies}), skipping update`);
                 }
               }
-            }, 0);
+            } catch {
+              // Silently fail - cache update is not critical for navigation
+            }
           }
           
-          // Navigate immediately without waiting for cache update
-          if (from === 'search' && query) {
-            router.push(`/search?query=${encodeURIComponent(query)}` as any);
-          } else {
-            try {
-              router.back();
-              // Reduced fallback timeout for faster response
-              setTimeout(() => {
-                router.replace('/lawyer/forum' as any);
-              }, 50);
-            } catch {
-              router.replace('/lawyer/forum' as any);
-            }
+          try {
+            router.back();
+          } catch {
+            router.replace('/lawyer/forum' as any);
           }
         }}
         rightComponent={
@@ -1276,6 +1354,17 @@ const ViewPost: React.FC = () => {
               ) : (
                 // Filter out real replies that match optimistic replies to prevent duplicates
                 (() => {
+                  // Debug logging to track deduplication
+                  if (__DEV__) {
+                    console.log(`🔍 ViewPost: Deduplication check - real replies: ${replies.length}, optimistic: ${optimisticReplies.length}`);
+                    optimisticReplies.forEach((opt, i) => {
+                      console.log(`  Optimistic ${i}: id=${opt.id}, body="${(opt as any).body?.slice(0, 50)}..."`);
+                    });
+                    replies.forEach((real, i) => {
+                      console.log(`  Real ${i}: id=${real.id}, body="${(real as any).body?.slice(0, 50)}..."`);
+                    });
+                  }
+                  
                   const filteredReplies = replies.filter(realReply => {
                     const hasOptimisticMatch = optimisticReplies.some(optReply => {
                       // Match by body and approximate timestamp (within 30 seconds)
@@ -1283,12 +1372,24 @@ const ViewPost: React.FC = () => {
                       const timeMatch = optReply.created_at && realReply.created_at ? Math.abs(
                         new Date(optReply.created_at).getTime() - new Date(realReply.created_at).getTime()
                       ) < 30000 : false; // 30 seconds tolerance
+                      
+                      if (__DEV__ && contentMatch) {
+                        console.log(`  🎯 Content match found between real ${realReply.id} and optimistic ${optReply.id}`);
+                      }
+                      
                       return contentMatch && timeMatch;
                     });
+                    
+                    if (__DEV__ && hasOptimisticMatch) {
+                      console.log(`  ❌ Filtering out real reply ${realReply.id} (has optimistic match)`);
+                    }
+                    
                     return !hasOptimisticMatch;
                   });
                   
-                  const allReplies = [...filteredReplies, ...optimisticReplies];
+                  // Put optimistic replies first during loading for smoother UX
+                  // New comments appear at top where user expects them
+                  const allReplies = isReplying ? [...optimisticReplies, ...filteredReplies] : [...filteredReplies, ...optimisticReplies];
                   return allReplies.length > 0 ? allReplies.map((reply) => {
                   const isReplyAnonymous = reply.is_anonymous || false;
                   const isReplyDeactivated = reply.user?.account_status === 'deactivated';
@@ -1376,7 +1477,7 @@ const ViewPost: React.FC = () => {
                   if (reply.isOptimistic && reply.animatedOpacity) {
                     return (
                       <Animated.View
-                        key={reply.id}
+                        key={`${reply.id}-optimistic`}
                         style={{ opacity: reply.animatedOpacity }}
                       >
                         {replyComponent}

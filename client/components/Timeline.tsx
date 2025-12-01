@@ -8,6 +8,7 @@ import Colors from '../constants/Colors';
 import apiClient from '@/lib/api-client';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface PostData {
   id: string;
@@ -28,6 +29,7 @@ interface TimelineProps {
 
 const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const router = useRouter();
+  const { user: currentUser } = useAuth();
   const [posts, setPosts] = useState<PostData[]>([]); // All displayed posts
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -154,11 +156,14 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     loadPosts();
   }, [loadPosts]);
 
-  // Refresh when screen gains focus
+  // Refresh from cache on focus to get updated comment counts
+  // ViewPost updates the cache, but we need to read the fresh data
   useFocusEffect(
     useCallback(() => {
-      loadPosts();
-    }, [loadPosts])
+      // Timeline doesn't use ForumCacheContext like LawyerTimeline
+      // Real-time subscription handles count updates for user posts
+      if (__DEV__) console.log('📱 Timeline: Screen focused, relying on real-time updates for comment counts');
+    }, [])
   );
 
   // Real-time subscription for comment count updates (optimized with debouncing)
@@ -201,6 +206,21 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         },
         (payload) => {
           const postId = (payload.new as any)?.post_id || (payload.old as any)?.post_id;
+          const userId = (payload.new as any)?.user_id || (payload.old as any)?.user_id;
+          
+          // Debug logging to track filter behavior
+          if (__DEV__) {
+            console.log(`📡 Timeline: Real-time update - postId: ${postId}, userId: ${userId}, currentUserId: ${currentUser?.id}, match: ${userId === currentUser?.id}`);
+          }
+          
+          // Skip real-time updates for current user's own comments to prevent flicker
+          // Optimistic UI already handles these updates smoothly
+          if (userId === currentUser?.id) {
+            if (__DEV__) {
+              console.log(`📡 Timeline: Skipping real-time update for own comment (user ${userId})`);
+            }
+            return;
+          }
           
           if (postId) {
             const postIdStr = String(postId);
@@ -235,7 +255,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [currentUser?.id]);
 
   // Lightweight polling for near real-time updates
   useEffect(() => {
