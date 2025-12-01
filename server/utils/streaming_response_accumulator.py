@@ -143,7 +143,7 @@ class StreamingResponseAccumulator:
 def accumulate_streaming_response(chunks: List[str]) -> Dict[str, Any]:
     """
     Factory function to accumulate streaming response from chunks
-    Following industry-standard factory pattern
+    Following factory pattern
     """
     accumulator = StreamingResponseAccumulator()
     

@@ -3,6 +3,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
 from functools import lru_cache
+from .timeout_config import get_timeout
 
 logging.basicConfig(level=logging.CRITICAL, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)

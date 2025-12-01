@@ -1,6 +1,5 @@
 """
 Centralized timeout configuration for AI.ttorney backend
-Following DRY principles and industry standards for slow internet conditions
 """
 
 import os
@@ -21,10 +20,7 @@ def _ENV_INT(key: str, default: str) -> int:
     """Get int from environment variable with default"""
     return int(os.getenv(key, default))
 
-# Industry-standard timeout values optimized for slow internet connections
-# Based on FAANG practices (Google, Facebook, Amazon, Netflix)
-
-# Core timeout configurations
+# Timeout configurations
 TIMEOUT_CONFIG = {
     # Chatbot timeouts - highest priority for user experience
     "chatbot_streaming": _ENV_FLOAT("CHATBOT_STREAMING_TIMEOUT", "120.0"),  # 2 minutes for complex AI responses
@@ -110,7 +106,16 @@ def create_httpx_timeout(operation: str) -> "httpx.Timeout":
         pool=5.0,  # Connection pool acquisition
     )
 
-# Industry-standard timeout bundles for common use cases
+# Timeout values for slow internet connections
+SLOW_INTERNET_TIMEOUTS = {
+    "chatbot_openai": 180.0,
+    "chatbot_vector_search": 90.0,
+    "http_default": 90.0,
+    "http_quick": 60.0,
+    "http_upload": 120.0,
+}
+
+# Timeout bundles for common use cases
 TIMEOUT_BUNDLES = {
     "chatbot": {
         "openai": get_timeout("chatbot_openai"),
