@@ -100,6 +100,9 @@ export const ConsultationsProvider: React.FC<ConsultationsProviderProps> = ({ ch
     loadConsultations();
 
     // Real-time subscription
+    // Lawyers: listen on lawyer_id; regular users: listen on user_id
+    const filterField = user.role === 'verified_lawyer' ? 'lawyer_id' : 'user_id';
+
     const channel = supabase
       .channel(`consultations:${user.id}`)
       .on(
@@ -108,7 +111,7 @@ export const ConsultationsProvider: React.FC<ConsultationsProviderProps> = ({ ch
           event: '*',
           schema: 'public',
           table: 'consultation_requests',
-          filter: `user_id=eq.${user.id}`,
+          filter: `${filterField}=eq.${user.id}`,
         },
         () => {
           // Refresh count on any change
