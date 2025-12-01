@@ -138,9 +138,7 @@ const LawyerConsultPage: React.FC = () => {
           console.log(`📸 Consultation ${index + 1} Profile Photos:`, {
             client_name: consultation.client_name,
             client_profile_photo: consultation.client_profile_photo,
-            has_photo: !!consultation.client_profile_photo,
-            photo_type: typeof consultation.client_profile_photo,
-            photo_length: consultation.client_profile_photo?.length
+            users_profile_photo: consultation.users?.profile_photo
           });
         });
         
@@ -635,18 +633,14 @@ const LawyerConsultPage: React.FC = () => {
                   <View style={tw`flex-row items-start justify-between mb-4`}>
                     <View style={tw`flex-row items-center flex-1 mr-3`}>
                       <View style={tw`relative`}>
-                        {(() => {
-                          console.log('🔍 Rendering avatar for:', request.client_name, 'Photo:', request.client_profile_photo);
-                          return request.client_profile_photo && request.client_profile_photo.trim() !== '';
-                        })() ? (
+                        {request.client_profile_photo ? (
                           <Image
-                            source={{ uri: request.client_profile_photo as string }}
+                            source={{ uri: request.client_profile_photo }}
                             style={[tw`w-12 h-12 rounded-full`, { backgroundColor: '#E5E7EB' }]}
                             resizeMode="cover"
                             onError={(error) => {
                               console.log('❌ Image Load Error (List):', error.nativeEvent.error);
                               console.log('❌ Failed URI (List):', request.client_profile_photo);
-                              console.log('❌ Full request data:', request);
                             }}
                             onLoad={() => {
                               console.log('✅ Image Loaded Successfully (List):', request.client_profile_photo);

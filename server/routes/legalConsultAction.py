@@ -311,7 +311,7 @@ async def get_consultation_stats(
         
         consultations = response.data if hasattr(response, 'data') else []
         
-                         
+                         # Count consultations by status
         total_requests = len(consultations)
         pending_requests = len([c for c in consultations if c.get("status") == "pending"])
         accepted_requests = len([c for c in consultations if c.get("status") == "accepted"])

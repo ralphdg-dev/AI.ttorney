@@ -255,13 +255,14 @@ const ConsultationDetailPage: React.FC = () => {
         const data = await response.json();
         console.log('🔍 Consultation API Response:', JSON.stringify(data, null, 2));
         console.log('📸 Profile Photo Fields:', {
-          client_profile_photo: data.client_profile_photo
+          client_profile_photo: data.client_profile_photo,
+          users_profile_photo: data.users?.profile_photo
         });
         
         const normalizedData: ConsultationRequest = {
           ...data,
           client_name: data.client_name || data.users?.full_name || 'Unknown Client',
-          client_profile_photo: data.client_profile_photo ?? data.users?.profile_photo ?? null
+          client_profile_photo: data.users?.profile_photo ?? null,
         };
         
         console.log('✅ Final Normalized Data:', {
