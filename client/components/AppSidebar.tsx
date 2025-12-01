@@ -203,7 +203,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     favoriteTerms: favoriteTermsCount,
     bookmarkedPosts: bookmarkedPostsCount,
     bookmarkedGuides: bookmarkedGuidesCount,
-    acceptedConsultations: consultationsCount,
+    consultations: consultationsCount,
   }), [favoriteTermsCount, bookmarkedPostsCount, bookmarkedGuidesCount, consultationsCount]);
 
   const { user } = useAuth();
@@ -243,7 +243,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: isLawyerMemo ? "Consultation Requests" : "Consultations",
       icon: Calendar,
       route: isLawyerMemo ? "lawyer/consult" : "consultations",
-      badge: badgeCounts.acceptedConsultations || undefined,
+      badge: badgeCounts.consultations || undefined,
     },
     {
       id: "divider1",
