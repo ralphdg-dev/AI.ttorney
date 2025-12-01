@@ -162,7 +162,6 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     useCallback(() => {
       // Timeline doesn't use ForumCacheContext like LawyerTimeline
       // Real-time subscription handles count updates for user posts
-      if (__DEV__) console.log('📱 Timeline: Screen focused, relying on real-time updates for comment counts');
     }, [])
   );
 
@@ -208,17 +207,9 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
           const postId = (payload.new as any)?.post_id || (payload.old as any)?.post_id;
           const userId = (payload.new as any)?.user_id || (payload.old as any)?.user_id;
           
-          // Debug logging to track filter behavior
-          if (__DEV__) {
-            console.log(`📡 Timeline: Real-time update - postId: ${postId}, userId: ${userId}, currentUserId: ${currentUser?.id}, match: ${userId === currentUser?.id}`);
-          }
-          
           // Skip real-time updates for current user's own comments to prevent flicker
           // Optimistic UI already handles these updates smoothly
           if (userId === currentUser?.id) {
-            if (__DEV__) {
-              console.log(`📡 Timeline: Skipping real-time update for own comment (user ${userId})`);
-            }
             return;
           }
           

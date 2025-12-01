@@ -307,7 +307,6 @@ const LawyerTimeline: React.FC = React.memo(() => {
       // ViewPost updates the cache, but we need to read the fresh data
       const cachedPosts = getCachedPosts();
       if (cachedPosts && cachedPosts.length > 0) {
-        if (__DEV__) console.log('📱 LawyerTimeline: Screen focused, refreshing from cache for updated counts');
         setPosts(cachedPosts);
       }
     }, [getCachedPosts])
@@ -359,17 +358,9 @@ const LawyerTimeline: React.FC = React.memo(() => {
           const postId = (payload.new as any)?.post_id || (payload.old as any)?.post_id;
           const userId = (payload.new as any)?.user_id || (payload.old as any)?.user_id;
           
-          // Debug logging to track filter behavior
-          if (__DEV__) {
-            console.log(`📡 LawyerTimeline: Real-time update - postId: ${postId}, userId: ${userId}, currentUserId: ${currentUser?.id}, match: ${userId === currentUser?.id}`);
-          }
-          
           // Skip real-time updates for current user's own comments to prevent flicker
           // Optimistic UI already handles these updates smoothly
           if (userId === currentUser?.id) {
-            if (__DEV__) {
-              console.log(`📡 LawyerTimeline: Skipping real-time update for own comment (user ${userId})`);
-            }
             return;
           }
           

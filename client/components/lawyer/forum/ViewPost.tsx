@@ -843,10 +843,7 @@ const ViewPost: React.FC = () => {
         // This prevents React key conflicts and double counting
         if (opts?.replyId && !opts?.backgroundRefresh) {
           const next = prev.filter(r => r.id !== optimisticId);
-          if (__DEV__) {
-            console.log(`🗑️ ViewPost: Removed optimistic reply ${optimisticId} to prevent duplicates`);
-          }
-          return next;
+                    return next;
         }
 
         // Remove optimistic reply - it will be replaced by server data from background refresh
@@ -1101,13 +1098,6 @@ const ViewPost: React.FC = () => {
               // Only update cache if count actually changed to prevent unnecessary updates
               if (totalReplies !== cachedCount) {
                 updatePostCommentCount(postId, totalReplies);
-                if (__DEV__) {
-                  console.log(`📊 ViewPost: Updated cache count from ${cachedCount} to ${totalReplies} for post ${postId}`);
-                }
-              } else {
-                if (__DEV__) {
-                  console.log(`📊 ViewPost: Cache count unchanged (${totalReplies}), skipping update`);
-                }
               }
             } catch {
               // Silently fail - cache update is not critical for navigation
@@ -1354,17 +1344,7 @@ const ViewPost: React.FC = () => {
               ) : (
                 // Filter out real replies that match optimistic replies to prevent duplicates
                 (() => {
-                  // Debug logging to track deduplication
-                  if (__DEV__) {
-                    console.log(`🔍 ViewPost: Deduplication check - real replies: ${replies.length}, optimistic: ${optimisticReplies.length}`);
-                    optimisticReplies.forEach((opt, i) => {
-                      console.log(`  Optimistic ${i}: id=${opt.id}, body="${(opt as any).body?.slice(0, 50)}..."`);
-                    });
-                    replies.forEach((real, i) => {
-                      console.log(`  Real ${i}: id=${real.id}, body="${(real as any).body?.slice(0, 50)}..."`);
-                    });
-                  }
-                  
+                                    
                   const filteredReplies = replies.filter(realReply => {
                     const hasOptimisticMatch = optimisticReplies.some(optReply => {
                       // Match by body and approximate timestamp (within 30 seconds)
@@ -1373,16 +1353,8 @@ const ViewPost: React.FC = () => {
                         new Date(optReply.created_at).getTime() - new Date(realReply.created_at).getTime()
                       ) < 30000 : false; // 30 seconds tolerance
                       
-                      if (__DEV__ && contentMatch) {
-                        console.log(`  🎯 Content match found between real ${realReply.id} and optimistic ${optReply.id}`);
-                      }
-                      
                       return contentMatch && timeMatch;
                     });
-                    
-                    if (__DEV__ && hasOptimisticMatch) {
-                      console.log(`  ❌ Filtering out real reply ${realReply.id} (has optimistic match)`);
-                    }
                     
                     return !hasOptimisticMatch;
                   });
