@@ -105,7 +105,7 @@ def transform_consultation_data(consultation: Dict[str, Any]) -> Dict[str, Any]:
             "client_name": user_data.get("full_name", "Unknown Client"),
             "client_email": user_data.get("email", consultation.get("email")),
             "client_username": user_data.get("username"),
-            "client_profile_photo": user_data.get("profile_photo")
+            "profile_photo": user_data.get("profile_photo")
         }
     except Exception as e:
         logger.error(f"❌ Error in transform_consultation_data: {e}", exc_info=True)
@@ -248,7 +248,7 @@ async def get_my_consultations(
         logger.info(f"🔍 DEBUG: Transformed consultation data:")
         for idx, transformed in enumerate(transformed_consultations):
             logger.info(f"  [{idx+1}] client_name: {transformed.get('client_name')}")
-            logger.info(f"  [{idx+1}] client_profile_photo: {transformed.get('client_profile_photo')}")
+            logger.info(f"  [{idx+1}] profile_photo: {transformed.get('profile_photo')}")
         
         logger.info(f" Returning {len(transformed_consultations)} consultations for lawyer_info.id {lawyer_info_id}")
         return transformed_consultations
@@ -412,7 +412,7 @@ async def get_consultation_detail(
         transformed_data = transform_consultation_data(consultation)
         logger.info(f"🔍 DEBUG: Final transformed consultation:")
         logger.info(f"  client_name: {transformed_data.get('client_name')}")
-        logger.info(f"  client_profile_photo: {transformed_data.get('client_profile_photo')}")
+        logger.info(f"  profile_photo: {transformed_data.get('profile_photo')}")
         
         return transformed_data
         
