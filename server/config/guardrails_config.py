@@ -3,7 +3,6 @@ import logging
 from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
 from functools import lru_cache
-from config.timeout_config import get_timeout
 
 logging.basicConfig(level=logging.CRITICAL, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -21,7 +20,7 @@ GUARDRAILS_CONFIG = {
     "strict_mode": _ENV_BOOL("GUARDRAILS_STRICT_MODE", "false"),
     "log_security_events": _ENV_BOOL("LOG_SECURITY_EVENTS", "false"),
     "max_retries": _ENV_INT("GUARDRAILS_MAX_RETRIES", "1"),
-    "timeout_seconds": get_timeout("guardrails"),
+    "timeout_seconds": 30,
     "silent_mode": _ENV_BOOL("GUARDRAILS_SILENT_MODE", "true")
 }
 

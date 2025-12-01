@@ -9,8 +9,8 @@ logger = logging.getLogger(__name__)
 
 class NotificationService:
     """
-    Notification service with hybrid delivery (real-time + polling fallback)
-    Follows patterns: Facebook notifications, Slack real-time, Discord hybrid
+    Industry-grade notification service with hybrid delivery (real-time + polling fallback)
+    Follows FAANG patterns: Facebook notifications, Slack real-time, Discord hybrid
     """
     
     def __init__(self, supabase: Client):

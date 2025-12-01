@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from typing import Optional, AsyncGenerator
-import asyncio
 import json
 import time
 import logging
@@ -753,152 +752,21 @@ async def ask_legal_question(
                 search_query = normalize_emotional_query(request.question, language)
             
                                           
-            # 🚀 PARALLEL PROCESSING: Run RAG retrieval and guardrails validation simultaneously
-            # This reduces total response time by 30-50% for authenticated users
-            parallel_tasks = []
-            
-            # Task 1: RAG retrieval (always needed for legal questions)
-            rag_task = asyncio.create_task(
-                asyncio.to_thread(
-                    retrieve_relevant_context_with_web_search,
-                    question=search_query,
-                    collection_name=COLLECTION_NAME,
-                    embedding_model=EMBEDDING_MODEL,
-                    top_k=TOP_K_RESULTS,
-                    min_confidence_score=MIN_CONFIDENCE_SCORE,
-                    enable_web_search=True
-                )
+            from api.chatbot_user import (
+                qdrant_client, COLLECTION_NAME, 
+                EMBEDDING_MODEL, MIN_CONFIDENCE_SCORE
             )
-            parallel_tasks.append(('rag', rag_task))
             
-            # Task 2: Guardrails validation (only for authenticated users)
-            guardrails_task = None
-            if effective_user_id:
-                async def run_guardrails():
-                    moderation_service = get_moderation_service()
-                    violation_service = get_violation_tracking_service()
-                    
-                    moderation_result = await moderation_service.moderate_content(request.question.strip())
-                    
-                    if not moderation_service.is_content_safe(moderation_result):
-                        logger.warning(f"  Chatbot prompt flagged for user {effective_user_id[:8]}: {moderation_result['violation_summary']}")
-                        
-                        try:
-                            logger.info(f"Recording violation for user: {effective_user_id}")
-                            violation_result = await violation_service.record_violation(
-                                user_id=effective_user_id,
-                                violation_type=ViolationType.CHATBOT_PROMPT,
-                                content_text=request.question.strip(),
-                                moderation_result=moderation_result,
-                                content_id=None
-                            )
-                            return {'moderation_result': moderation_result, 'violation_result': violation_result, 'blocked': True}
-                        except Exception as violation_error:
-                            logger.error(f" Failed to record violation: {str(violation_error)}")
-                            return {'moderation_result': moderation_result, 'violation_result': None, 'blocked': True}
-                    
-                    return {'moderation_result': moderation_result, 'violation_result': None, 'blocked': False}
-                
-                guardrails_task = asyncio.create_task(run_guardrails())
-                parallel_tasks.append(('guardrails', guardrails_task))
+            context, sources, rag_metadata = retrieve_relevant_context_with_web_search(
+                question=search_query,
+                collection_name=COLLECTION_NAME,
+                embedding_model=EMBEDDING_MODEL,
+                top_k=TOP_K_RESULTS,
+                min_confidence_score=MIN_CONFIDENCE_SCORE,
+                enable_web_search=True
+            )
             
-            # Execute parallel tasks with timeout protection
-            try:
-                results = await asyncio.gather(*[task for _, task in parallel_tasks], return_exceptions=True)
-                
-                # Process results
-                context, sources, rag_metadata = None, [], {}
-                guardrails_result = {'blocked': False}
-                
-                for i, (task_name, _) in enumerate(parallel_tasks):
-                    if isinstance(results[i], Exception):
-                        logger.error(f"❌ {task_name.title()} task failed: {results[i]}")
-                        if task_name == 'rag':
-                            # Fail-open for RAG: continue without context
-                            context, sources, rag_metadata = "", [], {}
-                        elif task_name == 'guardrails':
-                            # Fail-open for guardrails: allow request
-                            guardrails_result = {'blocked': False}
-                    else:
-                        if task_name == 'rag':
-                            context, sources, rag_metadata = results[i]
-                        elif task_name == 'guardrails':
-                            guardrails_result = results[i]
-                
-                # Check if guardrails blocked the request
-                if guardrails_result.get('blocked', False):
-                    moderation_result = guardrails_result.get('moderation_result', {})
-                    violation_result = guardrails_result.get('violation_result', {})
-                    
-                    language = detect_language(request.question)
-                    strike_count = violation_result.get('strike_count', 0)
-                    suspension_count = violation_result.get('suspension_count', 0)
-                    action_taken = violation_result.get('action_taken', 'strike_added')
-                    
-                    # Generate violation message (same logic as before)
-                    if language == "tagalog":
-                        if action_taken == 'banned':
-                            warning = "Ang iyong account ay permanenteng na-ban dahil sa paulit-ulit na paglabag. Hindi ka na makakapag-chat."
-                        elif action_taken == 'suspended':
-                            if suspension_count == 1:
-                                warning = f"Ang iyong account ay na-suspend ng 7 araw. Ito ang iyong unang suspensyon. Dalawa pang suspensyon ay magreresulta sa permanenteng ban."
-                            elif suspension_count == 2:
-                                warning = f"Ang iyong account ay na-suspend ng 7 araw. Ito ang iyong ikalawang suspensyon. Isa pang suspensyon ay magreresulta sa permanenteng ban."
-                            else:
-                                warning = f"Ang iyong account ay na-suspend ng 7 araw dahil sa paulit-ulit na paglabag."
-                        else:
-                            if strike_count == 1:
-                                warning = "Mayroon ka nang 1 strike. Dalawa pang paglabag ay magreresulta sa 7-araw na suspensyon."
-                            elif strike_count == 2:
-                                warning = "Mayroon ka nang 2 strikes. Isa pang paglabag ay magreresulta sa 7-araw na suspensyon."
-                            else:
-                                warning = f"Mayroon ka nang {strike_count} strikes. Mangyaring sumunod sa aming mga patakaran."
-                        
-                        violation_message = f"""Content Policy Violation ⚠️
-
-{warning}
-
-Ang iyong tanong ay lumabag sa aming community guidelines dahil sa: {moderation_result.get('violation_summary', 'Inappropriate content')}
-
-Mangyaring maging maingat sa susunod na mga tanong."""
-                    else:
-                        if action_taken == 'banned':
-                            warning = "Your account has been permanently banned due to repeated violations. You can no longer use the chatbot."
-                        elif action_taken == 'suspended':
-                            if suspension_count == 1:
-                                warning = f"Your account has been suspended for 7 days. This is your first suspension. Two more suspensions will result in a permanent ban."
-                            elif suspension_count == 2:
-                                warning = f"Your account has been suspended for 7 days. This is your second suspension. One more suspension will result in a permanent ban."
-                            else:
-                                warning = f"Your account has been suspended for 7 days due to repeated violations."
-                        else:
-                            if strike_count == 1:
-                                warning = "You now have 1 strike. Two more violations will result in a 7-day suspension."
-                            elif strike_count == 2:
-                                warning = "You now have 2 strikes. One more violation will result in a 7-day suspension."
-                            else:
-                                warning = f"You now have {strike_count} strikes. Please follow our community guidelines."
-                        
-                        violation_message = f"""Content Policy Violation ⚠️
-
-{warning}
-
-Your question violated our community guidelines for: {moderation_result.get('violation_summary', 'Inappropriate content')}
-
-Please be more careful with future questions."""
-                    
-                    yield format_sse({'content': violation_message})
-                    yield format_sse({'done': True})
-                    return
-                
-            except asyncio.TimeoutError:
-                logger.error("❌ Parallel processing timeout - using fail-open defaults")
-                context, sources, rag_metadata = "", [], {}
-            
-            # Log performance improvement
-            logger.debug(f"🚀 Parallel processing completed: RAG + Guardrails executed simultaneously")
-            
-            # Continue with RAG results (same as before)
+                              
             if rag_metadata.get("web_search_triggered"):
                 logger.info(f" Web search triggered (user streaming): {rag_metadata['search_strategy']}")
             

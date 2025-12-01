@@ -149,7 +149,6 @@ async def get_my_consultations(
 ):
     """
     Get consultation requests for the logged-in lawyer with client names from users table
-    🚀 OPTIMIZED: Eliminated N+1 queries with proper JOIN and batch fetching
     """
     try:
         user_id = current_user["id"]
@@ -172,98 +171,97 @@ async def get_my_consultations(
             logger.error(f" Error fetching lawyer_info: {e}")
             return []
         
-        # 🚀 OPTIMIZATION: Use proper JOIN with explicit user data selection
-        # This eliminates the N+1 query problem by fetching all data in a single query
-        OPTIMIZED_JOIN_QUERY = """*,
-            users!consultation_requests_user_id_fkey(
-                full_name,
-                email,
-                username,
-                profile_photo,
-                photo_url
-            )"""
+                                              
+        query = supabase.table("consultation_requests").select(USER_JOIN_QUERY).eq("lawyer_id", lawyer_info_id)
         
-        query = supabase.table("consultation_requests").select(OPTIMIZED_JOIN_QUERY).eq("lawyer_id", lawyer_info_id)
+                              
+        logger.info(f" Query: consultation_requests WHERE lawyer_id = {lawyer_info_id}")
         
-        logger.info(f"🚀 OPTIMIZED: Single query with JOIN for lawyer_id = {lawyer_info_id}")
-        
+                                         
         if status_filter and status_filter != "all":
             query = query.eq("status", status_filter)
         
+                                               
         query = query.order("created_at", desc=True)
         
-        # Execute the optimized single query
+                       
         response = query.execute()
         
         if hasattr(response, 'error') and response.error:
             logger.error(f" Supabase error: {response.error}")
-            # 🚀 FALLBACK: Try without JOIN if there's a foreign key issue
-            logger.warning("⚠️ JOIN failed, trying fallback without user data...")
-            fallback_response = supabase.table("consultation_requests").select("*").eq("lawyer_id", lawyer_info_id).order("created_at", desc=True).execute()
-            
-            if hasattr(fallback_response, 'error') and fallback_response.error:
-                logger.error(f"❌ Even fallback failed: {fallback_response.error}")
-                raise HTTPException(status_code=500, detail="Database error")
-            
-            consultations = fallback_response.data if hasattr(fallback_response, 'data') else []
-            logger.warning(f"⚠️ Using fallback without user data - {len(consultations)} consultations")
-        else:
-            consultations = response.data if hasattr(response, 'data') else []
-            logger.info(f"✅ Optimized query successful - {len(consultations)} consultations with user data")
+            raise HTTPException(status_code=500, detail="Database error")
         
-        # 🚀 PERFORMANCE WIN: No more N+1 queries!
-        # All user data is now fetched in the single JOIN query above
-        # Previously: 1 query for consultations + N queries for user data = N+1 queries
-        # Now: 1 optimized query with proper JOIN = 1 query total
+        consultations = response.data if hasattr(response, 'data') else []
         
-        # STEP 3: Validate data integrity and log results
+        # ALWAYS use fallback to ensure we get user data
         enhanced_consultations = []
-        missing_user_count = 0
         
+        # Process consultations with proper async handling
         for idx, consultation in enumerate(consultations):
-            # Check if user data is present (should be with the optimized JOIN)
-            if 'users' not in consultation or not consultation['users']:
-                missing_user_count += 1
-                # Set default user data to prevent frontend errors
-                consultation['users'] = {
-                    'full_name': 'Unknown User',
-                    'email': 'unknown@example.com',
-                    'username': None,
-                    'profile_photo': None,
-                    'photo_url': None
-                }
+            logger.info(f"  [{idx+1}] Processing consultation: {consultation.get('id', 'unknown')[:8]}...")
+            logger.info(f"  [{idx+1}] Keys: {list(consultation.keys())}")
+            logger.info(f"  [{idx+1}] Has 'users': {'users' in consultation}")
             
+            # Always try to get user data, either from JOIN or fallback
+            user_id = consultation.get('user_id')
+            if user_id:
+                # Check if JOIN worked
+                if 'users' in consultation and consultation['users']:
+                    logger.info(f"  [{idx+1}] ✅ Users data found in JOIN: {consultation['users']}")
+                else:
+                    logger.warning(f"  [{idx+1}] ❌ Missing 'users' object! Using fallback query...")
+                    try:
+                        fallback_user_data = await fetch_user_data_fallback(supabase, user_id)
+                        if fallback_user_data:
+                            consultation['users'] = fallback_user_data
+                            logger.info(f"  [{idx+1}] ✅ Fallback user data fetched: {fallback_user_data}")
+                        else:
+                            logger.warning(f"  [{idx+1}] ❌ Fallback fetch returned no data")
+                    except Exception as e:
+                        logger.error(f"  [{idx+1}] ❌ Fallback fetch failed: {e}")
+            else:
+                logger.error(f"  [{idx+1}] ❌ No user_id found in consultation!")
+                
             enhanced_consultations.append(consultation)
         
-        # Log performance improvement
-        logger.info(f"🚀 PERFORMANCE: Eliminated {missing_user_count if missing_user_count > 0 else 'N'} potential N+1 queries")
-        logger.info(f"📊 Found {len(enhanced_consultations)} consultation(s) for lawyer_info.id: {lawyer_info_id[:8]}...")
+        # Replace original consultations with enhanced ones
+        consultations = enhanced_consultations
         
-        if enhanced_consultations:
-            sample = enhanced_consultations[0]
-            user_status = "✅ with user data" if sample.get('users') else "❌ missing user data"
-            logger.info(f"✅ Sample: id={sample.get('id', 'N/A')[:8]}... status={sample.get('status', 'N/A')} {user_status}")
+        # STEP 3: Log results and debug if empty
+        logger.info(f"📊 Found {len(consultations)} consultation(s) for lawyer_info.id: {lawyer_info_id[:8]}...")
+        if consultations:
+            logger.info(f"✅ Sample consultation: id={consultations[0].get('id', 'N/A')[:8]}... status={consultations[0].get('status', 'N/A')}")
         else:
             logger.warning(f"⚠️  No consultations found for lawyer_info.id: {lawyer_info_id[:8]}...")
+            # Debug: Check if consultations exist in DB at all
+            all_response = supabase.table("consultation_requests").select("id, lawyer_id, user_id, status, created_at").order("created_at", desc=True).limit(10).execute()
+            if all_response.data:
+                logger.info(f"🔍 DEBUG: Total consultations in DB: {len(all_response.data)}")
+                for idx, c in enumerate(all_response.data):
+                    logger.info(f"  [{idx+1}] lawyer_id={c.get('lawyer_id', 'NULL')[:8] if c.get('lawyer_id') else 'NULL'}... status={c.get('status')}")
+                logger.info(f"🎯 Looking for lawyer_info.id: {lawyer_info_id[:8]}...")
+            else:
+                logger.warning(f"🚨 NO CONSULTATIONS EXIST IN DATABASE AT ALL")
         
-        # Transform and return the optimized data
-        transformed_consultations = []
-        for consultation in enhanced_consultations:
-            try:
-                transformed = transform_consultation_data(consultation)
-                transformed_consultations.append(transformed)
-            except Exception as e:
-                logger.error(f"❌ Error transforming consultation {consultation.get('id', 'unknown')}: {e}")
-                # Add original consultation if transform fails
-                transformed_consultations.append(consultation)
+                                                  
+        transformed_consultations = [transform_consultation_data(c) for c in consultations]
         
-        logger.info(f"🎯 Returning {len(transformed_consultations)} transformed consultations")
+        # DEBUG: Log transformed data to verify profile photos are included
+        logger.info(f"🔍 DEBUG: Transformed consultation data:")
+        for idx, transformed in enumerate(transformed_consultations):
+            logger.info(f"  [{idx+1}] client_name: {transformed.get('client_name')}")
+            logger.info(f"  [{idx+1}] client_profile_photo: {transformed.get('client_profile_photo')}")
+            logger.info(f"  [{idx+1}] client_photo_url: {transformed.get('client_photo_url')}")
+        
+        logger.info(f" Returning {len(transformed_consultations)} consultations for lawyer_info.id {lawyer_info_id}")
         return transformed_consultations
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Unexpected error in get_my_consultations: {e}", exc_info=True)
+        logger.error(f"❌ CRITICAL ERROR in get_my_consultations: {str(e)}", exc_info=True)
+        logger.error(f"❌ Error type: {type(e).__name__}")
+        logger.error(f"❌ User ID: {current_user.get('id', 'unknown')[:8]}...")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/stats", response_model=ConsultationStats)

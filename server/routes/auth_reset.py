@@ -16,7 +16,7 @@ class PasswordResetRequest(BaseModel):
 
 @router.post("/reset-password-clean")
 async def reset_password_clean(request: PasswordResetRequest = Body(...)):
-    """Clean password reset implementation"""
+    """Clean password reset implementation - FAANG style"""
     try:
                                
         jwt_secret = os.getenv("JWT_SECRET")

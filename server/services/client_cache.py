@@ -1,5 +1,6 @@
 """
-Client Caching - Single source of truth for all resource-intensive clients
+Industry-Grade Client Caching - FAANG Pattern
+Single source of truth for all resource-intensive clients
 Uses @lru_cache for thread-safe, zero-overhead singletons
 """
 
