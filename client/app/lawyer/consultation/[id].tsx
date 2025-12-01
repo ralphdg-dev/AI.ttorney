@@ -207,9 +207,11 @@ interface ConsultationRequest {
   client_email: string;
   client_username: string | null;
   client_profile_photo: string | null;
+  client_photo_url: string | null;
   users?: {
     full_name?: string | null;
     profile_photo?: string | null;
+    photo_url?: string | null;
   };
 }
 
@@ -256,18 +258,22 @@ const ConsultationDetailPage: React.FC = () => {
         console.log('🔍 Consultation API Response:', JSON.stringify(data, null, 2));
         console.log('📸 Profile Photo Fields:', {
           client_profile_photo: data.client_profile_photo,
-          users_profile_photo: data.users?.profile_photo
+          client_photo_url: data.client_photo_url,
+          users_profile_photo: data.users?.profile_photo,
+          users_photo_url: data.users?.photo_url
         });
         
         const normalizedData: ConsultationRequest = {
           ...data,
           client_name: data.client_name || data.users?.full_name || 'Unknown Client',
-          client_profile_photo: data.users?.profile_photo ?? null,
+          client_profile_photo: data.client_profile_photo ?? data.users?.profile_photo ?? null,
+          client_photo_url: data.client_photo_url ?? data.users?.photo_url ?? null,
         };
         
         console.log('✅ Final Normalized Data:', {
           client_name: normalizedData.client_name,
-          client_profile_photo: normalizedData.client_profile_photo
+          client_profile_photo: normalizedData.client_profile_photo,
+          client_photo_url: normalizedData.client_photo_url
         });
         
         setConsultation(normalizedData);
@@ -490,17 +496,17 @@ const ConsultationDetailPage: React.FC = () => {
           <View style={styles.card}>
             <View style={styles.headerRow}>
               <View style={styles.clientInfo}>
-                {consultation.client_profile_photo ? (
+                {(consultation.client_profile_photo || consultation.client_photo_url) ? (
                   <Image
-                    source={{ uri: consultation.client_profile_photo }}
+                    source={{ uri: (consultation.client_profile_photo || consultation.client_photo_url) as string }}
                     style={styles.avatar}
                     resizeMode="cover"
                     onError={(error) => {
                       console.log('❌ Image Load Error:', error.nativeEvent.error);
-                      console.log('❌ Failed URI:', consultation.client_profile_photo);
+                      console.log('❌ Failed URI:', consultation.client_profile_photo || consultation.client_photo_url);
                     }}
                     onLoad={() => {
-                      console.log('✅ Image Loaded Successfully:', consultation.client_profile_photo);
+                      console.log('✅ Image Loaded Successfully:', consultation.client_profile_photo || consultation.client_photo_url);
                     }}
                   />
                 ) : (

@@ -137,8 +137,7 @@ const LawyerConsultPage: React.FC = () => {
         data.forEach((consultation: any, index: number) => {
           console.log(`📸 Consultation ${index + 1} Profile Photos:`, {
             client_name: consultation.client_name,
-            client_profile_photo: consultation.client_profile_photo,
-            users_profile_photo: consultation.users?.profile_photo
+            client_profile_photo: consultation.client_profile_photo
           });
         });
         
