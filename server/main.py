@@ -390,6 +390,10 @@ app.include_router(legal_guides_router)  # Already has /api/legal prefix
 from routes.report_resolution import router as report_resolution_router
 app.include_router(report_resolution_router, prefix="/api")
 
+# User moderation routes
+from routes.user_moderation import router as user_moderation_router
+app.include_router(user_moderation_router, prefix="/api")
+
 @app.get("/")
 @limiter.limit("60/minute")
 async def root(request: Request):
