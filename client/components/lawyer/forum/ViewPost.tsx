@@ -31,7 +31,7 @@ interface PostData {
   title?: string;
   body: string;
   domain: 'family' | 'criminal' | 'civil' | 'labor' | 'consumer' | 'others' | null;
-  created_at: string | null;
+  created_at: string | null;  
   updated_at?: string | null;
   user_id?: string | null;
   is_anonymous?: boolean | null;
@@ -81,7 +81,7 @@ const ViewPost: React.FC = () => {
   const router = useRouter();
   const { postId, from, query } = useLocalSearchParams<{ postId?: string; from?: string; query?: string }>();
   const { user: currentUser, session } = useAuth();
-  const { getCachedPost, getCachedPostFromForum, prefetchPost } = useForumCache();
+  const { getCachedPost, getCachedPostFromForum, prefetchPost, updatePostCommentCount } = useForumCache();
   const { refreshStatus } = useModerationStatus();
   const toast = useToast();
   
@@ -104,7 +104,6 @@ const ViewPost: React.FC = () => {
   const responsive = usePostResponsive();
   
   // Enhanced keyboard handling with animation for reply input
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const keyboardAnimatedValue = useRef(new Animated.Value(0)).current;
   
@@ -114,7 +113,6 @@ const ViewPost: React.FC = () => {
   const resetInputPosition = useCallback(() => {
     // Reset all state and animation values
     setIsKeyboardVisible(false);
-    setKeyboardHeight(0);
     keyboardAnimatedValue.setValue(0);
     
     // Force layout update to ensure input is at bottom
@@ -144,7 +142,6 @@ const ViewPost: React.FC = () => {
         console.log('🕹 Keyboard will show:', e.endCoordinates.height);
         // Update state immediately
         setIsKeyboardVisible(true);
-        setKeyboardHeight(e.endCoordinates.height);
         
         // INSTANT ANIMATION - SUPER FAST
         keyboardAnimatedValue.setValue(1);
@@ -163,7 +160,6 @@ const ViewPost: React.FC = () => {
       (e) => {
         console.log('🕹 Keyboard did show');
         setIsKeyboardVisible(true);
-        setKeyboardHeight(e.endCoordinates.height);
         keyboardAnimatedValue.setValue(1);
       }
     );
@@ -759,6 +755,7 @@ const ViewPost: React.FC = () => {
       setError('Failed to load post. Please try again.');
       setPostReady(true);
       setLoading(false);
+      console.error('Error loading post:', error);
     }
   }, [getAuthHeaders]);
 
@@ -782,20 +779,13 @@ const ViewPost: React.FC = () => {
           }).start();
         }
 
-        // Promote optimistic to real by swapping id and clearing flag (prevents disappearance)
-        const promoted: Reply = {
-          ...target,
-          id: opts?.replyId || target.id,
-          created_at: opts?.created_at || target.created_at,
-          isOptimistic: false,
-        };
+        // Remove optimistic reply - it will be replaced by server data from background refresh
+        // This prevents duplicates when the server reply comes in
+        const next = prev.filter(r => r.id !== optimisticId);
 
-        const next = [...prev];
-        next[idx] = promoted;
-
-        // Optionally refresh in background to sync other metadata
+        // Optionally refresh in background to sync with server data
         if (opts?.backgroundRefresh && postId) {
-          // Fire-and-forget
+          // Fire-and-forget - will fetch the real reply from server
           loadFromAPI(String(postId)).catch(() => {});
         }
 
@@ -847,7 +837,9 @@ const ViewPost: React.FC = () => {
         try {
           const respJson = await response.json();
           replyId = String(respJson?.reply_id || respJson?.data?.reply_id || '');
-        } catch {}
+        } catch {
+          // JSON parsing failed, continue with empty replyId
+        }
         // Promote without full reload to prevent flicker
         confirmOptimisticReply(optimisticId, { replyId, backgroundRefresh: true });
       } else {
@@ -1015,25 +1007,37 @@ const ViewPost: React.FC = () => {
         title="Post"
         showBackButton={true}
         onBackPress={() => {
-          console.log('[ViewPost] Back button pressed, from:', from, 'query:', query);
+          // Update cache asynchronously (non-blocking) for instant navigation
+          if (postId) {
+            // Use setTimeout to make cache update non-blocking
+            setTimeout(() => {
+              try {
+                // Quick count - just use array lengths for speed
+                const totalReplies = replies.length + optimisticReplies.length;
+                updatePostCommentCount(postId, totalReplies);
+                if (__DEV__) {
+                  console.log(`📊 ViewPost: Updated cache for post ${postId} with ${totalReplies} replies`);
+                }
+              } catch (error) {
+                // Silently fail - cache update is not critical for navigation
+                if (__DEV__) {
+                  console.warn('Cache update failed:', error);
+                }
+              }
+            }, 0);
+          }
           
-          // Special case: if coming from search with query, preserve search state
+          // Navigate immediately without waiting for cache update
           if (from === 'search' && query) {
-            console.log('[ViewPost] Redirecting to search with query:', query);
             router.push(`/search?query=${encodeURIComponent(query)}` as any);
           } else {
-            // Try to go back first, but if that fails, navigate to lawyer forum
             try {
-              console.log('[ViewPost] Using router.back() to return to previous page');
               router.back();
-              
-              // Fallback timeout - if back doesn't work after a short delay, navigate explicitly
+              // Reduced fallback timeout for faster response
               setTimeout(() => {
-                console.log('[ViewPost] Back navigation fallback - navigating to lawyer forum');
                 router.replace('/lawyer/forum' as any);
-              }, 100);
-            } catch (error) {
-              console.log('[ViewPost] Back navigation failed, navigating to lawyer forum');
+              }, 50);
+            } catch {
               router.replace('/lawyer/forum' as any);
             }
           }
@@ -1238,7 +1242,24 @@ const ViewPost: React.FC = () => {
             {/* Replies Section */}
             <View style={tw`pt-6 mt-6 bg-white border-t border-gray-100`}>
               <Text style={tw`mb-4 text-lg font-bold text-gray-900`}>
-                Replies ({[...replies, ...optimisticReplies].length})
+                {(() => {
+                  // Apply the same filtering logic as the render to ensure accurate count
+                  const filteredReplies = replies.filter(realReply => {
+                    const hasOptimisticMatch = optimisticReplies.some(optReply => {
+                      // Match by body and approximate timestamp (within 30 seconds)
+                      const contentMatch = (optReply as any).body?.trim() === (realReply as any).body?.trim();
+                      const timeMatch = optReply.created_at && realReply.created_at ? Math.abs(
+                        new Date(optReply.created_at).getTime() - new Date(realReply.created_at).getTime()
+                      ) < 30000 : false; // 30 seconds tolerance
+                      return contentMatch && timeMatch;
+                    });
+                    return !hasOptimisticMatch;
+                  });
+                  
+                  const allReplies = [...filteredReplies, ...optimisticReplies];
+                  const replyCount = allReplies.length;
+                  return `Replies (${replyCount})`;
+                })()}
               </Text>
               
               {repliesLoading ? (
@@ -1277,7 +1298,7 @@ const ViewPost: React.FC = () => {
                   const replyTimestamp = formatTimestamp(reply.created_at);
                   
                   const replyComponent = (
-                    <View key={reply.id} style={tw`pl-4 mb-6 bg-white`}>
+                    <View key={`${reply.isOptimistic ? 'opt-' : ''}${reply.id}`} style={tw`pl-4 mb-6 bg-white`}>
                       <View style={tw`flex-row items-start mb-2`}>
                         {isReplyAnonymous || isReplyDeactivated ? (
                           <View style={tw`items-center justify-center w-10 h-10 mr-3 bg-gray-100 border border-gray-200 rounded-full`}>
