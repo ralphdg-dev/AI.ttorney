@@ -105,8 +105,7 @@ def transform_consultation_data(consultation: Dict[str, Any]) -> Dict[str, Any]:
             "client_name": user_data.get("full_name", "Unknown Client"),
             "client_email": user_data.get("email", consultation.get("email")),
             "client_username": user_data.get("username"),
-            "client_profile_photo": user_data.get("profile_photo"),
-            "client_photo_url": user_data.get("photo_url")
+            "client_profile_photo": user_data.get("profile_photo")
         }
     except Exception as e:
         logger.error(f"❌ Error in transform_consultation_data: {e}", exc_info=True)
@@ -119,7 +118,7 @@ async def fetch_user_data_fallback(supabase: Client, user_id: str) -> Dict[str, 
     """
     try:
         logger.info(f"🔍 FALLBACK: Fetching user data for user_id: {user_id[:8]}...")
-        user_response = supabase.table("users").select("full_name, email, username, profile_photo, photo_url").eq("id", user_id).execute()
+        user_response = supabase.table("users").select("full_name, email, username, profile_photo").eq("id", user_id).execute()
         if user_response.data and len(user_response.data) > 0:
             user_data = user_response.data[0]
             logger.info(f"✅ FALLBACK: User data found: {user_data}")
@@ -136,8 +135,7 @@ USER_JOIN_QUERY = """*,
         full_name,
         email,
         username,
-        profile_photo,
-        photo_url
+        profile_photo
     )
 """
 
@@ -251,7 +249,6 @@ async def get_my_consultations(
         for idx, transformed in enumerate(transformed_consultations):
             logger.info(f"  [{idx+1}] client_name: {transformed.get('client_name')}")
             logger.info(f"  [{idx+1}] client_profile_photo: {transformed.get('client_profile_photo')}")
-            logger.info(f"  [{idx+1}] client_photo_url: {transformed.get('client_photo_url')}")
         
         logger.info(f" Returning {len(transformed_consultations)} consultations for lawyer_info.id {lawyer_info_id}")
         return transformed_consultations
@@ -416,7 +413,6 @@ async def get_consultation_detail(
         logger.info(f"🔍 DEBUG: Final transformed consultation:")
         logger.info(f"  client_name: {transformed_data.get('client_name')}")
         logger.info(f"  client_profile_photo: {transformed_data.get('client_profile_photo')}")
-        logger.info(f"  client_photo_url: {transformed_data.get('client_photo_url')}")
         
         return transformed_data
         
