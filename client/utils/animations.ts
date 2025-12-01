@@ -11,12 +11,11 @@ import { Animated, Easing, Platform } from 'react-native';
 export const shouldUseNativeDriver = (animationType: 'opacity' | 'transform' | 'all' = 'all'): boolean => {
   // Always use JS driver to avoid native driver compatibility issues
   // JS driver supports all properties including width, height, margins, etc.
-  if (Platform.OS === 'web') {
-    return false;
-  }
-
-  // For native platforms, use native driver for opacity and transform-based animations
-  return animationType === 'opacity' || animationType === 'transform' || animationType === 'all';
+  // If we ever want to re-enable the native driver for specific animations,
+  // we can update this helper to be more selective. For now, returning false
+  // globally guarantees we never hit "style property 'width' is not supported
+  // by native animated module" errors.
+  return false;
 };
 
 export const AnimationDurations = {
