@@ -24,33 +24,33 @@ def _ENV_INT(key: str, default: str) -> int:
 # Industry-standard timeout values optimized for slow internet connections
 # Based on FAANG practices (Google, Facebook, Amazon, Netflix)
 
-# Core timeout configurations
+# Core timeout configurations - Optimized for Philippine rural internet (2G/3G/slow 4G)
 TIMEOUT_CONFIG = {
     # Chatbot timeouts - highest priority for user experience
-    "chatbot_streaming": _ENV_FLOAT("CHATBOT_STREAMING_TIMEOUT", "120.0"),  # 2 minutes for complex AI responses
-    "chatbot_openai": _ENV_FLOAT("CHATBOT_OPENAI_TIMEOUT", "120.0"),  # Match streaming timeout
-    "chatbot_vector_search": _ENV_FLOAT("CHATBOT_VECTOR_SEARCH_TIMEOUT", "60.0"),  # Vector DB operations
+    "chatbot_streaming": _ENV_FLOAT("CHATBOT_STREAMING_TIMEOUT", "180.0"),  # 3 minutes for complex AI responses on slow networks
+    "chatbot_openai": _ENV_FLOAT("CHATBOT_OPENAI_TIMEOUT", "180.0"),  # Match streaming timeout for consistency
+    "chatbot_vector_search": _ENV_FLOAT("CHATBOT_VECTOR_SEARCH_TIMEOUT", "90.0"),  # Vector DB operations with 50% buffer
     
-    # General HTTP client timeouts - increased for slow internet
-    "http_default": _ENV_FLOAT("HTTP_DEFAULT_TIMEOUT", "60.0"),  # Standard HTTP operations
-    "http_quick": _ENV_FLOAT("HTTP_QUICK_TIMEOUT", "30.0"),  # Quick operations (moderation, search)
-    "http_upload": _ENV_FLOAT("HTTP_UPLOAD_TIMEOUT", "80.0"),  # File uploads/downloads
+    # General HTTP client timeouts - significantly increased for PH rural conditions
+    "http_default": _ENV_FLOAT("HTTP_DEFAULT_TIMEOUT", "90.0"),  # Standard HTTP operations (60s → 90s)
+    "http_quick": _ENV_FLOAT("HTTP_QUICK_TIMEOUT", "45.0"),  # Quick operations (30s → 45s)
+    "http_upload": _ENV_FLOAT("HTTP_UPLOAD_TIMEOUT", "120.0"),  # File uploads/downloads (80s → 120s)
     
-    # Service-specific timeouts
-    "smtp": _ENV_FLOAT("SMTP_TIMEOUT", "30.0"),  # Email operations
-    "places_proxy": _ENV_FLOAT("PLACES_PROXY_TIMEOUT", "10.0"),  # Keep fast for map queries
-    "web_search": _ENV_FLOAT("WEB_SEARCH_TIMEOUT", "45.0"),  # Web scraping operations
-    "bookmark_service": _ENV_FLOAT("BOOKMARK_SERVICE_TIMEOUT", "40.0"),  # External bookmark APIs
+    # Service-specific timeouts - optimized for PH network reliability
+    "smtp": _ENV_FLOAT("SMTP_TIMEOUT", "45.0"),  # Email operations (30s → 45s)
+    "places_proxy": _ENV_FLOAT("PLACES_PROXY_TIMEOUT", "20.0"),  # Map queries with buffer (10s → 20s)
+    "web_search": _ENV_FLOAT("WEB_SEARCH_TIMEOUT", "60.0"),  # Web scraping operations (45s → 60s)
+    "bookmark_service": _ENV_FLOAT("BOOKMARK_SERVICE_TIMEOUT", "60.0"),  # External bookmark APIs (40s → 60s)
     
-    # Database and internal service timeouts
-    "database_query": _ENV_FLOAT("DATABASE_QUERY_TIMEOUT", "45.0"),  # Database operations
-    "guardrails": _ENV_FLOAT("GUARDRAILS_TIMEOUT", "40.0"),  # AI guardrails validation
-    "otp_service": _ENV_FLOAT("OTP_SERVICE_TIMEOUT", "30.0"),  # OTP generation/sending
+    # Database and internal service timeouts - increased for stability
+    "database_query": _ENV_FLOAT("DATABASE_QUERY_TIMEOUT", "60.0"),  # Database operations (45s → 60s)
+    "guardrails": _ENV_FLOAT("GUARDRAILS_TIMEOUT", "60.0"),  # AI guardrails validation (40s → 60s)
+    "otp_service": _ENV_FLOAT("OTP_SERVICE_TIMEOUT", "45.0"),  # OTP generation/sending (30s → 45s)
     
-    # Admin and moderation timeouts
-    "moderation_service": _ENV_FLOAT("MODERATION_SERVICE_TIMEOUT", "45.0"),  # Content moderation
-    "violation_tracking": _ENV_FLOAT("VIOLATION_TRACKING_TIMEOUT", "45.0"),  # Violation logging
-    "admin_operations": _ENV_FLOAT("ADMIN_OPERATIONS_TIMEOUT", "60.0"),  # Admin panel operations
+    # Admin and moderation timeouts - enhanced for reliability
+    "moderation_service": _ENV_FLOAT("MODERATION_SERVICE_TIMEOUT", "60.0"),  # Content moderation (45s → 60s)
+    "violation_tracking": _ENV_FLOAT("VIOLATION_TRACKING_TIMEOUT", "60.0"),  # Violation logging (45s → 60s)
+    "admin_operations": _ENV_FLOAT("ADMIN_OPERATIONS_TIMEOUT", "90.0"),  # Admin panel operations (60s → 90s)
 }
 
 # Connection pool settings to prevent resource exhaustion
@@ -59,6 +59,14 @@ CONNECTION_CONFIG = {
     "http_max_keepalive": _ENV_INT("HTTP_MAX_KEEPALIVE", "20"),  # Keep-alive connections
     "http_retries": _ENV_INT("HTTP_RETRIES", "3"),  # Automatic retries
     "http_backoff_factor": _ENV_FLOAT("HTTP_BACKOFF_FACTOR", "0.5"),  # Retry backoff
+}
+
+# Connection-specific timeouts for PH network conditions (high latency, packet loss)
+CONNECTION_TIMEOUTS = {
+    "connect": _ENV_FLOAT("HTTP_CONNECT_TIMEOUT", "15.0"),  # TCP establishment (5s → 15s) for slow DNS/handshakes
+    "write": _ENV_FLOAT("HTTP_WRITE_TIMEOUT", "30.0"),  # Request upload (10s → 30s) for packet loss
+    "read": _ENV_FLOAT("HTTP_READ_TIMEOUT", "90.0"),  # Response download (matches http_default)
+    "pool": _ENV_FLOAT("HTTP_POOL_TIMEOUT", "10.0"),  # Connection pool acquisition (5s → 10s)
 }
 
 def get_timeout(operation: str) -> float:
@@ -89,25 +97,25 @@ def get_connection_config() -> Dict[str, Any]:
 
 def create_httpx_timeout(operation: str) -> "httpx.Timeout":
     """
-    Create httpx.Timeout object for specific operation
+    Create httpx.Timeout object for specific operation with PH-optimized connection timeouts
     
     Args:
         operation: Operation key from TIMEOUT_CONFIG
         
     Returns:
-        httpx.Timeout configured for the operation
+        httpx.Timeout configured for the operation with PH network optimizations
     """
     import httpx
     
     timeout_seconds = get_timeout(operation)
     
-    # Configure different timeout values for different scenarios
-    # httpx.Timeout(connect=5.0, read=timeout_seconds, write=10.0, pool=5.0)
+    # Configure PH-optimized timeouts for high latency and packet loss
+    # httpx.Timeout(connect=15.0, read=timeout_seconds, write=30.0, pool=10.0)
     return httpx.Timeout(
-        connect=5.0,  # Connection establishment
+        connect=CONNECTION_TIMEOUTS["connect"],  # TCP establishment (15s for slow DNS/handshakes)
         read=timeout_seconds,  # Read response (main operation)
-        write=10.0,  # Write request
-        pool=5.0,  # Connection pool acquisition
+        write=CONNECTION_TIMEOUTS["write"],  # Write request (30s for packet loss)
+        pool=CONNECTION_TIMEOUTS["pool"],  # Connection pool acquisition (10s for congestion)
     )
 
 # Industry-standard timeout bundles for common use cases
