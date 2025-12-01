@@ -103,102 +103,6 @@ const ViewPost: React.FC = () => {
   
   const responsive = usePostResponsive();
   
-  // Enhanced keyboard handling with animation for reply input
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-  const keyboardAnimatedValue = useRef(new Animated.Value(0)).current;
-  
-  // We don't need interpolation anymore since we're using absolute positioning
-  
-  // Function to reset input position
-  const resetInputPosition = useCallback(() => {
-    // Reset all state and animation values
-    setIsKeyboardVisible(false);
-    setKeyboardHeight(0);
-    keyboardAnimatedValue.setValue(0);
-    
-    // Force layout update to ensure input is at bottom
-    requestAnimationFrame(() => {
-      keyboardAnimatedValue.setValue(0);
-    });
-  }, [keyboardAnimatedValue]);
-
-  // Reset input position when component unmounts
-  useEffect(() => {
-    return () => {
-      // Ensure input position is reset when leaving the screen
-      resetInputPosition();
-    };
-  }, [resetInputPosition]);
-
-  useEffect(() => {
-    // Only add keyboard listeners on native platforms (iOS/Android), not web
-    if (Platform.OS === 'web') {
-      return;
-    }
-    
-    // Listen for keyboard WILL show (earliest possible event)
-    const keyboardWillShowListener = Keyboard.addListener(
-      'keyboardWillShow',
-      (e) => {
-        console.log('🕹 Keyboard will show:', e.endCoordinates.height);
-        // Update state immediately
-        setIsKeyboardVisible(true);
-        setKeyboardHeight(e.endCoordinates.height);
-        
-        // INSTANT ANIMATION - SUPER FAST
-        keyboardAnimatedValue.setValue(1);
-        
-        // Force immediate layout update
-        requestAnimationFrame(() => {
-          // Double-check that animation value is set
-          keyboardAnimatedValue.setValue(1);
-        });
-      }
-    );
-    
-    // Also listen for did show as backup
-    const keyboardDidShowListener = Keyboard.addListener(
-      'keyboardDidShow',
-      (e) => {
-        console.log('🕹 Keyboard did show');
-        setIsKeyboardVisible(true);
-        setKeyboardHeight(e.endCoordinates.height);
-        keyboardAnimatedValue.setValue(1);
-      }
-    );
-    
-    // Listen for keyboard WILL hide
-    const keyboardWillHideListener = Keyboard.addListener(
-      'keyboardWillHide',
-      () => {
-        console.log('🕹 Keyboard will hide');
-        // INSTANT HIDE - SUPER FAST
-        resetInputPosition();
-      }
-    );
-    
-    // Also listen for did hide as backup
-    const keyboardDidHideListener = Keyboard.addListener(
-      'keyboardDidHide',
-      () => {
-        console.log('🕹 Keyboard did hide');
-        resetInputPosition();
-      }
-    );
-    
-    // Listen for blur events on the TextInput
-    const blurSubscription = Keyboard.addListener('keyboardDidHide', resetInputPosition);
-    
-    return () => {
-      keyboardWillShowListener?.remove();
-      keyboardDidShowListener.remove();
-      keyboardWillHideListener?.remove();
-      keyboardDidHideListener.remove();
-      blurSubscription.remove();
-    };
-  }, [resetInputPosition, keyboardAnimatedValue]);
-  
   const [showFullContent, setShowFullContent] = useState(false);
   const [post, setPost] = useState<PostData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1386,7 +1290,9 @@ const ViewPost: React.FC = () => {
               { 
                 paddingHorizontal: responsive.horizontalPadding, 
                 paddingVertical: LAYOUT.SPACING.sm, 
-                paddingBottom: isKeyboardVisible ? 8 : getSafeBottomPosition(insets.bottom, 16),
+                // Always anchor the reply bar to the safe bottom area so it
+                // cleanly returns when the keyboard is dismissed.
+                paddingBottom: getSafeBottomPosition(insets.bottom, 16),
               }
             ]}
           >
@@ -1404,26 +1310,11 @@ const ViewPost: React.FC = () => {
               value={replyText}
               onChangeText={setReplyText}
               multiline={false}
-              // Enhanced keyboard handling props
               blurOnSubmit={false}
               keyboardType="default"
               autoCapitalize="none"
               spellCheck={false}
               autoCorrect={false}
-              onFocus={() => {
-                // INSTANT RESPONSE - Force keyboard visibility and animation
-                setIsKeyboardVisible(true);
-                keyboardAnimatedValue.setValue(1);
-                
-                // Force immediate layout update
-                requestAnimationFrame(() => {
-                  keyboardAnimatedValue.setValue(1);
-                });
-              }}
-              onBlur={() => {
-                // Ensure input resets when focus is lost
-                resetInputPosition();
-              }}
             />
             <TouchableOpacity
               onPress={handleSendReply}
