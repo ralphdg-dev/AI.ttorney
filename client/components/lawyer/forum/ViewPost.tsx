@@ -31,7 +31,7 @@ interface PostData {
   title?: string;
   body: string;
   domain: 'family' | 'criminal' | 'civil' | 'labor' | 'consumer' | 'others' | null;
-  created_at: string | null;
+  created_at: string | null;  
   updated_at?: string | null;
   user_id?: string | null;
   is_anonymous?: boolean | null;

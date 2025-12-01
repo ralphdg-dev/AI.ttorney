@@ -15,7 +15,6 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   Platform,
   Linking,
   Image,
@@ -23,7 +22,7 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Keyboard,
-  } from "react-native";
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
 import { Ionicons } from "@expo/vector-icons";
@@ -1707,7 +1706,6 @@ export default function ChatbotScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         enabled={Platform.OS !== 'web'}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         {/* Messages list or centered placeholder */}
         <View style={tw`flex-1`}>
         {messages.length === 0 ? (
@@ -1942,7 +1940,6 @@ export default function ChatbotScreen() {
           />
         )}
         </View>
-        </TouchableWithoutFeedback>
 
         {/* Input Field - Sits directly on keyboard with no gap */}
         <View
