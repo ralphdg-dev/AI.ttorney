@@ -7,6 +7,9 @@ import logging
 
 from utils.sse_formatter import format_sse
 
+# Import timeout configuration
+from config.timeout_config import get_timeout
+
 # Import everything from the old file including pre-initialized clients
 from api.chatbot_user import (
     ChatRequest,
