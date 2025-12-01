@@ -52,6 +52,7 @@ class ConsultationRequest(BaseModel):
     client_name: str
     client_email: str
     client_username: Optional[str]
+    profile_photo: Optional[str]
 
 class ConsultationStats(BaseModel):
     total_requests: int
