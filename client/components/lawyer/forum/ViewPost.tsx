@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, TouchableWithoutFeedback, Image, TextInput, Animated, StatusBar, useWindowDimensions, Keyboard, Platform, KeyboardAvoidingView } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, TouchableWithoutFeedback, Image, TextInput, Animated, StatusBar, useWindowDimensions, Keyboard, Platform, KeyboardAvoidingView, Modal, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { User, Bookmark, MoreHorizontal, Flag, Send, Pencil } from 'lucide-react-native';
+import { User, Bookmark, MoreHorizontal, Flag, Send, Pencil, Trash2, X } from 'lucide-react-native';
 import ReportModal from '../../common/ReportModal';
 import EditPostModal from '../../home/EditPostModal';
 import EditReplyModal from '../../home/EditReplyModal';
@@ -224,6 +224,9 @@ const ViewPost: React.FC = () => {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editReplyModalVisible, setEditReplyModalVisible] = useState(false);
   const [editingReply, setEditingReply] = useState<{ id: string; body: string } | null>(null);
+  const [deleteReplyModalVisible, setDeleteReplyModalVisible] = useState(false);
+  const [deletingReplyId, setDeletingReplyId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Check if current user is a lawyer
   const isLawyer = currentUser?.role === 'verified_lawyer';
@@ -1052,6 +1055,49 @@ const ViewPost: React.FC = () => {
     }
   }, [editingReply]);
   
+  // Handle delete reply press - open confirmation modal
+  const handleDeleteReplyPress = useCallback((replyId: string) => {
+    setReplyMenuOpen(null);
+    setDeletingReplyId(replyId);
+    setDeleteReplyModalVisible(true);
+  }, []);
+  
+  // Handle delete reply confirm
+  const handleDeleteReplyConfirm = useCallback(async () => {
+    if (!deletingReplyId) return;
+    
+    setIsDeleting(true);
+    try {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/api/forum/replies/${deletingReplyId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData?.detail || 'Failed to delete reply');
+      }
+      
+      // Remove the reply from local state
+      setReplies(prev => prev.filter(reply => reply.id !== deletingReplyId));
+      
+      // Close modal
+      setDeleteReplyModalVisible(false);
+      setDeletingReplyId(null);
+    } catch (error: any) {
+      console.error('Error deleting reply:', error);
+      // Show error alert
+      const { Alert } = require('react-native');
+      Alert.alert('Error', error.message || 'Failed to delete reply. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [deletingReplyId, session?.access_token]);
+  
   // Wait for post to be ready before showing content
   React.useEffect(() => {
     if (postReady) {
@@ -1531,6 +1577,14 @@ const ViewPost: React.FC = () => {
                                 <Text style={{ color: '#3B82F6' }}>Edit</Text>
                               </TouchableOpacity>
                               <View style={tw`h-px mx-2 bg-gray-200`} />
+                              <TouchableOpacity
+                                onPress={() => handleDeleteReplyPress(reply.id)}
+                                style={tw`flex-row items-center px-3 py-2`}
+                              >
+                                <Trash2 size={14} color="#EF4444" style={tw`mr-2`} />
+                                <Text style={tw`text-sm text-red-600`}>Delete</Text>
+                              </TouchableOpacity>
+                              <View style={tw`h-px mx-2 bg-gray-200`} />
                             </>
                           )}
                           <TouchableOpacity
@@ -1689,6 +1743,81 @@ const ViewPost: React.FC = () => {
           initialContent={editingReply.body}
         />
       )}
+
+      {/* Delete Reply Confirmation Modal */}
+      <Modal
+        visible={deleteReplyModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setDeleteReplyModalVisible(false);
+          setDeletingReplyId(null);
+        }}
+      >
+        <View style={tw`flex-1 bg-black bg-opacity-50 justify-center items-center px-4`}>
+          <View style={tw`bg-white rounded-lg w-full max-w-md`}>
+            {/* Header */}
+            <View style={tw`p-6 pb-4`}>
+              <View style={tw`flex-row items-center justify-between mb-4`}>
+                <Text style={tw`text-xl font-semibold text-gray-900`}>
+                  Delete Reply
+                </Text>
+                <TouchableOpacity 
+                  onPress={() => {
+                    setDeleteReplyModalVisible(false);
+                    setDeletingReplyId(null);
+                  }} 
+                  style={tw`p-1`}
+                >
+                  <X size={20} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+              
+              <Text style={tw`text-sm text-gray-600 leading-5`}>
+                Are you sure you want to delete this reply? This action cannot be undone.
+              </Text>
+            </View>
+
+            {/* Buttons */}
+            <View style={tw`px-6 pb-6`}>
+              <TouchableOpacity
+                onPress={handleDeleteReplyConfirm}
+                disabled={isDeleting}
+                style={[
+                  tw`w-full py-3 rounded-lg flex-row justify-center items-center mb-3`,
+                  { backgroundColor: isDeleting ? '#FCA5A5' : '#EF4444' }
+                ]}
+              >
+                {isDeleting ? (
+                  <>
+                    <ActivityIndicator size="small" color="#FFFFFF" style={tw`mr-2`} />
+                    <Text style={tw`text-center font-medium text-white`}>
+                      Deleting...
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={tw`text-center font-medium text-white`}>
+                    Delete Reply
+                  </Text>
+                )}
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                onPress={() => {
+                  setDeleteReplyModalVisible(false);
+                  setDeletingReplyId(null);
+                }}
+                disabled={isDeleting}
+                style={tw`w-full py-3 rounded-lg bg-gray-100`}
+              >
+                <Text style={tw`text-center font-medium text-gray-700`}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
     </SafeAreaView>
   );

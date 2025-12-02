@@ -707,7 +707,7 @@ async def list_recent_posts(
                                                            
                         ids_param = ",".join(post_ids)
                                                                    
-                        replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&post_id=in.({ids_param})&hidden=eq.false&order=created_at.asc"
+                        replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&post_id=in.({ids_param})&hidden=eq.false&deleted_at=is.null&order=created_at.asc"
                         
                         logger.info(f" Fetching replies with URL: {replies_url}")
                         
@@ -724,7 +724,7 @@ async def list_recent_posts(
                             
                                                                    
                             logger.info(" Trying fallback query without users join...")
-                            fallback_url = f"{supabase.rest_url}/forum_replies?select=id,reply_body,created_at,updated_at,user_id,is_anonymous,is_edited,post_id&post_id=in.({ids_param})&hidden=eq.false&order=created_at.asc"
+                            fallback_url = f"{supabase.rest_url}/forum_replies?select=id,reply_body,created_at,updated_at,user_id,is_anonymous,is_edited,post_id&post_id=in.({ids_param})&hidden=eq.false&deleted_at=is.null&order=created_at.asc"
                             logger.info(f" Fallback URL: {fallback_url}")
                             
                             async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
@@ -880,7 +880,7 @@ async def list_replies(post_id: str, current_user: Dict[str, Any] = Depends(get_
         supabase = SupabaseService()
                                                   
                                                    
-        replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&post_id=eq.{post_id}&hidden=eq.false&order=created_at.desc"
+        replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&post_id=eq.{post_id}&hidden=eq.false&deleted_at=is.null&order=created_at.desc"
         logger.info(f" Individual replies URL: {replies_url}")
         
         async with httpx.AsyncClient(timeout=get_timeout("http_upload")) as client:
@@ -910,7 +910,7 @@ async def list_replies(post_id: str, current_user: Dict[str, Any] = Depends(get_
             
                                                    
             logger.info(" Trying fallback individual replies query without users join...")
-            fallback_url = f"{supabase.rest_url}/forum_replies?select=*&post_id=eq.{post_id}&hidden=eq.false&order=created_at.desc"
+            fallback_url = f"{supabase.rest_url}/forum_replies?select=*&post_id=eq.{post_id}&hidden=eq.false&deleted_at=is.null&order=created_at.desc"
             logger.info(f" Fallback individual replies URL: {fallback_url}")
             
             async with httpx.AsyncClient(timeout=get_timeout("http_upload")) as client:
@@ -1253,6 +1253,78 @@ async def update_reply(
         raise
     except Exception as e:
         logger.error(f"Update reply error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+class DeleteReplyResponse(BaseModel):
+    success: bool
+    message: str
+
+
+@router.delete("/replies/{reply_id}", response_model=DeleteReplyResponse)
+async def delete_reply(
+    reply_id: str,
+    current_user: Dict[str, Any] = Depends(require_role("verified_lawyer"))
+):
+    """Soft delete a forum reply (lawyers only, own replies only)."""
+    try:
+        user_id = current_user["user"]["id"]
+        logger.info(f"🗑️ Soft deleting reply {reply_id} from lawyer {user_id[:8]}...")
+        
+        supabase = SupabaseService()
+        
+        # Verify the reply exists and belongs to the current user
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
+            check_response = await client.get(
+                f"{supabase.rest_url}/forum_replies?id=eq.{reply_id}&select=id,user_id",
+                headers=supabase._get_headers(use_service_key=True)
+            )
+        
+        if check_response.status_code != 200:
+            raise HTTPException(status_code=404, detail="Reply not found")
+        
+        reply_data = check_response.json()
+        if not reply_data or len(reply_data) == 0:
+            raise HTTPException(status_code=404, detail="Reply not found")
+        
+        if reply_data[0].get("user_id") != user_id:
+            raise HTTPException(status_code=403, detail="You can only delete your own replies")
+        
+        # Soft delete: set deleted_at timestamp
+        from datetime import datetime, timezone
+        update_data = {
+            "deleted_at": datetime.now(timezone.utc).isoformat()
+        }
+        headers = supabase._get_headers(use_service_key=True)
+        headers["Prefer"] = "return=representation"
+        
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
+            response = await client.patch(
+                f"{supabase.rest_url}/forum_replies?id=eq.{reply_id}",
+                json=update_data,
+                headers=headers
+            )
+        
+        if response.status_code not in (200, 204):
+            details = {}
+            try:
+                details = response.json() if response.content else {}
+            except Exception:
+                details = {"raw": response.text}
+            logger.error(f"Delete reply failed: {response.status_code} - {details}")
+            raise HTTPException(status_code=400, detail="Failed to delete reply")
+        
+        # Clear cache
+        clear_posts_cache()
+        clear_reply_counts_cache()
+        
+        logger.info(f"✅ Reply {reply_id} soft deleted successfully")
+        return DeleteReplyResponse(success=True, message="Reply deleted successfully")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete reply error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
