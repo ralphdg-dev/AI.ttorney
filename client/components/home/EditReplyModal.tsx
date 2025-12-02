@@ -80,77 +80,102 @@ const EditReplyModal: React.FC<EditReplyModalProps> = ({
         throw new Error(errorMessage);
       }
 
-      // Backend confirmed - call success callback for toast
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to update reply');
+      }
+      // Success - notify parent to show toast
       onSaveConfirmed?.();
     } catch (error: any) {
-      console.error('Error updating reply:', error);
       // Revert the optimistic update
       onError?.(originalContent);
-      Alert.alert('Error', error.message || 'Failed to update reply. Please try again.');
+      Alert.alert('Error', error.message || 'Failed to update reply. Your changes have been reverted.');
     }
   };
+
+  // Don't render edit form if modal is closing
+  if (!visible) {
+    return null;
+  }
 
   return (
     <Modal
       visible={visible}
-      animationType="slide"
       transparent={true}
+      animationType="fade"
       onRequestClose={handleClose}
     >
-      <View style={tw`flex-1 justify-end bg-black bg-opacity-50`}>
-        <View style={tw`bg-white rounded-t-3xl p-6`}>
+      <View style={tw`flex-1 bg-black bg-opacity-50 justify-center items-center px-4`}>
+        <View style={tw`bg-white rounded-lg w-full max-w-md`}>
           {/* Header */}
-          <View style={tw`flex-row justify-between items-center mb-4`}>
-            <Text style={tw`text-xl font-bold text-gray-900`}>Edit Reply</Text>
-            <TouchableOpacity onPress={handleClose} style={tw`p-2`}>
-              <X size={24} color="#6B7280" />
-            </TouchableOpacity>
+          <View style={tw`p-6 pb-4`}>
+            <View style={tw`flex-row items-center justify-between mb-4`}>
+              <Text style={tw`text-xl font-semibold text-gray-900`}>
+                Edit Reply
+              </Text>
+              <TouchableOpacity onPress={handleClose} style={tw`p-1`}>
+                <X size={20} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={tw`text-sm text-gray-600 leading-5`}>
+              Make changes to your reply. Your edited reply will be visible to everyone.
+            </Text>
           </View>
 
           {/* Content Input */}
-          <TextInput
-            style={[
-              tw`border border-gray-300 rounded-xl p-4 text-base text-gray-900`,
-              { minHeight: 150, textAlignVertical: 'top' }
-            ]}
-            multiline
-            value={content}
-            onChangeText={setContent}
-            placeholder="Edit your reply..."
-            placeholderTextColor="#9CA3AF"
-            editable={!isSubmitting}
-          />
-
-          {/* Character count */}
-          <Text style={tw`text-right text-gray-500 text-sm mt-2`}>
-            {content.length}/5000
-          </Text>
+          <View style={tw`px-6 pb-6`}>
+            <Text style={tw`text-base font-medium text-gray-900 mb-2`}>
+              Reply Content
+            </Text>
+            <TextInput
+              style={[
+                tw`border border-gray-300 rounded-lg p-3 text-sm bg-gray-50`,
+                { minHeight: 120, textAlignVertical: 'top' }
+              ]}
+              placeholder="Write your reply..."
+              value={content}
+              onChangeText={setContent}
+              multiline
+              maxLength={5000}
+              editable={!isSubmitting}
+            />
+            <Text style={tw`text-xs text-gray-400 mt-1 text-right`}>
+              {content.length}/5000
+            </Text>
+          </View>
 
           {/* Submit Button */}
-          <TouchableOpacity
-            style={[
-              tw`mt-4 py-4 rounded-xl items-center`,
-              { backgroundColor: Colors.primary.blue },
-              (isSubmitting || !content.trim() || content.trim() === initialContent.trim()) && tw`opacity-50`
-            ]}
-            onPress={handleSubmit}
-            disabled={isSubmitting || !content.trim() || content.trim() === initialContent.trim()}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={tw`text-white font-semibold text-base`}>Save Changes</Text>
-            )}
-          </TouchableOpacity>
-
-          {/* Cancel Button */}
-          <TouchableOpacity
-            style={tw`mt-3 py-4 rounded-xl items-center bg-gray-100`}
-            onPress={handleClose}
-            disabled={isSubmitting}
-          >
-            <Text style={tw`text-gray-700 font-semibold text-base`}>Cancel</Text>
-          </TouchableOpacity>
+          <View style={tw`px-6 pb-6`}>
+            <TouchableOpacity
+              onPress={handleSubmit}
+              disabled={!content.trim() || isSubmitting}
+              style={[
+                tw`w-full py-3 rounded-lg flex-row justify-center items-center`,
+                {
+                  backgroundColor: (!content.trim() || isSubmitting) 
+                    ? '#D1D5DB' 
+                    : Colors.primary.blue
+                }
+              ]}
+            >
+              {isSubmitting ? (
+                <>
+                  <ActivityIndicator size="small" color="#FFFFFF" style={tw`mr-2`} />
+                  <Text style={tw`text-center font-medium text-white`}>
+                    Saving...
+                  </Text>
+                </>
+              ) : (
+                <Text style={[
+                  tw`text-center font-medium`,
+                  !content.trim() ? tw`text-gray-500` : tw`text-white`
+                ]}>
+                  Save Changes
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
