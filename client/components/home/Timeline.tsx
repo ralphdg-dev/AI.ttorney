@@ -591,6 +591,13 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     }, 2500);
   }, [editToastOpacity, editToastTranslateY]);
 
+  const handleDeleteSuccess = useCallback((postId: string) => {
+    setPosts(prev => prev.filter(post => post.id !== postId));
+    // Also update the cache
+    setCachedPosts(posts.filter(post => post.id !== postId));
+    if (__DEV__) console.log('Post deleted:', postId);
+  }, [posts, setCachedPosts]);
+
   const handleReportPress = useCallback((postId: string) => {
     // The Post component handles the actual report logic
     if (__DEV__) console.log('Report submitted:', postId);
@@ -798,6 +805,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         onEditSuccess={(postId, newContent) => handleEditSuccess(postId, newContent)}
         onEditError={(postId, originalContent) => handleEditError(postId, originalContent)}
         onSaveConfirmed={handleSaveConfirmed}
+        onDeleteSuccess={handleDeleteSuccess}
         index={animationIndex}
         isLoading={item.isLoading}
         isOptimistic={item.isOptimistic}
@@ -826,6 +834,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     handleEditSuccess,
     handleEditError,
     handleSaveConfirmed,
+    handleDeleteSuccess,
     openMenuPostId,
     handleMenuToggle,
     handleBookmarkStatusChange,

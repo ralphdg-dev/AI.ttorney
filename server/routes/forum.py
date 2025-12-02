@@ -297,6 +297,77 @@ async def update_post(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+class DeletePostResponse(BaseModel):
+    success: bool
+    message: str
+
+
+@router.delete("/posts/{post_id}", response_model=DeletePostResponse)
+async def delete_post(
+    post_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Soft delete a forum post (own posts only)."""
+    try:
+        user_id = current_user["user"]["id"]
+        logger.info(f"🗑️ Soft deleting post {post_id} from user {user_id[:8]}...")
+        
+        supabase = SupabaseService()
+        
+        # Verify the post exists and belongs to the current user
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
+            check_response = await client.get(
+                f"{supabase.rest_url}/forum_posts?id=eq.{post_id}&select=id,user_id",
+                headers=supabase._get_headers(use_service_key=True)
+            )
+        
+        if check_response.status_code != 200:
+            raise HTTPException(status_code=404, detail="Post not found")
+        
+        post_data = check_response.json()
+        if not post_data or len(post_data) == 0:
+            raise HTTPException(status_code=404, detail="Post not found")
+        
+        if post_data[0].get("user_id") != user_id:
+            raise HTTPException(status_code=403, detail="You can only delete your own posts")
+        
+        # Soft delete: set deleted_at timestamp
+        from datetime import datetime, timezone
+        update_data = {
+            "deleted_at": datetime.now(timezone.utc).isoformat()
+        }
+        headers = supabase._get_headers(use_service_key=True)
+        headers["Prefer"] = "return=representation"
+        
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
+            response = await client.patch(
+                f"{supabase.rest_url}/forum_posts?id=eq.{post_id}",
+                json=update_data,
+                headers=headers
+            )
+        
+        if response.status_code not in (200, 204):
+            details = {}
+            try:
+                details = response.json() if response.content else {}
+            except Exception:
+                details = {"raw": response.text}
+            logger.error(f"Delete post failed: {response.status_code} - {details}")
+            raise HTTPException(status_code=400, detail="Failed to delete post")
+        
+        # Clear cache
+        clear_posts_cache()
+        
+        logger.info(f"✅ Post {post_id} soft deleted successfully")
+        return DeletePostResponse(success=True, message="Post deleted successfully")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete post error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 @router.post("/posts", response_model=CreatePostResponse)
 async def create_post(
     body: CreatePostRequest,
@@ -480,7 +551,7 @@ async def list_my_posts(
         limit_param = f"&limit={limit}" if limit is not None else "&limit=10000"
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{supabase.rest_url}/forum_posts?select=*&user_id=eq.{user_id}&order=created_at.desc{limit_param}",
+                f"{supabase.rest_url}/forum_posts?select=*&user_id=eq.{user_id}&deleted_at=is.null&order=created_at.desc{limit_param}",
                 headers=supabase._get_headers(use_service_key=True)
             )
 
@@ -672,6 +743,7 @@ async def list_recent_posts(
                     f"?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)"
                     f"&order=created_at.desc"
                     f"&or=(is_flagged.is.null,is_flagged.eq.false)"
+                    f"&deleted_at=is.null"
                     f"&limit={limit}&offset={offset}"
                 )
                 posts_response = await client.get(posts_url, headers=posts_headers)
@@ -836,7 +908,7 @@ async def get_post(post_id: str, current_user: Dict[str, Any] = Depends(get_curr
                                                   
         async with httpx.AsyncClient(timeout=get_timeout("http_upload")) as client:
             response = await client.get(
-                f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&id=eq.{post_id}&is_flagged=eq.false",
+                f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&id=eq.{post_id}&is_flagged=eq.false&deleted_at=is.null",
                 headers=supabase._get_headers(use_service_key=True)
             )
 
