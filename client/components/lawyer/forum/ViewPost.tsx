@@ -2,8 +2,10 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, TouchableWithoutFeedback, Image, TextInput, Animated, StatusBar, useWindowDimensions, Keyboard, Platform, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { User, Bookmark, MoreHorizontal, Flag, Send } from 'lucide-react-native';
+import { User, Bookmark, MoreHorizontal, Flag, Send, Pencil } from 'lucide-react-native';
 import ReportModal from '../../common/ReportModal';
+import EditPostModal from '../../home/EditPostModal';
+import EditReplyModal from '../../home/EditReplyModal';
 import { ReportService } from '../../../services/reportService';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../../../constants/Colors';
@@ -36,6 +38,7 @@ interface PostData {
   user_id?: string | null;
   is_anonymous?: boolean | null;
   is_flagged?: boolean | null;
+  is_edited?: boolean | null;
   user?: {
     name: string;
     username: string;
@@ -61,6 +64,7 @@ interface Reply {
   user_id?: string | null;
   is_anonymous?: boolean;
   is_flagged?: boolean;
+  is_edited?: boolean;
   user?: {
     name: string;
     username: string;
@@ -217,9 +221,15 @@ const ViewPost: React.FC = () => {
   const [replyText, setReplyText] = useState('');
   const [isReplying, setIsReplying] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editReplyModalVisible, setEditReplyModalVisible] = useState(false);
+  const [editingReply, setEditingReply] = useState<{ id: string; body: string } | null>(null);
   
   // Check if current user is a lawyer
   const isLawyer = currentUser?.role === 'verified_lawyer';
+  
+  // Check if current user owns this post (for edit permission)
+  const isOwnPost = currentUser?.id && post?.user_id && currentUser.id === post.user_id;
 
   // Type adapter functions - MUST be declared before any useCallback that uses them
   const mapCachedToViewPost = useCallback((cached: any) => {
@@ -546,9 +556,11 @@ const ViewPost: React.FC = () => {
             body: cachedPostWithComments.body || '',
             domain: (cachedPostWithComments.domain as any) || 'others',
             created_at: cachedPostWithComments.created_at || null,
+            updated_at: (cachedPostWithComments as any).updated_at || null,
             user_id: cachedPostWithComments.user_id || null,
             is_anonymous: cachedPostWithComments.is_anonymous || false,
             is_flagged: cachedPostWithComments.is_flagged || false,
+            is_edited: (cachedPostWithComments as any).is_edited || false,
             users: cachedPostWithComments.users
           };
           
@@ -584,9 +596,11 @@ const ViewPost: React.FC = () => {
             body: forumPost.content || '',
             domain: (forumPost.category as any) || 'others',
             created_at: forumPost.created_at || null,
+            updated_at: (forumPost as any).updated_at || null,
             user_id: forumPost.user_id || null,
             is_anonymous: forumPost.is_anonymous || false,
             is_flagged: forumPost.is_flagged || false,
+            is_edited: (forumPost as any).is_edited || false,
             users: forumPost.users
           };
           
@@ -610,6 +624,7 @@ const ViewPost: React.FC = () => {
                 user_id: r.user_id || null,
                 is_anonymous: isReplyAnon,
                 is_flagged: !!r.is_flagged,
+                is_edited: !!r.is_edited,
                 user: isReplyAnon ? undefined : {
                   name: replyUserData?.full_name || replyUserData?.username || 'User',
                   username: replyUserData?.username || 'user',
@@ -736,6 +751,7 @@ const ViewPost: React.FC = () => {
           user_id: row.user_id || null,
           is_anonymous: isAnon,
           is_flagged: !!row.is_flagged,
+          is_edited: !!row.is_edited,
           user: isAnon ? undefined : {
             name: userData?.full_name || userData?.username || 'User',
             username: userData?.username || 'user',
@@ -775,6 +791,7 @@ const ViewPost: React.FC = () => {
                   user_id: r.user_id || null,
                   is_anonymous: isReplyAnon,
                   is_flagged: !!r.is_flagged,
+                  is_edited: !!r.is_edited,
                   user: isReplyAnon ? undefined : {
                     name: replyUserData?.full_name || replyUserData?.username || 'User',
                     username: replyUserData?.username || 'user',
@@ -995,7 +1012,45 @@ const ViewPost: React.FC = () => {
     ? { name: 'Anonymous User', avatar: 'https://cdn-icons-png.flaticon.com/512/1077/1077114.png', isLawyer: false } // Detective icon for anonymous users
     : (post?.user || { name: 'User', avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', isLawyer: false }); // Gray default for regular users
   const displayTimestamp = formatTimestamp(post?.created_at || null);
+  const editedTimeDisplay = post?.is_edited && post?.updated_at ? `Edited ${formatTimestamp(post.updated_at)}` : null;
   const displayContent = post?.body || '';
+  
+  // Handle edit success - update local state
+  const handleEditSuccess = useCallback((newContent: string) => {
+    if (post) {
+      setPost({
+        ...post,
+        body: newContent,
+        is_edited: true,
+        updated_at: new Date().toISOString()
+      });
+    }
+  }, [post]);
+  
+  // Handle edit press
+  const handleEditPress = useCallback(() => {
+    setMenuOpen(false);
+    setEditModalVisible(true);
+  }, []);
+  
+  // Handle reply edit press
+  const handleEditReplyPress = useCallback((reply: Reply) => {
+    setReplyMenuOpen(null);
+    setEditingReply({ id: reply.id, body: reply.body });
+    setEditReplyModalVisible(true);
+  }, []);
+  
+  // Handle reply edit success - update local state
+  const handleEditReplySuccess = useCallback((newContent: string) => {
+    if (editingReply) {
+      const now = new Date().toISOString();
+      setReplies(prev => prev.map(reply => 
+        reply.id === editingReply.id 
+          ? { ...reply, body: newContent, is_edited: true, updated_at: now }
+          : reply
+      ));
+    }
+  }, [editingReply]);
   
   // Wait for post to be ready before showing content
   React.useEffect(() => {
@@ -1172,6 +1227,18 @@ const ViewPost: React.FC = () => {
                 }
               </Text>
             </TouchableOpacity>
+            {isOwnPost && (
+              <>
+                <View style={tw`h-px mx-2 bg-gray-200`} />
+                <TouchableOpacity
+                  style={tw`flex-row items-center px-4 py-3`}
+                  onPress={handleEditPress}
+                >
+                  <Pencil size={16} color="#3B82F6" />
+                  <Text style={[tw`ml-3`, { color: '#3B82F6' }]}>Edit post</Text>
+                </TouchableOpacity>
+              </>
+            )}
             <View style={tw`h-px mx-2 bg-gray-200`} />
             <TouchableOpacity
               style={tw`flex-row items-center px-4 py-3`}
@@ -1303,9 +1370,19 @@ const ViewPost: React.FC = () => {
             )}
             
             {/* [timestamp] - at the bottom of post content */}
-            <Text style={tw`mb-2 text-xs text-gray-500`}>
-              {displayTimestamp}
-            </Text>
+            <View style={tw`flex-row items-center mb-2`}>
+              <Text style={tw`text-xs text-gray-500`}>
+                {displayTimestamp}
+              </Text>
+              {editedTimeDisplay && (
+                <>
+                  <Text style={tw`mx-1 text-xs text-gray-500`}>•</Text>
+                  <Text style={[tw`text-xs text-gray-400`, { fontStyle: 'italic' }]}>
+                    {editedTimeDisplay}
+                  </Text>
+                </>
+              )}
+            </View>
 
             {/* Replies Section */}
             <View style={tw`pt-6 mt-6 bg-white border-t border-gray-100`}>
@@ -1424,15 +1501,38 @@ const ViewPost: React.FC = () => {
                           <Text style={tw`mb-2 text-gray-900`}>{reply.body}</Text>
                           
                           {/* [timestamp] */}
-                          <Text style={tw`mb-1 text-xs text-gray-500`}>
-                            {replyTimestamp}
-                          </Text>
+                          <View style={tw`flex-row items-center mb-1`}>
+                            <Text style={tw`text-xs text-gray-500`}>
+                              {replyTimestamp}
+                            </Text>
+                            {reply.is_edited && reply.updated_at && (
+                              <>
+                                <Text style={tw`mx-1 text-xs text-gray-500`}>•</Text>
+                                <Text style={[tw`text-xs text-gray-400`, { fontStyle: 'italic' }]}>
+                                  Edited {formatTimestamp(reply.updated_at)}
+                                </Text>
+                              </>
+                            )}
+                          </View>
                         </View>
                       </View>
                       
                       {/* Reply Menu Dropdown */}
                       {replyMenuOpen === reply.id && !reply.isOptimistic && (
-                        <View style={tw`absolute right-0 z-10 w-32 bg-white border border-gray-200 rounded-lg shadow-lg top-8`}>
+                        <View style={tw`absolute right-0 z-10 bg-white border border-gray-200 rounded-lg shadow-lg top-8`} >
+                          {/* Edit option - only for own replies */}
+                          {currentUser?.id === reply.user_id && (
+                            <>
+                              <TouchableOpacity
+                                onPress={() => handleEditReplyPress(reply)}
+                                style={tw`flex-row items-center px-3 py-2`}
+                              >
+                                <Pencil size={14} color="#3B82F6" style={tw`mr-2`} />
+                                <Text style={{ color: '#3B82F6' }}>Edit</Text>
+                              </TouchableOpacity>
+                              <View style={tw`h-px mx-2 bg-gray-200`} />
+                            </>
+                          )}
                           <TouchableOpacity
                             onPress={() => handleReportReplyPress(reply.id)}
                             style={tw`flex-row items-center px-3 py-2`}
@@ -1564,6 +1664,31 @@ const ViewPost: React.FC = () => {
         isLoading={isReportLoading}
         showAlreadyReported={showAlreadyReportedReply}
       />
+
+      {/* Edit Post Modal */}
+      {post && (
+        <EditPostModal
+          visible={editModalVisible}
+          onClose={() => setEditModalVisible(false)}
+          onSuccess={handleEditSuccess}
+          postId={post.id}
+          initialContent={post.body}
+        />
+      )}
+
+      {/* Edit Reply Modal */}
+      {editingReply && (
+        <EditReplyModal
+          visible={editReplyModalVisible}
+          onClose={() => {
+            setEditReplyModalVisible(false);
+            setEditingReply(null);
+          }}
+          onSuccess={handleEditReplySuccess}
+          replyId={editingReply.id}
+          initialContent={editingReply.body}
+        />
+      )}
 
     </SafeAreaView>
   );
