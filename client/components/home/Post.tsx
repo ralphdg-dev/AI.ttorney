@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, useWindowDimensions } from 'react-native';
 import { Bookmark, MoreHorizontal, User, MessageCircle, Flag, ChevronRight, Pencil } from 'lucide-react-native';
 import { getCategoryColors, getCategoryDisplayText } from '@/utils/categoryUtils';
@@ -28,6 +28,8 @@ interface PostProps {
   userId?: string; // Post owner's user ID for edit permission check
   timestamp: string;
   created_at?: string; // Raw timestamp for dynamic formatting
+  updated_at?: string; // Raw timestamp for when post was last edited
+  isEdited?: boolean; // Whether the post has been edited
   category: string;
   content: string;
   comments: number;
@@ -36,6 +38,8 @@ interface PostProps {
   onBookmarkPress?: () => void;
   onPostPress?: () => void;
   onEditSuccess?: (postId: string, newContent: string) => void; // Callback when edit is successful
+  onEditError?: (postId: string, originalContent: string) => void; // Callback to revert if edit fails
+  onSaveConfirmed?: () => void; // Called when backend confirms save (for toast)
   index?: number; // For staggered animations
   isLoading?: boolean; // For optimistic posts
   isOptimistic?: boolean; // To identify optimistic posts
@@ -57,6 +61,8 @@ const Post: React.FC<PostProps> = React.memo(({
   userId,
   timestamp,
   created_at,
+  updated_at,
+  isEdited,
   category,
   content,
   comments,
@@ -65,6 +71,8 @@ const Post: React.FC<PostProps> = React.memo(({
   onBookmarkPress,
   onPostPress,
   onEditSuccess,
+  onEditError,
+  onSaveConfirmed,
   index = 0,
   isLoading = false,
   isOptimistic = false,
@@ -120,15 +128,14 @@ const Post: React.FC<PostProps> = React.memo(({
     
     return fullName;
   }, [responsive.useCompactName, isDeactivated]);
-  const [displayTime, setDisplayTime] = useState(() => {
-    // Initialize with formatted time
-    const dateToFormat = created_at || timestamp;
-    if (!dateToFormat) return 'now';
+  // Helper function to format relative time
+  const formatRelativeTime = (dateString: string | undefined) => {
+    if (!dateString) return 'now';
     try {
-      const createdMs = new Date(dateToFormat).getTime();
-      if (Number.isNaN(createdMs)) return 'now';
+      const dateMs = new Date(dateString).getTime();
+      if (Number.isNaN(dateMs)) return 'now';
       const now = Date.now();
-      const diffSec = Math.max(0, Math.floor((now - createdMs) / 1000));
+      const diffSec = Math.max(0, Math.floor((now - dateMs) / 1000));
       if (diffSec < 60) return `${diffSec}s`;
       const diffMin = Math.floor(diffSec / 60);
       if (diffMin < 60) return `${diffMin}m`;
@@ -145,7 +152,20 @@ const Post: React.FC<PostProps> = React.memo(({
     } catch {
       return 'now';
     }
+  };
+
+  const [displayTime, setDisplayTime] = useState(() => {
+    // Initialize with formatted time
+    const dateToFormat = created_at || timestamp;
+    return formatRelativeTime(dateToFormat);
   });
+  
+  // Calculate edited time display
+  const editedTimeDisplay = useMemo(() => {
+    if (!isEdited || !updated_at) return null;
+    return `Edited ${formatRelativeTime(updated_at)} ago`;
+  }, [isEdited, updated_at]);
+  
   const [showAlreadyReported, setShowAlreadyReported] = useState(false);
 
 
@@ -429,6 +449,12 @@ const Post: React.FC<PostProps> = React.memo(({
                 </>
               )}
               <Text style={[styles.timestamp, { fontSize: responsive.timestampFontSize }]}>{displayTime}</Text>
+              {editedTimeDisplay && (
+                <>
+                  <Text style={[styles.metaSeparator, { fontSize: responsive.timestampFontSize }]}> • </Text>
+                  <Text style={[styles.editedIndicator, { fontSize: responsive.timestampFontSize }]}>{editedTimeDisplay}</Text>
+                </>
+              )}
             </View>
             
             {/* Category Badge Row */}
@@ -559,6 +585,8 @@ const Post: React.FC<PostProps> = React.memo(({
           visible={editModalVisible}
           onClose={() => setEditModalVisible(false)}
           onSuccess={handleEditSuccess}
+          onError={(originalContent) => onEditError?.(id, originalContent)}
+          onSaveConfirmed={onSaveConfirmed}
           postId={id}
           initialContent={content}
         />
@@ -646,6 +674,11 @@ const styles = StyleSheet.create({
   timestamp: {
     fontSize: 12, // Will be overridden by responsive value
     color: '#536471',
+  },
+  editedIndicator: {
+    fontSize: 12, // Will be overridden by responsive value
+    color: '#6B7280', // Slightly lighter gray for edited indicator
+    fontStyle: 'italic',
   },
   moreButton: {
     padding: 4,

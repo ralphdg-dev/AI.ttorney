@@ -258,8 +258,13 @@ async def update_post(
         except Exception as e:
             logger.error(f"Content moderation failed: {str(e)}")
         
-        # Update the post
-        update_data = {"body": body.body.strip()}
+        # Update the post with is_edited flag and updated_at timestamp
+        from datetime import datetime, timezone
+        update_data = {
+            "body": body.body.strip(),
+            "is_edited": True,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
         headers = supabase._get_headers(use_service_key=True)
         headers["Prefer"] = "return=representation"
         

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, TouchableOpacity, TextInput, ActivityIndicator, Alert } from 'react-native';
-import { X, CheckCircle } from 'lucide-react-native';
+import { X } from 'lucide-react-native';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
 import { useAuth } from '../../contexts/AuthContext';
@@ -10,6 +10,8 @@ interface EditPostModalProps {
   visible: boolean;
   onClose: () => void;
   onSuccess: (newContent: string) => void;
+  onError?: (originalContent: string) => void; // Called if backend fails, to revert
+  onSaveConfirmed?: () => void; // Called when backend confirms save (for toast)
   postId: string;
   initialContent: string;
 }
@@ -18,19 +20,19 @@ const EditPostModal: React.FC<EditPostModalProps> = ({
   visible,
   onClose,
   onSuccess,
+  onError,
+  onSaveConfirmed,
   postId,
   initialContent,
 }) => {
   const { session } = useAuth();
   const [content, setContent] = useState(initialContent);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
 
   // Reset content when modal opens with new initial content
   useEffect(() => {
     if (visible) {
       setContent(initialContent);
-      setShowSuccess(false);
     }
   }, [visible, initialContent]);
 
@@ -39,7 +41,6 @@ const EditPostModal: React.FC<EditPostModalProps> = ({
     setTimeout(() => {
       setContent(initialContent);
       setIsSubmitting(false);
-      setShowSuccess(false);
     }, 400);
   };
 
@@ -54,7 +55,14 @@ const EditPostModal: React.FC<EditPostModalProps> = ({
       return;
     }
 
-    setIsSubmitting(true);
+    const trimmedContent = content.trim();
+    const originalContent = initialContent;
+
+    // Optimistic update: close modal and update UI immediately
+    onSuccess(trimmedContent);
+    onClose();
+
+    // Process in background
     try {
       const apiUrl = await NetworkConfig.getBestApiUrl();
       const response = await fetch(`${apiUrl}/api/forum/posts/${postId}`, {
@@ -63,7 +71,7 @@ const EditPostModal: React.FC<EditPostModalProps> = ({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`,
         },
-        body: JSON.stringify({ body: content.trim() }),
+        body: JSON.stringify({ body: trimmedContent }),
       });
 
       if (!response.ok) {
@@ -73,64 +81,17 @@ const EditPostModal: React.FC<EditPostModalProps> = ({
       }
 
       const result = await response.json();
-      if (result.success) {
-        setShowSuccess(true);
-      } else {
+      if (!result.success) {
         throw new Error(result.message || 'Failed to update post');
       }
+      // Success - notify parent to show toast
+      onSaveConfirmed?.();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update post. Please try again.');
-    } finally {
-      setIsSubmitting(false);
+      // Revert the optimistic update
+      onError?.(originalContent);
+      Alert.alert('Error', error.message || 'Failed to update post. Your changes have been reverted.');
     }
   };
-
-  const handleSuccessClose = () => {
-    onSuccess(content.trim());
-    setTimeout(() => {
-      setShowSuccess(false);
-      setContent(initialContent);
-    }, 400);
-  };
-
-  // Success Modal
-  if (showSuccess && visible) {
-    return (
-      <Modal
-        visible={visible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={handleSuccessClose}
-      >
-        <View style={tw`flex-1 bg-black bg-opacity-50 justify-center items-center px-4`}>
-          <View style={tw`bg-white rounded-lg w-full max-w-md p-6`}>
-            <View style={tw`items-center mb-6`}>
-              <View style={tw`w-16 h-16 bg-green-100 rounded-full items-center justify-center mb-4`}>
-                <CheckCircle size={32} color="#10B981" />
-              </View>
-            </View>
-            <Text style={tw`text-lg font-semibold text-gray-900 mb-2 text-center`}>
-              Post Updated Successfully
-            </Text>
-            <Text style={tw`text-sm text-gray-600 text-center mb-6 leading-5`}>
-              Your post has been updated. The changes are now visible to everyone.
-            </Text>
-            <TouchableOpacity
-              onPress={handleSuccessClose}
-              style={[
-                tw`w-full py-3 rounded-lg`,
-                { backgroundColor: Colors.primary.blue }
-              ]}
-            >
-              <Text style={tw`text-center font-medium text-white`}>
-                Done
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    );
-  }
 
   // Don't render edit form if modal is closing
   if (!visible) {
@@ -139,12 +100,12 @@ const EditPostModal: React.FC<EditPostModalProps> = ({
 
   return (
     <Modal
-      visible={visible}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={handleClose}
-    >
-      <View style={tw`flex-1 bg-black bg-opacity-50 justify-center items-center px-4`}>
+        visible={visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleClose}
+      >
+        <View style={tw`flex-1 bg-black bg-opacity-50 justify-center items-center px-4`}>
         <View style={tw`bg-white rounded-lg w-full max-w-md`}>
           {/* Header */}
           <View style={tw`p-6 pb-4`}>
