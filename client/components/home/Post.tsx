@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, useWindowDimensions } from 'react-native';
-import { Bookmark, MoreHorizontal, User, MessageCircle, Flag, ChevronRight } from 'lucide-react-native';
+import { Bookmark, MoreHorizontal, User, MessageCircle, Flag, ChevronRight, Pencil } from 'lucide-react-native';
 import { getCategoryColors, getCategoryDisplayText } from '@/utils/categoryUtils';
 import ReportModal from '../common/ReportModal';
+import EditPostModal from './EditPostModal';
 import { ReportService } from '../../services/reportService';
 import Colors from '@/constants/Colors';
 import { BookmarkService } from '../../services/bookmarkService';
@@ -24,6 +25,7 @@ interface PostProps {
     isLawyer?: boolean;
     account_status?: string;
   };
+  userId?: string; // Post owner's user ID for edit permission check
   timestamp: string;
   created_at?: string; // Raw timestamp for dynamic formatting
   category: string;
@@ -33,6 +35,7 @@ interface PostProps {
   onReportPress?: () => void;
   onBookmarkPress?: () => void;
   onPostPress?: () => void;
+  onEditSuccess?: (postId: string, newContent: string) => void; // Callback when edit is successful
   index?: number; // For staggered animations
   isLoading?: boolean; // For optimistic posts
   isOptimistic?: boolean; // To identify optimistic posts
@@ -51,6 +54,7 @@ interface PostProps {
 const Post: React.FC<PostProps> = React.memo(({
   id,
   user,
+  userId,
   timestamp,
   created_at,
   category,
@@ -60,6 +64,7 @@ const Post: React.FC<PostProps> = React.memo(({
   onReportPress,
   onBookmarkPress,
   onPostPress,
+  onEditSuccess,
   index = 0,
   isLoading = false,
   isOptimistic = false,
@@ -208,8 +213,10 @@ const Post: React.FC<PostProps> = React.memo(({
   }, [propIsBookmarked]);
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [isReportLoading, setIsReportLoading] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
 
-
+  // Check if the current user owns this post
+  const isOwnPost = currentUser?.id && userId && currentUser.id === userId;
 
   // Remove individual bookmark status checks - now handled by parent Timeline component
 
@@ -333,6 +340,15 @@ const Post: React.FC<PostProps> = React.memo(({
     }
   }, [currentUser?.id, id, onReportPress, session]);
 
+  const handleEditPress = useCallback(() => {
+    setEditModalVisible(true);
+    onMenuToggle?.(id); // Close the menu
+  }, [id, onMenuToggle]);
+
+  const handleEditSuccess = useCallback((newContent: string) => {
+    setEditModalVisible(false);
+    onEditSuccess?.(id, newContent);
+  }, [id, onEditSuccess]);
 
   // Clean category text by removing "Related Post" and simplifying names
   const cleanCategory = category?.trim() || '';
@@ -474,6 +490,18 @@ const Post: React.FC<PostProps> = React.memo(({
                 }
               </Text>
             </TouchableOpacity>
+            {isOwnPost && (
+              <>
+                <View style={styles.menuDivider} />
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleEditPress}
+                >
+                  <Pencil size={16} color="#3B82F6" />
+                  <Text style={[styles.menuText, { color: '#3B82F6' }]}>Edit post</Text>
+                </TouchableOpacity>
+              </>
+            )}
             <View style={styles.menuDivider} />
             <TouchableOpacity
               style={styles.menuItem}
@@ -524,6 +552,15 @@ const Post: React.FC<PostProps> = React.memo(({
           targetType="post"
           isLoading={isReportLoading}
           showAlreadyReported={showAlreadyReported}
+        />
+
+        {/* Edit Post Modal */}
+        <EditPostModal
+          visible={editModalVisible}
+          onClose={() => setEditModalVisible(false)}
+          onSuccess={handleEditSuccess}
+          postId={id}
+          initialContent={content}
         />
       </TouchableOpacity>
     </FadeInView>

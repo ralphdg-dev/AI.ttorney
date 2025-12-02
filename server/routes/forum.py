@@ -149,6 +149,149 @@ class CreatePostResponse(BaseModel):
     post_id: Optional[str] = None
 
 
+class UpdatePostRequest(BaseModel):
+    body: str = Field(..., min_length=1, max_length=5000)
+
+
+class UpdatePostResponse(BaseModel):
+    success: bool
+    message: str
+
+
+@router.put("/posts/{post_id}", response_model=UpdatePostResponse)
+async def update_post(
+    post_id: str,
+    body: UpdatePostRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Update an existing forum post. Only the post owner can update their post."""
+    try:
+        user_id = current_user["user"]["id"]
+        logger.info(f"✏️ Updating forum post {post_id} for user {user_id[:8]}...")
+        
+        supabase = SupabaseService()
+        
+        # First, verify the post exists and belongs to the current user
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
+            check_response = await client.get(
+                f"{supabase.rest_url}/forum_posts?select=id,user_id&id=eq.{post_id}",
+                headers=supabase._get_headers(use_service_key=True)
+            )
+        
+        if check_response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to verify post ownership")
+        
+        posts = check_response.json() if check_response.content else []
+        if not posts:
+            raise HTTPException(status_code=404, detail="Post not found")
+        
+        post = posts[0]
+        if post.get("user_id") != user_id:
+            raise HTTPException(status_code=403, detail="You can only edit your own posts")
+        
+        # Check user status (suspended/banned)
+        try:
+            violation_service = get_violation_tracking_service()
+            user_status = await violation_service.check_user_status(user_id)
+            
+            if not user_status["is_allowed"]:
+                logger.warning(f"🚫 User {user_id[:8]}... blocked: {user_status['account_status']}")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=user_status["reason"]
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"User status check failed: {str(e)}")
+        
+        # Validate content for promotional material
+        try:
+            promotional_validator = get_promotional_validator()
+            validation_result = await promotional_validator.validate_content(body.body.strip())
+            
+            if not validation_result["is_valid"]:
+                logger.warning(f"🚫 Edit blocked for user {user_id[:8]}: {validation_result['reason']}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "detail": validation_result["details"],
+                        "reason": validation_result["reason"],
+                        "violation_type": validation_result["violation_type"],
+                        "action_taken": "content_blocked"
+                    }
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Promotional validation failed: {str(e)}")
+        
+        # Content moderation
+        try:
+            moderation_service = get_moderation_service()
+            moderation_result = await moderation_service.moderate_content(body.body.strip())
+            
+            if not moderation_service.is_content_safe(moderation_result):
+                logger.warning(f"⚠️ Edit flagged for user {user_id[:8]}: {moderation_result['violation_summary']}")
+                
+                violation_service = get_violation_tracking_service()
+                violation_result = await violation_service.record_violation(
+                    user_id=user_id,
+                    violation_type=ViolationType.FORUM_POST,
+                    content_text=body.body.strip(),
+                    moderation_result=moderation_result,
+                    content_id=post_id
+                )
+                
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "detail": violation_result["message"],
+                        "action_taken": violation_result["action_taken"],
+                        "strike_count": violation_result["strike_count"],
+                        "suspension_count": violation_result["suspension_count"],
+                        "suspension_end": violation_result.get("suspension_end")
+                    }
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Content moderation failed: {str(e)}")
+        
+        # Update the post
+        update_data = {"body": body.body.strip()}
+        headers = supabase._get_headers(use_service_key=True)
+        headers["Prefer"] = "return=representation"
+        
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
+            response = await client.patch(
+                f"{supabase.rest_url}/forum_posts?id=eq.{post_id}",
+                json=update_data,
+                headers=headers
+            )
+        
+        if response.status_code not in (200, 204):
+            details = {}
+            try:
+                details = response.json() if response.content else {}
+            except Exception:
+                details = {"raw": response.text}
+            logger.error(f"Update post failed: {response.status_code} - {details}")
+            raise HTTPException(status_code=400, detail="Failed to update post")
+        
+        # Clear cache
+        clear_posts_cache()
+        
+        logger.info(f"✅ Post {post_id} updated successfully")
+        return UpdatePostResponse(success=True, message="Post updated successfully")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update forum post error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 @router.post("/posts", response_model=CreatePostResponse)
 async def create_post(
     body: CreatePostRequest,

@@ -505,6 +505,18 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     updatePostBookmark(postId, isBookmarked);
   }, [updatePostBookmark]);
 
+  const handleEditSuccess = useCallback((postId: string, newContent: string) => {
+    // Update the post content in the posts array
+    setPosts(prev => prev.map(post => 
+      post.id === postId ? { ...post, content: newContent, body: newContent } : post
+    ));
+    // Also update the cache
+    setCachedPosts(posts.map(post => 
+      post.id === postId ? { ...post, content: newContent, body: newContent } : post
+    ));
+    if (__DEV__) console.log('Post edited:', postId);
+  }, [posts, setCachedPosts]);
+
   const handleReportPress = useCallback((postId: string) => {
     // The Post component handles the actual report logic
     if (__DEV__) console.log('Report submitted:', postId);
@@ -688,7 +700,6 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
   // Memoized key extractor
   const keyExtractor = useCallback((item: PostData) => item.id, []);
 
-  // Memoized render item
   const renderItem: ListRenderItem<PostData> = useCallback(({ item, index }: { item: PostData; index: number }) => {
     // Use loadedIndex for newly loaded posts to create staggered animation
     const animationIndex = item.isNewlyLoaded && item.loadedIndex !== undefined ? item.loadedIndex : 0;
@@ -698,6 +709,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         key={item.id}
         id={item.id}
         user={item.user}
+        userId={item.user_id}
         timestamp={item.timestamp}
         created_at={item.created_at}
         category={item.category}
@@ -707,6 +719,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         onReportPress={() => handleReportPress(item.id)}
         onBookmarkPress={() => handleBookmarkPress(item.id)}
         onPostPress={() => handlePostPress(item.id)}
+        onEditSuccess={(postId, newContent) => handleEditSuccess(postId, newContent)}
         index={animationIndex}
         isLoading={item.isLoading}
         isOptimistic={item.isOptimistic}
@@ -732,6 +745,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     handleReportPress,
     handleBookmarkPress,
     handlePostPress,
+    handleEditSuccess,
     openMenuPostId,
     handleMenuToggle,
     handleBookmarkStatusChange,
