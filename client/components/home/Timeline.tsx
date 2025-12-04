@@ -4,7 +4,7 @@ import { View, FlatList, RefreshControl, TouchableOpacity, Animated, StyleSheet,
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NetworkConfig } from '../../utils/networkConfig';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { Plus } from 'lucide-react-native';
+import { Plus, CheckCircle } from 'lucide-react-native';
 import Post from './Post';
 import { useAuth } from '../../contexts/AuthContext';
 import { useForumCache } from '../../contexts/ForumCacheContext';
@@ -39,9 +39,11 @@ interface PostData {
   body?: string;
   domain?: string;
   created_at?: string;
+  updated_at?: string;
   user_id?: string;
   is_anonymous?: boolean;
   is_flagged?: boolean;
+  is_edited?: boolean;
   users?: any;
   // For pagination animation
   isNewlyLoaded?: boolean;
@@ -78,6 +80,11 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
   const [initialLoading, setInitialLoading] = useState(true);
   const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
   const [, setError] = useState<string | null>(null);
+
+  // Toast state for edit success
+  const [showEditToast, setShowEditToast] = useState(false);
+  const editToastOpacity = useRef(new Animated.Value(0)).current;
+  const editToastTranslateY = useRef(new Animated.Value(-20)).current;
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -159,9 +166,11 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       body: row?.body || '',
       domain: row?.category || 'others',
       created_at: row?.created_at || null,
+      updated_at: row?.updated_at || null,
       user_id: row?.user_id || null,
       is_anonymous: isAnon,
       is_flagged: !!row?.is_flagged,
+      is_edited: !!row?.is_edited,
       users: userData,
     };
     return postData;
@@ -505,6 +514,90 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     updatePostBookmark(postId, isBookmarked);
   }, [updatePostBookmark]);
 
+  const handleEditSuccess = useCallback((postId: string, newContent: string) => {
+    // Optimistic update: update the post content immediately with is_edited flag
+    const now = new Date().toISOString();
+    setPosts(prev => prev.map(post => 
+      post.id === postId ? { 
+        ...post, 
+        content: newContent, 
+        body: newContent,
+        is_edited: true,
+        updated_at: now
+      } : post
+    ));
+    // Also update the cache
+    setCachedPosts(posts.map(post => 
+      post.id === postId ? { 
+        ...post, 
+        content: newContent, 
+        body: newContent,
+        is_edited: true,
+        updated_at: now
+      } : post
+    ));
+    if (__DEV__) console.log('Post edited (optimistic):', postId);
+  }, [posts, setCachedPosts]);
+
+  const handleEditError = useCallback((postId: string, originalContent: string) => {
+    // Revert the optimistic update if backend fails
+    setPosts(prev => prev.map(post => 
+      post.id === postId ? { ...post, content: originalContent, body: originalContent } : post
+    ));
+    // Also revert the cache
+    setCachedPosts(posts.map(post => 
+      post.id === postId ? { ...post, content: originalContent, body: originalContent } : post
+    ));
+    if (__DEV__) console.log('Post edit reverted:', postId);
+  }, [posts, setCachedPosts]);
+
+  // Show success toast when backend confirms save
+  const handleSaveConfirmed = useCallback(() => {
+    setShowEditToast(true);
+    
+    // Animate in
+    Animated.parallel([
+      Animated.timing(editToastOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(editToastTranslateY, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Auto hide after 2.5 seconds
+    setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(editToastOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(editToastTranslateY, {
+          toValue: -20,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setShowEditToast(false);
+        // Reset animation values for next time
+        editToastOpacity.setValue(0);
+        editToastTranslateY.setValue(-20);
+      });
+    }, 2500);
+  }, [editToastOpacity, editToastTranslateY]);
+
+  const handleDeleteSuccess = useCallback((postId: string) => {
+    setPosts(prev => prev.filter(post => post.id !== postId));
+    // Also update the cache
+    setCachedPosts(posts.filter(post => post.id !== postId));
+    if (__DEV__) console.log('Post deleted:', postId);
+  }, [posts, setCachedPosts]);
+
   const handleReportPress = useCallback((postId: string) => {
     // The Post component handles the actual report logic
     if (__DEV__) console.log('Report submitted:', postId);
@@ -688,7 +781,6 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
   // Memoized key extractor
   const keyExtractor = useCallback((item: PostData) => item.id, []);
 
-  // Memoized render item
   const renderItem: ListRenderItem<PostData> = useCallback(({ item, index }: { item: PostData; index: number }) => {
     // Use loadedIndex for newly loaded posts to create staggered animation
     const animationIndex = item.isNewlyLoaded && item.loadedIndex !== undefined ? item.loadedIndex : 0;
@@ -698,8 +790,11 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         key={item.id}
         id={item.id}
         user={item.user}
+        userId={item.user_id}
         timestamp={item.timestamp}
         created_at={item.created_at}
+        updated_at={item.updated_at}
+        isEdited={item.is_edited}
         category={item.category}
         content={item.content}
         comments={item.comments}
@@ -707,6 +802,10 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         onReportPress={() => handleReportPress(item.id)}
         onBookmarkPress={() => handleBookmarkPress(item.id)}
         onPostPress={() => handlePostPress(item.id)}
+        onEditSuccess={(postId, newContent) => handleEditSuccess(postId, newContent)}
+        onEditError={(postId, originalContent) => handleEditError(postId, originalContent)}
+        onSaveConfirmed={handleSaveConfirmed}
+        onDeleteSuccess={handleDeleteSuccess}
         index={animationIndex}
         isLoading={item.isLoading}
         isOptimistic={item.isOptimistic}
@@ -732,6 +831,10 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     handleReportPress,
     handleBookmarkPress,
     handlePostPress,
+    handleEditSuccess,
+    handleEditError,
+    handleSaveConfirmed,
+    handleDeleteSuccess,
     openMenuPostId,
     handleMenuToggle,
     handleBookmarkStatusChange,
@@ -900,6 +1003,23 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       >
         <Plus size={iconSize} color="#FFFFFF" strokeWidth={2.5} />
       </TouchableOpacity>
+
+      {/* Success Toast for Edit */}
+      {showEditToast && (
+        <Animated.View
+          style={[
+            styles.editToast,
+            {
+              top: insets.top + 10,
+              opacity: editToastOpacity,
+              transform: [{ translateY: editToastTranslateY }],
+            },
+          ]}
+        >
+          <CheckCircle size={20} color="#FFFFFF" />
+          <Text style={styles.editToastText}>Post edited successfully</Text>
+        </Animated.View>
+      )}
     </View>
   );
 });
@@ -970,6 +1090,28 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  editToast: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    backgroundColor: '#10B981',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 9999,
+  },
+  editToastText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    marginLeft: 10,
+    fontSize: 14,
   },
 });
 

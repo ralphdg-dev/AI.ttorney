@@ -49,8 +49,7 @@ interface ConsultationRequest {
   client_name: string;
   client_email: string;
   client_username: string | null;
-  client_profile_photo: string | null;
-  client_photo_url: string | null;
+  profile_photo: string | null;
 }
 
 const LawyerConsultPage: React.FC = () => {
@@ -138,10 +137,7 @@ const LawyerConsultPage: React.FC = () => {
         data.forEach((consultation: any, index: number) => {
           console.log(`📸 Consultation ${index + 1} Profile Photos:`, {
             client_name: consultation.client_name,
-            client_profile_photo: consultation.client_profile_photo,
-            client_photo_url: consultation.client_photo_url,
-            users_profile_photo: consultation.users?.profile_photo,
-            users_photo_url: consultation.users?.photo_url
+            profile_photo: consultation.profile_photo
           });
         });
         
@@ -636,17 +632,17 @@ const LawyerConsultPage: React.FC = () => {
                   <View style={tw`flex-row items-start justify-between mb-4`}>
                     <View style={tw`flex-row items-center flex-1 mr-3`}>
                       <View style={tw`relative`}>
-                        {(request.client_profile_photo || request.client_photo_url) ? (
+                        {request.profile_photo ? (
                           <Image
-                            source={{ uri: (request.client_profile_photo || request.client_photo_url) as string }}
+                            source={{ uri: request.profile_photo }}
                             style={[tw`w-12 h-12 rounded-full`, { backgroundColor: '#E5E7EB' }]}
                             resizeMode="cover"
                             onError={(error) => {
                               console.log('❌ Image Load Error (List):', error.nativeEvent.error);
-                              console.log('❌ Failed URI (List):', request.client_profile_photo || request.client_photo_url);
+                              console.log('❌ Failed URI (List):', request.profile_photo);
                             }}
                             onLoad={() => {
-                              console.log('✅ Image Loaded Successfully (List):', request.client_profile_photo || request.client_photo_url);
+                              console.log('✅ Image Loaded Successfully (List):', request.profile_photo);
                             }}
                           />
                         ) : (

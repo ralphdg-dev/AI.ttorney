@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, TouchableWithoutFeedback, Image, TextInput, Animated, StatusBar, useWindowDimensions, Keyboard, Platform, KeyboardAvoidingView } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, TouchableWithoutFeedback, Image, TextInput, Animated, StatusBar, useWindowDimensions, Keyboard, Platform, KeyboardAvoidingView, Modal, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { User, Bookmark, MoreHorizontal, Flag, Send } from 'lucide-react-native';
+import { User, Bookmark, MoreHorizontal, Flag, Send, Pencil, Trash2, X } from 'lucide-react-native';
 import ReportModal from '../../common/ReportModal';
+import EditPostModal from '../../home/EditPostModal';
+import EditReplyModal from '../../home/EditReplyModal';
 import { ReportService } from '../../../services/reportService';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../../../constants/Colors';
@@ -31,11 +33,12 @@ interface PostData {
   title?: string;
   body: string;
   domain: 'family' | 'criminal' | 'civil' | 'labor' | 'consumer' | 'others' | null;
-  created_at: string | null;
+  created_at: string | null;  
   updated_at?: string | null;
   user_id?: string | null;
   is_anonymous?: boolean | null;
   is_flagged?: boolean | null;
+  is_edited?: boolean | null;
   user?: {
     name: string;
     username: string;
@@ -61,6 +64,7 @@ interface Reply {
   user_id?: string | null;
   is_anonymous?: boolean;
   is_flagged?: boolean;
+  is_edited?: boolean;
   user?: {
     name: string;
     username: string;
@@ -79,9 +83,9 @@ interface Reply {
 const ViewPost: React.FC = () => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { postId, from, query } = useLocalSearchParams<{ postId?: string; from?: string; query?: string }>();
+  const { postId } = useLocalSearchParams<{ postId?: string; from?: string; query?: string }>();
   const { user: currentUser, session } = useAuth();
-  const { getCachedPost, getCachedPostFromForum, prefetchPost } = useForumCache();
+  const { getCachedPost, setCachedPost, getCachedPostFromForum, prefetchPost, isPostCacheValid, updatePostCommentCount } = useForumCache();
   const { refreshStatus } = useModerationStatus();
   const toast = useToast();
   
@@ -102,6 +106,98 @@ const ViewPost: React.FC = () => {
   }, [width]);
   
   const responsive = usePostResponsive();
+  
+  // Enhanced keyboard handling with animation for reply input
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const keyboardAnimatedValue = useRef(new Animated.Value(0)).current;
+  
+  // We don't need interpolation anymore since we're using absolute positioning
+  
+  // Function to reset input position
+  const resetInputPosition = useCallback(() => {
+    // Reset all state and animation values
+    setIsKeyboardVisible(false);
+    keyboardAnimatedValue.setValue(0);
+    
+    // Force layout update to ensure input is at bottom
+    requestAnimationFrame(() => {
+      keyboardAnimatedValue.setValue(0);
+    });
+  }, [keyboardAnimatedValue]);
+
+  // Reset input position when component unmounts
+  useEffect(() => {
+    return () => {
+      // Ensure input position is reset when leaving the screen
+      resetInputPosition();
+    };
+  }, [resetInputPosition]);
+
+  useEffect(() => {
+    // Only add keyboard listeners on native platforms (iOS/Android), not web
+    if (Platform.OS === 'web') {
+      return;
+    }
+    
+    // Listen for keyboard WILL show (earliest possible event)
+    const keyboardWillShowListener = Keyboard.addListener(
+      'keyboardWillShow',
+      (e) => {
+        console.log('🕹 Keyboard will show:', e.endCoordinates.height);
+        // Update state immediately
+        setIsKeyboardVisible(true);
+        
+        // INSTANT ANIMATION - SUPER FAST
+        keyboardAnimatedValue.setValue(1);
+        
+        // Force immediate layout update
+        requestAnimationFrame(() => {
+          // Double-check that animation value is set
+          keyboardAnimatedValue.setValue(1);
+        });
+      }
+    );
+    
+    // Also listen for did show as backup
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      (e) => {
+        console.log('🕹 Keyboard did show');
+        setIsKeyboardVisible(true);
+        keyboardAnimatedValue.setValue(1);
+      }
+    );
+    
+    // Listen for keyboard WILL hide
+    const keyboardWillHideListener = Keyboard.addListener(
+      'keyboardWillHide',
+      () => {
+        console.log('🕹 Keyboard will hide');
+        // INSTANT HIDE - SUPER FAST
+        resetInputPosition();
+      }
+    );
+    
+    // Also listen for did hide as backup
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        console.log('🕹 Keyboard did hide');
+        resetInputPosition();
+      }
+    );
+    
+    // Listen for blur events on the TextInput
+    const blurSubscription = Keyboard.addListener('keyboardDidHide', resetInputPosition);
+    
+    return () => {
+      keyboardWillShowListener?.remove();
+      keyboardDidShowListener.remove();
+      keyboardWillHideListener?.remove();
+      keyboardDidHideListener.remove();
+      blurSubscription.remove();
+    };
+  }, [resetInputPosition, keyboardAnimatedValue]);
   
   const [showFullContent, setShowFullContent] = useState(false);
   const [post, setPost] = useState<PostData | null>(null);
@@ -125,9 +221,54 @@ const ViewPost: React.FC = () => {
   const [replyText, setReplyText] = useState('');
   const [isReplying, setIsReplying] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editReplyModalVisible, setEditReplyModalVisible] = useState(false);
+  const [editingReply, setEditingReply] = useState<{ id: string; body: string } | null>(null);
+  const [deleteReplyModalVisible, setDeleteReplyModalVisible] = useState(false);
+  const [deletingReplyId, setDeletingReplyId] = useState<string | null>(null);
+  const [isDeletingReply, setIsDeletingReply] = useState(false);
+  const [deletePostModalVisible, setDeletePostModalVisible] = useState(false);
+  const [isDeletingPost, setIsDeletingPost] = useState(false);
   
   // Check if current user is a lawyer
   const isLawyer = currentUser?.role === 'verified_lawyer';
+  
+  // Check if current user owns this post (for edit permission)
+  const isOwnPost = currentUser?.id && post?.user_id && currentUser.id === post.user_id;
+
+  // Type adapter functions - MUST be declared before any useCallback that uses them
+  const mapCachedToViewPost = useCallback((cached: any) => {
+    return {
+      ...cached,
+      body: cached.body || '',
+    };
+  }, []);
+
+  const mapCachedRepliesToViewPost = useCallback((cachedReplies: any[]) => {
+    return cachedReplies.map(reply => ({
+      ...reply,
+      is_anonymous: reply.is_anonymous ?? undefined,
+    }));
+  }, []);
+
+  const mapViewPostToCache = useCallback((post: PostData, replies: Reply[]) => {
+    return {
+      ...post,
+      user: post.user || { name: 'Anonymous', username: 'anonymous', avatar: '' },
+      timestamp: post.timestamp || '',
+      category: post.category || '',
+      content: post.content || '',
+      comments: post.comments || 0,
+      domain: post.domain || undefined,
+      created_at: post.created_at || undefined,
+      user_id: post.user_id || undefined,
+      replies: replies.map(reply => ({
+        ...reply,
+        is_anonymous: reply.is_anonymous ?? null,
+      })),
+      commentsLoaded: true,
+    };
+  }, []);
 
   // Helper function to get initials from name
   const getInitials = (name: string) => {
@@ -420,9 +561,11 @@ const ViewPost: React.FC = () => {
             body: cachedPostWithComments.body || '',
             domain: (cachedPostWithComments.domain as any) || 'others',
             created_at: cachedPostWithComments.created_at || null,
+            updated_at: (cachedPostWithComments as any).updated_at || null,
             user_id: cachedPostWithComments.user_id || null,
             is_anonymous: cachedPostWithComments.is_anonymous || false,
             is_flagged: cachedPostWithComments.is_flagged || false,
+            is_edited: (cachedPostWithComments as any).is_edited || false,
             users: cachedPostWithComments.users
           };
           
@@ -458,9 +601,11 @@ const ViewPost: React.FC = () => {
             body: forumPost.content || '',
             domain: (forumPost.category as any) || 'others',
             created_at: forumPost.created_at || null,
+            updated_at: (forumPost as any).updated_at || null,
             user_id: forumPost.user_id || null,
             is_anonymous: forumPost.is_anonymous || false,
             is_flagged: forumPost.is_flagged || false,
+            is_edited: (forumPost as any).is_edited || false,
             users: forumPost.users
           };
           
@@ -484,6 +629,7 @@ const ViewPost: React.FC = () => {
                 user_id: r.user_id || null,
                 is_anonymous: isReplyAnon,
                 is_flagged: !!r.is_flagged,
+                is_edited: !!r.is_edited,
                 user: isReplyAnon ? undefined : {
                   name: replyUserData?.full_name || replyUserData?.username || 'User',
                   username: replyUserData?.username || 'user',
@@ -538,7 +684,7 @@ const ViewPost: React.FC = () => {
       animatedOpacity,
     };
 
-    setOptimisticReplies(prev => [...prev, optimisticReply]);
+    setOptimisticReplies(prev => [optimisticReply, ...prev]);
     
     Animated.timing(animatedOpacity, {
       toValue: 0.8,
@@ -549,9 +695,24 @@ const ViewPost: React.FC = () => {
     return optimisticReply.id;
   }, [currentUser]);
 
-  // Fallback to API when no cache available
+  
+  // Load post and replies with caching
   const loadFromAPI = useCallback(async (postId: string) => {
     try {
+      // Check cache first
+      const cachedPost = getCachedPost(postId);
+      if (cachedPost && isPostCacheValid(postId) && cachedPost.commentsLoaded) {
+        setPost(mapCachedToViewPost(cachedPost));
+        setReplies(mapCachedRepliesToViewPost(cachedPost.replies));
+        setPostReady(true);
+        setLoading(false);
+        setRepliesLoading(false);
+        if (__DEV__) {
+          console.log(`📦 ViewPost: Loaded post ${postId} from cache with ${cachedPost.replies.length} replies`);
+        }
+        return;
+      }
+
       const headers = await getAuthHeaders();
       const apiUrl = await NetworkConfig.getBestApiUrl();
 
@@ -595,6 +756,7 @@ const ViewPost: React.FC = () => {
           user_id: row.user_id || null,
           is_anonymous: isAnon,
           is_flagged: !!row.is_flagged,
+          is_edited: !!row.is_edited,
           user: isAnon ? undefined : {
             name: userData?.full_name || userData?.username || 'User',
             username: userData?.username || 'user',
@@ -634,6 +796,7 @@ const ViewPost: React.FC = () => {
                   user_id: r.user_id || null,
                   is_anonymous: isReplyAnon,
                   is_flagged: !!r.is_flagged,
+                  is_edited: !!r.is_edited,
                   user: isReplyAnon ? undefined : {
                     name: replyUserData?.full_name || replyUserData?.username || 'User',
                     username: replyUserData?.username || 'user',
@@ -645,10 +808,20 @@ const ViewPost: React.FC = () => {
                 };
               });
               
-              setReplies(mappedReplies.sort((a, b) => 
+              const sortedReplies = mappedReplies.sort((a, b) => 
                 new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-              ));
+              );
+              setReplies(sortedReplies);
               setRepliesLoading(false);
+              
+              // Save to cache
+              if (post) {
+                const postWithReplies = mapViewPostToCache(post, sortedReplies) as any;
+                setCachedPost(postId, postWithReplies);
+                if (__DEV__) {
+                  console.log(`💾 ViewPost: Cached post ${postId} with ${sortedReplies.length} replies`);
+                }
+              }
             }
           }
         } catch {
@@ -663,8 +836,9 @@ const ViewPost: React.FC = () => {
       setError('Failed to load post. Please try again.');
       setPostReady(true);
       setLoading(false);
+      console.error('Error loading post:', error);
     }
-  }, [getAuthHeaders]);
+  }, [getAuthHeaders, mapCachedToViewPost, mapCachedRepliesToViewPost, mapViewPostToCache, getCachedPost, isPostCacheValid, setCachedPost]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Function to confirm/promote optimistic reply (no flicker)
   const confirmOptimisticReply = useCallback(
@@ -686,20 +860,21 @@ const ViewPost: React.FC = () => {
           }).start();
         }
 
-        // Promote optimistic to real by swapping id and clearing flag (prevents disappearance)
-        const promoted: Reply = {
-          ...target,
-          id: opts?.replyId || target.id,
-          created_at: opts?.created_at || target.created_at,
-          isOptimistic: false,
-        };
+        // Remove optimistic reply entirely to prevent duplicates
+        // The real reply will arrive via normal data flow (cache/API)
+        // This prevents React key conflicts and double counting
+        if (opts?.replyId && !opts?.backgroundRefresh) {
+          const next = prev.filter(r => r.id !== optimisticId);
+                    return next;
+        }
 
-        const next = [...prev];
-        next[idx] = promoted;
+        // Remove optimistic reply - it will be replaced by server data from background refresh
+        // This prevents duplicates when the server reply comes in
+        const next = prev.filter(r => r.id !== optimisticId);
 
-        // Optionally refresh in background to sync other metadata
+        // Optionally refresh in background to sync with server data
         if (opts?.backgroundRefresh && postId) {
-          // Fire-and-forget
+          // Fire-and-forget - will fetch the real reply from server
           loadFromAPI(String(postId)).catch(() => {});
         }
 
@@ -751,9 +926,22 @@ const ViewPost: React.FC = () => {
         try {
           const respJson = await response.json();
           replyId = String(respJson?.reply_id || respJson?.data?.reply_id || '');
-        } catch {}
-        // Promote without full reload to prevent flicker
-        confirmOptimisticReply(optimisticId, { replyId, backgroundRefresh: true });
+        } catch {
+          // JSON parsing failed, continue with empty replyId
+        }
+        // Convert optimistic reply to real reply using server replyId
+        // This prevents flicker while keeping the comment visible
+        confirmOptimisticReply(optimisticId, { replyId, backgroundRefresh: false });
+        
+        // Invalidate post cache to ensure fresh load on return
+        // This prevents the user's own comment from disappearing
+        if (postId) {
+          // Clear the cached post so it reloads fresh on next visit
+          setCachedPost(postId, null as any);
+          if (__DEV__) {
+            console.log(`🗑️ ViewPost: Cleared cache for post ${postId} to ensure fresh load`);
+          }
+        }
       } else {
         const errorText = await response.text();
         removeOptimisticReply(optimisticId);
@@ -818,7 +1006,7 @@ const ViewPost: React.FC = () => {
     } finally {
       setIsReplying(false);
     }
-  }, [replyText, postId, addOptimisticReply, confirmOptimisticReply, removeOptimisticReply, getAuthHeaders, refreshStatus, toast]);
+  }, [replyText, postId, addOptimisticReply, confirmOptimisticReply, removeOptimisticReply, getAuthHeaders, refreshStatus, toast, setCachedPost]);
 
   // Replies are now loaded with the post in loadPost and loadFromAPI
   // No separate loadReplies function needed
@@ -829,7 +1017,126 @@ const ViewPost: React.FC = () => {
     ? { name: 'Anonymous User', avatar: 'https://cdn-icons-png.flaticon.com/512/1077/1077114.png', isLawyer: false } // Detective icon for anonymous users
     : (post?.user || { name: 'User', avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', isLawyer: false }); // Gray default for regular users
   const displayTimestamp = formatTimestamp(post?.created_at || null);
+  const editedTimeDisplay = post?.is_edited && post?.updated_at ? `Edited ${formatTimestamp(post.updated_at)}` : null;
   const displayContent = post?.body || '';
+  
+  // Handle edit success - update local state
+  const handleEditSuccess = useCallback((newContent: string) => {
+    if (post) {
+      setPost({
+        ...post,
+        body: newContent,
+        is_edited: true,
+        updated_at: new Date().toISOString()
+      });
+    }
+  }, [post]);
+  
+  // Handle edit press
+  const handleEditPress = useCallback(() => {
+    setMenuOpen(false);
+    setEditModalVisible(true);
+  }, []);
+  
+  // Handle reply edit press
+  const handleEditReplyPress = useCallback((reply: Reply) => {
+    setReplyMenuOpen(null);
+    setEditingReply({ id: reply.id, body: reply.body });
+    setEditReplyModalVisible(true);
+  }, []);
+  
+  // Handle reply edit success - update local state
+  const handleEditReplySuccess = useCallback((newContent: string) => {
+    if (editingReply) {
+      const now = new Date().toISOString();
+      setReplies(prev => prev.map(reply => 
+        reply.id === editingReply.id 
+          ? { ...reply, body: newContent, is_edited: true, updated_at: now }
+          : reply
+      ));
+    }
+  }, [editingReply]);
+  
+  // Handle delete reply press - open confirmation modal
+  const handleDeleteReplyPress = useCallback((replyId: string) => {
+    setReplyMenuOpen(null);
+    setDeletingReplyId(replyId);
+    setDeleteReplyModalVisible(true);
+  }, []);
+  
+  // Handle delete reply confirm
+  const handleDeleteReplyConfirm = useCallback(async () => {
+    if (!deletingReplyId) return;
+    
+    setIsDeletingReply(true);
+    try {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/api/forum/replies/${deletingReplyId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData?.detail || 'Failed to delete reply');
+      }
+      
+      // Remove the reply from local state
+      setReplies(prev => prev.filter(reply => reply.id !== deletingReplyId));
+      
+      // Close modal
+      setDeleteReplyModalVisible(false);
+      setDeletingReplyId(null);
+    } catch (error: any) {
+      console.error('Error deleting reply:', error);
+      // Show error alert
+      const { Alert } = require('react-native');
+      Alert.alert('Error', error.message || 'Failed to delete reply. Please try again.');
+    } finally {
+      setIsDeletingReply(false);
+    }
+  }, [deletingReplyId, session?.access_token]);
+  
+  // Handle delete post press - open confirmation modal
+  const handleDeletePostPress = useCallback(() => {
+    setMenuOpen(false);
+    setDeletePostModalVisible(true);
+  }, []);
+  
+  // Handle delete post confirm
+  const handleDeletePostConfirm = useCallback(async () => {
+    if (!post?.id) return;
+    
+    setIsDeletingPost(true);
+    try {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/api/forum/posts/${post.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData?.detail || 'Failed to delete post');
+      }
+      
+      // Close modal and navigate back
+      setDeletePostModalVisible(false);
+      router.back();
+    } catch (error: any) {
+      console.error('Error deleting post:', error);
+      const { Alert } = require('react-native');
+      Alert.alert('Error', error.message || 'Failed to delete post. Please try again.');
+    } finally {
+      setIsDeletingPost(false);
+    }
+  }, [post?.id, session?.access_token, router]);
   
   // Wait for post to be ready before showing content
   React.useEffect(() => {
@@ -919,27 +1226,29 @@ const ViewPost: React.FC = () => {
         title="Post"
         showBackButton={true}
         onBackPress={() => {
-          console.log('[ViewPost] Back button pressed, from:', from, 'query:', query);
-          
-          // Special case: if coming from search with query, preserve search state
-          if (from === 'search' && query) {
-            console.log('[ViewPost] Redirecting to search with query:', query);
-            router.push(`/search?query=${encodeURIComponent(query)}` as any);
-          } else {
-            // Try to go back first, but if that fails, navigate to lawyer forum
+          // Update cache with current reply count to ensure timeline shows correct count
+          // Real-time subscription is filtered for user's own comments, so we need explicit cache update
+          if (postId) {
             try {
-              console.log('[ViewPost] Using router.back() to return to previous page');
-              router.back();
+              // Calculate total replies including optimistic ones
+              const totalReplies = replies.length + optimisticReplies.length;
+              // Get the cached post to compare counts
+              const cachedPost = getCachedPost(postId);
+              const cachedCount = cachedPost?.replies?.length || 0;
               
-              // Fallback timeout - if back doesn't work after a short delay, navigate explicitly
-              setTimeout(() => {
-                console.log('[ViewPost] Back navigation fallback - navigating to lawyer forum');
-                router.replace('/lawyer/forum' as any);
-              }, 100);
-            } catch (error) {
-              console.log('[ViewPost] Back navigation failed, navigating to lawyer forum');
-              router.replace('/lawyer/forum' as any);
+              // Only update cache if count actually changed to prevent unnecessary updates
+              if (totalReplies !== cachedCount) {
+                updatePostCommentCount(postId, totalReplies);
+              }
+            } catch {
+              // Silently fail - cache update is not critical for navigation
             }
+          }
+          
+          try {
+            router.back();
+          } catch {
+            router.replace('/lawyer/forum' as any);
           }
         }}
         rightComponent={
@@ -1004,6 +1313,26 @@ const ViewPost: React.FC = () => {
                 }
               </Text>
             </TouchableOpacity>
+            {isOwnPost && (
+              <>
+                <View style={tw`h-px mx-2 bg-gray-200`} />
+                <TouchableOpacity
+                  style={tw`flex-row items-center px-4 py-3`}
+                  onPress={handleEditPress}
+                >
+                  <Pencil size={16} color="#3B82F6" />
+                  <Text style={[tw`ml-3`, { color: '#3B82F6' }]}>Edit post</Text>
+                </TouchableOpacity>
+                <View style={tw`h-px mx-2 bg-gray-200`} />
+                <TouchableOpacity
+                  style={tw`flex-row items-center px-4 py-3`}
+                  onPress={handleDeletePostPress}
+                >
+                  <Trash2 size={16} color="#EF4444" />
+                  <Text style={tw`ml-3 text-red-600`}>Delete post</Text>
+                </TouchableOpacity>
+              </>
+            )}
             <View style={tw`h-px mx-2 bg-gray-200`} />
             <TouchableOpacity
               style={tw`flex-row items-center px-4 py-3`}
@@ -1135,14 +1464,41 @@ const ViewPost: React.FC = () => {
             )}
             
             {/* [timestamp] - at the bottom of post content */}
-            <Text style={tw`mb-2 text-xs text-gray-500`}>
-              {displayTimestamp}
-            </Text>
+            <View style={tw`flex-row items-center mb-2`}>
+              <Text style={tw`text-xs text-gray-500`}>
+                {displayTimestamp}
+              </Text>
+              {editedTimeDisplay && (
+                <>
+                  <Text style={tw`mx-1 text-xs text-gray-500`}>•</Text>
+                  <Text style={[tw`text-xs text-gray-400`, { fontStyle: 'italic' }]}>
+                    {editedTimeDisplay}
+                  </Text>
+                </>
+              )}
+            </View>
 
             {/* Replies Section */}
             <View style={tw`pt-6 mt-6 bg-white border-t border-gray-100`}>
               <Text style={tw`mb-4 text-lg font-bold text-gray-900`}>
-                Replies ({[...replies, ...optimisticReplies].length})
+                {(() => {
+                  // Apply the same filtering logic as the render to ensure accurate count
+                  const filteredReplies = replies.filter(realReply => {
+                    const hasOptimisticMatch = optimisticReplies.some(optReply => {
+                      // Match by body and approximate timestamp (within 30 seconds)
+                      const contentMatch = (optReply as any).body?.trim() === (realReply as any).body?.trim();
+                      const timeMatch = optReply.created_at && realReply.created_at ? Math.abs(
+                        new Date(optReply.created_at).getTime() - new Date(realReply.created_at).getTime()
+                      ) < 30000 : false; // 30 seconds tolerance
+                      return contentMatch && timeMatch;
+                    });
+                    return !hasOptimisticMatch;
+                  });
+                  
+                  const allReplies = [...filteredReplies, ...optimisticReplies];
+                  const replyCount = allReplies.length;
+                  return `Replies (${replyCount})`;
+                })()}
               </Text>
               
               {repliesLoading ? (
@@ -1159,6 +1515,7 @@ const ViewPost: React.FC = () => {
               ) : (
                 // Filter out real replies that match optimistic replies to prevent duplicates
                 (() => {
+                                    
                   const filteredReplies = replies.filter(realReply => {
                     const hasOptimisticMatch = optimisticReplies.some(optReply => {
                       // Match by body and approximate timestamp (within 30 seconds)
@@ -1166,12 +1523,16 @@ const ViewPost: React.FC = () => {
                       const timeMatch = optReply.created_at && realReply.created_at ? Math.abs(
                         new Date(optReply.created_at).getTime() - new Date(realReply.created_at).getTime()
                       ) < 30000 : false; // 30 seconds tolerance
+                      
                       return contentMatch && timeMatch;
                     });
+                    
                     return !hasOptimisticMatch;
                   });
                   
-                  const allReplies = [...filteredReplies, ...optimisticReplies];
+                  // Put optimistic replies first during loading for smoother UX
+                  // New comments appear at top where user expects them
+                  const allReplies = isReplying ? [...optimisticReplies, ...filteredReplies] : [...filteredReplies, ...optimisticReplies];
                   return allReplies.length > 0 ? allReplies.map((reply) => {
                   const isReplyAnonymous = reply.is_anonymous || false;
                   const isReplyDeactivated = reply.user?.account_status === 'deactivated';
@@ -1181,7 +1542,7 @@ const ViewPost: React.FC = () => {
                   const replyTimestamp = formatTimestamp(reply.created_at);
                   
                   const replyComponent = (
-                    <View key={reply.id} style={tw`pl-4 mb-6 bg-white`}>
+                    <View key={`${reply.isOptimistic ? 'opt-' : ''}${reply.id}`} style={tw`pl-4 mb-6 bg-white`}>
                       <View style={tw`flex-row items-start mb-2`}>
                         {isReplyAnonymous || isReplyDeactivated ? (
                           <View style={tw`items-center justify-center w-10 h-10 mr-3 bg-gray-100 border border-gray-200 rounded-full`}>
@@ -1234,15 +1595,46 @@ const ViewPost: React.FC = () => {
                           <Text style={tw`mb-2 text-gray-900`}>{reply.body}</Text>
                           
                           {/* [timestamp] */}
-                          <Text style={tw`mb-1 text-xs text-gray-500`}>
-                            {replyTimestamp}
-                          </Text>
+                          <View style={tw`flex-row items-center mb-1`}>
+                            <Text style={tw`text-xs text-gray-500`}>
+                              {replyTimestamp}
+                            </Text>
+                            {reply.is_edited && reply.updated_at && (
+                              <>
+                                <Text style={tw`mx-1 text-xs text-gray-500`}>•</Text>
+                                <Text style={[tw`text-xs text-gray-400`, { fontStyle: 'italic' }]}>
+                                  Edited {formatTimestamp(reply.updated_at)}
+                                </Text>
+                              </>
+                            )}
+                          </View>
                         </View>
                       </View>
                       
                       {/* Reply Menu Dropdown */}
                       {replyMenuOpen === reply.id && !reply.isOptimistic && (
-                        <View style={tw`absolute right-0 z-10 w-32 bg-white border border-gray-200 rounded-lg shadow-lg top-8`}>
+                        <View style={tw`absolute right-0 z-10 bg-white border border-gray-200 rounded-lg shadow-lg top-8`} >
+                          {/* Edit option - only for own replies */}
+                          {currentUser?.id === reply.user_id && (
+                            <>
+                              <TouchableOpacity
+                                onPress={() => handleEditReplyPress(reply)}
+                                style={tw`flex-row items-center px-3 py-2`}
+                              >
+                                <Pencil size={14} color="#3B82F6" style={tw`mr-2`} />
+                                <Text style={{ color: '#3B82F6' }}>Edit</Text>
+                              </TouchableOpacity>
+                              <View style={tw`h-px mx-2 bg-gray-200`} />
+                              <TouchableOpacity
+                                onPress={() => handleDeleteReplyPress(reply.id)}
+                                style={tw`flex-row items-center px-3 py-2`}
+                              >
+                                <Trash2 size={14} color="#EF4444" style={tw`mr-2`} />
+                                <Text style={tw`text-sm text-red-600`}>Delete</Text>
+                              </TouchableOpacity>
+                              <View style={tw`h-px mx-2 bg-gray-200`} />
+                            </>
+                          )}
                           <TouchableOpacity
                             onPress={() => handleReportReplyPress(reply.id)}
                             style={tw`flex-row items-center px-3 py-2`}
@@ -1259,7 +1651,7 @@ const ViewPost: React.FC = () => {
                   if (reply.isOptimistic && reply.animatedOpacity) {
                     return (
                       <Animated.View
-                        key={reply.id}
+                        key={`${reply.id}-optimistic`}
                         style={{ opacity: reply.animatedOpacity }}
                       >
                         {replyComponent}
@@ -1290,9 +1682,7 @@ const ViewPost: React.FC = () => {
               { 
                 paddingHorizontal: responsive.horizontalPadding, 
                 paddingVertical: LAYOUT.SPACING.sm, 
-                // Always anchor the reply bar to the safe bottom area so it
-                // cleanly returns when the keyboard is dismissed.
-                paddingBottom: getSafeBottomPosition(insets.bottom, 16),
+                paddingBottom: isKeyboardVisible ? 8 : getSafeBottomPosition(insets.bottom, 16),
               }
             ]}
           >
@@ -1310,11 +1700,26 @@ const ViewPost: React.FC = () => {
               value={replyText}
               onChangeText={setReplyText}
               multiline={false}
+              // Enhanced keyboard handling props
               blurOnSubmit={false}
               keyboardType="default"
               autoCapitalize="none"
               spellCheck={false}
               autoCorrect={false}
+              onFocus={() => {
+                // INSTANT RESPONSE - Force keyboard visibility and animation
+                setIsKeyboardVisible(true);
+                keyboardAnimatedValue.setValue(1);
+                
+                // Force immediate layout update
+                requestAnimationFrame(() => {
+                  keyboardAnimatedValue.setValue(1);
+                });
+              }}
+              onBlur={() => {
+                // Ensure input resets when focus is lost
+                resetInputPosition();
+              }}
             />
             <TouchableOpacity
               onPress={handleSendReply}
@@ -1361,6 +1766,157 @@ const ViewPost: React.FC = () => {
         isLoading={isReportLoading}
         showAlreadyReported={showAlreadyReportedReply}
       />
+
+      {/* Edit Post Modal */}
+      {post && (
+        <EditPostModal
+          visible={editModalVisible}
+          onClose={() => setEditModalVisible(false)}
+          onSuccess={handleEditSuccess}
+          postId={post.id}
+          initialContent={post.body}
+        />
+      )}
+
+      {/* Edit Reply Modal */}
+      {editingReply && (
+        <EditReplyModal
+          visible={editReplyModalVisible}
+          onClose={() => {
+            setEditReplyModalVisible(false);
+            setEditingReply(null);
+          }}
+          onSuccess={handleEditReplySuccess}
+          replyId={editingReply.id}
+          initialContent={editingReply.body}
+        />
+      )}
+
+      {/* Delete Reply Confirmation Modal */}
+      <Modal
+        visible={deleteReplyModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setDeleteReplyModalVisible(false);
+          setDeletingReplyId(null);
+        }}
+      >
+        <View style={tw`flex-1 bg-black bg-opacity-50 justify-center items-center px-4`}>
+          <View style={tw`bg-white rounded-lg w-full max-w-md`}>
+            {/* Header */}
+            <View style={tw`p-6 pb-4`}>
+              <View style={tw`flex-row items-center justify-between mb-4`}>
+                <Text style={tw`text-xl font-semibold text-gray-900`}>
+                  Delete Reply
+                </Text>
+              </View>
+              
+              <Text style={tw`text-sm text-gray-600 leading-5`}>
+                Are you sure you want to delete this reply? This action cannot be undone.
+              </Text>
+            </View>
+
+            {/* Buttons */}
+            <View style={tw`px-6 pb-6`}>
+              <TouchableOpacity
+                onPress={handleDeleteReplyConfirm}
+                disabled={isDeletingReply}
+                style={[
+                  tw`w-full py-3 rounded-lg flex-row justify-center items-center mb-3`,
+                  { backgroundColor: isDeletingReply ? '#FCA5A5' : '#EF4444' }
+                ]}
+              >
+                {isDeletingReply ? (
+                  <>
+                    <ActivityIndicator size="small" color="#FFFFFF" style={tw`mr-2`} />
+                    <Text style={tw`text-center font-medium text-white`}>
+                      Deleting...
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={tw`text-center font-medium text-white`}>
+                    Delete Reply
+                  </Text>
+                )}
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                onPress={() => {
+                  setDeleteReplyModalVisible(false);
+                  setDeletingReplyId(null);
+                }}
+                disabled={isDeletingReply}
+                style={tw`w-full py-3 rounded-lg bg-gray-100`}
+              >
+                <Text style={tw`text-center font-medium text-gray-700`}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Post Confirmation Modal */}
+      <Modal
+        visible={deletePostModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setDeletePostModalVisible(false)}
+      >
+        <View style={tw`flex-1 bg-black bg-opacity-50 justify-center items-center px-4`}>
+          <View style={tw`bg-white rounded-lg w-full max-w-md`}>
+            {/* Header */}
+            <View style={tw`p-6 pb-4`}>
+              <View style={tw`flex-row items-center justify-between mb-4`}>
+                <Text style={tw`text-xl font-semibold text-gray-900`}>
+                  Delete Post
+                </Text>
+              </View>
+              
+              <Text style={tw`text-sm text-gray-600 leading-5`}>
+                Are you sure you want to delete this post? This action cannot be undone. All replies will also be hidden.
+              </Text>
+            </View>
+
+            {/* Buttons */}
+            <View style={tw`px-6 pb-6`}>
+              <TouchableOpacity
+                onPress={handleDeletePostConfirm}
+                disabled={isDeletingPost}
+                style={[
+                  tw`w-full py-3 rounded-lg flex-row justify-center items-center mb-3`,
+                  { backgroundColor: isDeletingPost ? '#FCA5A5' : '#EF4444' }
+                ]}
+              >
+                {isDeletingPost ? (
+                  <>
+                    <ActivityIndicator size="small" color="#FFFFFF" style={tw`mr-2`} />
+                    <Text style={tw`text-center font-medium text-white`}>
+                      Deleting...
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={tw`text-center font-medium text-white`}>
+                    Delete Post
+                  </Text>
+                )}
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                onPress={() => setDeletePostModalVisible(false)}
+                disabled={isDeletingPost}
+                style={tw`w-full py-3 rounded-lg bg-gray-100`}
+              >
+                <Text style={tw`text-center font-medium text-gray-700`}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
     </SafeAreaView>
   );

@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, useWindowDimensions } from 'react-native';
-import { Bookmark, MoreHorizontal, User, MessageCircle, Flag, ChevronRight } from 'lucide-react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, useWindowDimensions, Modal, ActivityIndicator } from 'react-native';
+import { Bookmark, MoreHorizontal, User, MessageCircle, Flag, ChevronRight, Pencil, Trash2 } from 'lucide-react-native';
 import { getCategoryColors, getCategoryDisplayText } from '@/utils/categoryUtils';
 import ReportModal from '../common/ReportModal';
+import EditPostModal from './EditPostModal';
 import { ReportService } from '../../services/reportService';
 import Colors from '@/constants/Colors';
 import { BookmarkService } from '../../services/bookmarkService';
@@ -10,6 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { usePostBookmarks } from '../../contexts/PostBookmarksContext';
 import { getResponsiveValue } from '@/constants/LayoutConstants';
 import FadeInView from '../ui/FadeInView';
+import AnimatedCounter from '../ui/AnimatedCounter';
  
 import { VerifiedLawyerBadge } from '../common/VerifiedLawyerBadge';
 
@@ -23,8 +25,11 @@ interface PostProps {
     isLawyer?: boolean;
     account_status?: string;
   };
+  userId?: string; // Post owner's user ID for edit permission check
   timestamp: string;
   created_at?: string; // Raw timestamp for dynamic formatting
+  updated_at?: string; // Raw timestamp for when post was last edited
+  isEdited?: boolean; // Whether the post has been edited
   category: string;
   content: string;
   comments: number;
@@ -32,6 +37,10 @@ interface PostProps {
   onReportPress?: () => void;
   onBookmarkPress?: () => void;
   onPostPress?: () => void;
+  onEditSuccess?: (postId: string, newContent: string) => void; // Callback when edit is successful
+  onEditError?: (postId: string, originalContent: string) => void; // Callback to revert if edit fails
+  onSaveConfirmed?: () => void; // Called when backend confirms save (for toast)
+  onDeleteSuccess?: (postId: string) => void; // Callback when delete is successful
   index?: number; // For staggered animations
   isLoading?: boolean; // For optimistic posts
   isOptimistic?: boolean; // To identify optimistic posts
@@ -50,8 +59,11 @@ interface PostProps {
 const Post: React.FC<PostProps> = React.memo(({
   id,
   user,
+  userId,
   timestamp,
   created_at,
+  updated_at,
+  isEdited,
   category,
   content,
   comments,
@@ -59,6 +71,10 @@ const Post: React.FC<PostProps> = React.memo(({
   onReportPress,
   onBookmarkPress,
   onPostPress,
+  onEditSuccess,
+  onEditError,
+  onSaveConfirmed,
+  onDeleteSuccess,
   index = 0,
   isLoading = false,
   isOptimistic = false,
@@ -114,15 +130,14 @@ const Post: React.FC<PostProps> = React.memo(({
     
     return fullName;
   }, [responsive.useCompactName, isDeactivated]);
-  const [displayTime, setDisplayTime] = useState(() => {
-    // Initialize with formatted time
-    const dateToFormat = created_at || timestamp;
-    if (!dateToFormat) return 'now';
+  // Helper function to format relative time
+  const formatRelativeTime = (dateString: string | undefined) => {
+    if (!dateString) return 'now';
     try {
-      const createdMs = new Date(dateToFormat).getTime();
-      if (Number.isNaN(createdMs)) return 'now';
+      const dateMs = new Date(dateString).getTime();
+      if (Number.isNaN(dateMs)) return 'now';
       const now = Date.now();
-      const diffSec = Math.max(0, Math.floor((now - createdMs) / 1000));
+      const diffSec = Math.max(0, Math.floor((now - dateMs) / 1000));
       if (diffSec < 60) return `${diffSec}s`;
       const diffMin = Math.floor(diffSec / 60);
       if (diffMin < 60) return `${diffMin}m`;
@@ -139,7 +154,20 @@ const Post: React.FC<PostProps> = React.memo(({
     } catch {
       return 'now';
     }
+  };
+
+  const [displayTime, setDisplayTime] = useState(() => {
+    // Initialize with formatted time
+    const dateToFormat = created_at || timestamp;
+    return formatRelativeTime(dateToFormat);
   });
+  
+  // Calculate edited time display
+  const editedTimeDisplay = useMemo(() => {
+    if (!isEdited || !updated_at) return null;
+    return `Edited ${formatRelativeTime(updated_at)} ago`;
+  }, [isEdited, updated_at]);
+  
   const [showAlreadyReported, setShowAlreadyReported] = useState(false);
 
 
@@ -207,8 +235,12 @@ const Post: React.FC<PostProps> = React.memo(({
   }, [propIsBookmarked]);
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [isReportLoading, setIsReportLoading] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-
+  // Check if the current user owns this post
+  const isOwnPost = currentUser?.id && userId && currentUser.id === userId;
 
   // Remove individual bookmark status checks - now handled by parent Timeline component
 
@@ -332,6 +364,49 @@ const Post: React.FC<PostProps> = React.memo(({
     }
   }, [currentUser?.id, id, onReportPress, session]);
 
+  const handleEditPress = useCallback(() => {
+    setEditModalVisible(true);
+    onMenuToggle?.(id); // Close the menu
+  }, [id, onMenuToggle]);
+
+  const handleEditSuccess = useCallback((newContent: string) => {
+    setEditModalVisible(false);
+    onEditSuccess?.(id, newContent);
+  }, [id, onEditSuccess]);
+
+  const handleDeletePress = useCallback(() => {
+    setDeleteModalVisible(true);
+    onMenuToggle?.(id); // Close the menu
+  }, [id, onMenuToggle]);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    setIsDeleting(true);
+    try {
+      const { NetworkConfig } = await import('../../utils/networkConfig');
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/api/forum/posts/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData?.detail || 'Failed to delete post');
+      }
+      
+      setDeleteModalVisible(false);
+      onDeleteSuccess?.(id);
+    } catch (error: any) {
+      console.error('Error deleting post:', error);
+      const { Alert } = require('react-native');
+      Alert.alert('Error', error.message || 'Failed to delete post. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [id, session?.access_token, onDeleteSuccess]);
 
   // Clean category text by removing "Related Post" and simplifying names
   const cleanCategory = category?.trim() || '';
@@ -412,6 +487,12 @@ const Post: React.FC<PostProps> = React.memo(({
                 </>
               )}
               <Text style={[styles.timestamp, { fontSize: responsive.timestampFontSize }]}>{displayTime}</Text>
+              {editedTimeDisplay && (
+                <>
+                  <Text style={[styles.metaSeparator, { fontSize: responsive.timestampFontSize }]}> • </Text>
+                  <Text style={[styles.editedIndicator, { fontSize: responsive.timestampFontSize }]}>{editedTimeDisplay}</Text>
+                </>
+              )}
             </View>
             
             {/* Category Badge Row */}
@@ -473,6 +554,26 @@ const Post: React.FC<PostProps> = React.memo(({
                 }
               </Text>
             </TouchableOpacity>
+            {isOwnPost && (
+              <>
+                <View style={styles.menuDivider} />
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleEditPress}
+                >
+                  <Pencil size={16} color="#3B82F6" />
+                  <Text style={[styles.menuText, { color: '#3B82F6' }]}>Edit post</Text>
+                </TouchableOpacity>
+                <View style={styles.menuDivider} />
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleDeletePress}
+                >
+                  <Trash2 size={16} color="#EF4444" />
+                  <Text style={[styles.menuText, { color: '#EF4444' }]}>Delete post</Text>
+                </TouchableOpacity>
+              </>
+            )}
             <View style={styles.menuDivider} />
             <TouchableOpacity
               style={styles.menuItem}
@@ -488,9 +589,22 @@ const Post: React.FC<PostProps> = React.memo(({
         {/* Engagement Actions */}
         <View style={styles.actions}>
           <View style={styles.actionsLeft}>
-            <TouchableOpacity style={styles.actionButton} onPress={handleCommentPress}>
-              <MessageCircle size={18} color="#536471" />
-              <Text style={styles.actionCount}>{comments}</Text>
+            <TouchableOpacity 
+              style={styles.actionButton} 
+              onPress={handleCommentPress}
+              disabled={isLoading}
+            >
+              <MessageCircle size={18} color={isLoading ? "#9CA3AF" : "#536471"} />
+              {isLoading ? (
+                <View style={[styles.actionCount, { 
+                  backgroundColor: '#E5E7EB', 
+                  borderRadius: 4, 
+                  width: 20, 
+                  height: 14 
+                }]} />
+              ) : (
+                <AnimatedCounter count={comments} style={styles.actionCount} duration={250} />
+              )}
             </TouchableOpacity>
           </View>
           <TouchableOpacity style={styles.viewMoreButton} onPress={handlePostPress}>
@@ -511,7 +625,67 @@ const Post: React.FC<PostProps> = React.memo(({
           isLoading={isReportLoading}
           showAlreadyReported={showAlreadyReported}
         />
+
+        {/* Edit Post Modal */}
+        <EditPostModal
+          visible={editModalVisible}
+          onClose={() => setEditModalVisible(false)}
+          onSuccess={handleEditSuccess}
+          onError={(originalContent) => onEditError?.(id, originalContent)}
+          onSaveConfirmed={onSaveConfirmed}
+          postId={id}
+          initialContent={content}
+        />
+
       </TouchableOpacity>
+
+      {/* Delete Post Confirmation Modal - Outside TouchableOpacity for proper overlay */}
+      <Modal
+        visible={deleteModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setDeleteModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Delete Post</Text>
+            </View>
+            
+            <Text style={styles.modalDescription}>
+              Are you sure you want to delete this post? This action cannot be undone.
+            </Text>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                onPress={handleDeleteConfirm}
+                disabled={isDeleting}
+                style={[
+                  styles.deleteButton,
+                  isDeleting && styles.deleteButtonDisabled
+                ]}
+              >
+                {isDeleting ? (
+                  <View style={styles.deleteButtonContent}>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <Text style={styles.deleteButtonText}>Deleting...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.deleteButtonText}>Delete Post</Text>
+                )}
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                onPress={() => setDeleteModalVisible(false)}
+                disabled={isDeleting}
+                style={styles.cancelButton}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </FadeInView>
   );
 });
@@ -595,6 +769,11 @@ const styles = StyleSheet.create({
   timestamp: {
     fontSize: 12, // Will be overridden by responsive value
     color: '#536471',
+  },
+  editedIndicator: {
+    fontSize: 12, // Will be overridden by responsive value
+    color: '#6B7280', // Slightly lighter gray for edited indicator
+    fontStyle: 'italic',
   },
   moreButton: {
     padding: 4,
@@ -681,6 +860,72 @@ const styles = StyleSheet.create({
   },
   viewMoreButton: {
     padding: 4,
+  },
+  // Delete Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalHeader: {
+    padding: 24,
+    paddingBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  modalDescription: {
+    fontSize: 14,
+    color: '#4B5563',
+    lineHeight: 20,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+  },
+  modalButtons: {
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+  },
+  deleteButton: {
+    backgroundColor: '#EF4444',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  deleteButtonDisabled: {
+    backgroundColor: '#FCA5A5',
+  },
+  deleteButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  deleteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  cancelButton: {
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#374151',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 

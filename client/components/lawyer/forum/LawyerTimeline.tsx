@@ -14,6 +14,7 @@ import { NetworkConfig } from '../../../utils/networkConfig';
 import { useList } from '@/hooks/useOptimizedList';
 import { SkeletonList } from '@/components/ui/SkeletonLoader';
 import { getResponsiveValue } from '@/constants/LayoutConstants';
+import { supabase } from '@/lib/supabase';
 
 
 type ForumPostWithUser = {
@@ -47,7 +48,7 @@ type ForumPostWithUser = {
 const LawyerTimeline: React.FC = React.memo(() => {
   const router = useRouter();
   const { session, isAuthenticated, user: currentUser } = useAuth();
-  const { getCachedPosts, setCachedPosts, isCacheValid, updatePostBookmark, setLastFetchTime, prefetchPost, setCachedPost } = useForumCache();
+  const { getCachedPosts, setCachedPosts, isCacheValid, updatePostBookmark, updatePostCommentCount, setLastFetchTime, prefetchPost } = useForumCache();
   
   // Responsive sizing for create post button
   const insets = useSafeAreaInsets();
@@ -302,14 +303,101 @@ const LawyerTimeline: React.FC = React.memo(() => {
         return;
       }
 
-      if (!isCacheValid()) {
-        if (__DEV__) console.log('📱 LawyerTimeline: Screen focused, cache invalid - refreshing');
-        loadPosts(true); // Force refresh
-      } else {
-        if (__DEV__) console.log('📱 LawyerTimeline: Screen focused, cache valid - skipping refresh');
+      // Refresh from cache on focus to get updated comment counts
+      // ViewPost updates the cache, but we need to read the fresh data
+      const cachedPosts = getCachedPosts();
+      if (cachedPosts && cachedPosts.length > 0) {
+        setPosts(cachedPosts);
       }
-    }, [loadPosts, isCacheValid])
+    }, [getCachedPosts])
   );
+
+  // Real-time subscription for comment count updates (optimized with debouncing)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    if (__DEV__) {
+      console.log('📡 LawyerTimeline: Setting up real-time subscription for forum replies');
+    }
+    
+    // Debounce timer to batch rapid updates
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const pendingUpdates = new Map<string, number>();
+    
+    const applyPendingUpdates = () => {
+      if (pendingUpdates.size === 0) return;
+      
+      // Use requestAnimationFrame for smoother UI updates
+      requestAnimationFrame(() => {
+        setPosts(prevPosts => {
+          return prevPosts.map(post => {
+            const newCount = pendingUpdates.get(post.id);
+            if (newCount !== undefined) {
+              // Update cache once per batch
+              updatePostCommentCount(post.id, newCount);
+              return { ...post, comments: newCount };
+            }
+            return post;
+          });
+        });
+        
+        pendingUpdates.clear();
+      });
+    };
+    
+    const channel = supabase
+      .channel('forum_replies_timeline')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'forum_replies'
+        },
+        (payload) => {
+          const postId = (payload.new as any)?.post_id || (payload.old as any)?.post_id;
+          const userId = (payload.new as any)?.user_id || (payload.old as any)?.user_id;
+          
+          // Skip real-time updates for current user's own comments to prevent flicker
+          // Optimistic UI already handles these updates smoothly
+          if (userId === currentUser?.id) {
+            return;
+          }
+          
+          if (postId) {
+            const postIdStr = String(postId);
+            
+            // Find current count
+            setPosts(prevPosts => {
+              const post = prevPosts.find(p => p.id === postIdStr);
+              if (post) {
+                let newCount = post.comments;
+                
+                if (payload.eventType === 'INSERT') {
+                  newCount = post.comments + 1;
+                } else if (payload.eventType === 'DELETE') {
+                  newCount = Math.max(0, post.comments - 1);
+                }
+                
+                // Store update instead of applying immediately
+                pendingUpdates.set(postIdStr, newCount);
+                
+                // Debounce: apply updates after 100ms of no new events
+                if (debounceTimer) clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(applyPendingUpdates, 100);
+              }
+              return prevPosts; // Don't update yet
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      supabase.removeChannel(channel);
+    };
+  }, [isAuthenticated, updatePostCommentCount, currentUser?.id]);
 
   // Optimized polling with smart intervals (only when component is active)
   useEffect(() => {

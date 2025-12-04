@@ -66,6 +66,7 @@ interface ForumCacheContextType {
   isCacheValid: () => boolean;
   clearCache: () => void;
   updatePostBookmark: (postId: string, isBookmarked: boolean) => void;
+  updatePostCommentCount: (postId: string, count: number) => void;
   getLastFetchTime: () => number;
   setLastFetchTime: (time: number) => void;
   // Individual post caching
@@ -151,6 +152,32 @@ export const ForumCacheProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       posts: updatedPosts,
     });
   }, [cacheData]);
+
+  const updatePostCommentCount = useCallback((postId: string, count: number) => {
+    setCacheData(prevCache => {
+      if (!prevCache) return null;
+      
+      // Check if update is needed to avoid unnecessary re-renders
+      const existingPost = prevCache.posts.find(p => p.id === postId);
+      if (existingPost?.comments === count) {
+        return prevCache; // No change needed
+      }
+      
+      // Only update the specific post, not the entire array
+      const updatedPosts = prevCache.posts.map(post =>
+        post.id === postId ? { ...post, comments: count } : post
+      );
+      
+      if (__DEV__) {
+        console.log(`📊 ForumCache: Updated post ${postId} comment count to ${count}`);
+      }
+      
+      return {
+        ...prevCache,
+        posts: updatedPosts,
+      };
+    });
+  }, []);
 
   const getLastFetchTime = useCallback(() => {
     return lastFetchTimeRef.current;
@@ -276,6 +303,7 @@ export const ForumCacheProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         isCacheValid: () => false,
         clearCache: () => {},
         updatePostBookmark: () => {},
+        updatePostCommentCount: () => {},
         getLastFetchTime: () => 0,
         setLastFetchTime: () => {},
         getCachedPost: () => null,
@@ -293,6 +321,7 @@ export const ForumCacheProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       isCacheValid,
       clearCache,
       updatePostBookmark,
+      updatePostCommentCount,
       getLastFetchTime,
       setLastFetchTime,
       getCachedPost,
@@ -302,7 +331,7 @@ export const ForumCacheProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       isPostCacheValid,
       prefetchPost,
     };
-  }, [isInitialized, getCachedPosts, setCachedPosts, isCacheValid, clearCache, updatePostBookmark, getLastFetchTime, setLastFetchTime, getCachedPost, setCachedPost, getCachedPostFromForum, updatePostComments, isPostCacheValid, prefetchPost]);
+  }, [isInitialized, getCachedPosts, setCachedPosts, isCacheValid, clearCache, updatePostBookmark, updatePostCommentCount, getLastFetchTime, setLastFetchTime, getCachedPost, setCachedPost, getCachedPostFromForum, updatePostComments, isPostCacheValid, prefetchPost]);
 
   return (
     <ForumCacheContext.Provider value={value}>

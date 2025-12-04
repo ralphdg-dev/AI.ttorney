@@ -149,6 +149,225 @@ class CreatePostResponse(BaseModel):
     post_id: Optional[str] = None
 
 
+class UpdatePostRequest(BaseModel):
+    body: str = Field(..., min_length=1, max_length=5000)
+
+
+class UpdatePostResponse(BaseModel):
+    success: bool
+    message: str
+
+
+@router.put("/posts/{post_id}", response_model=UpdatePostResponse)
+async def update_post(
+    post_id: str,
+    body: UpdatePostRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Update an existing forum post. Only the post owner can update their post."""
+    try:
+        user_id = current_user["user"]["id"]
+        logger.info(f"✏️ Updating forum post {post_id} for user {user_id[:8]}...")
+        
+        supabase = SupabaseService()
+        
+        # First, verify the post exists and belongs to the current user
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
+            check_response = await client.get(
+                f"{supabase.rest_url}/forum_posts?select=id,user_id&id=eq.{post_id}",
+                headers=supabase._get_headers(use_service_key=True)
+            )
+        
+        if check_response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to verify post ownership")
+        
+        posts = check_response.json() if check_response.content else []
+        if not posts:
+            raise HTTPException(status_code=404, detail="Post not found")
+        
+        post = posts[0]
+        if post.get("user_id") != user_id:
+            raise HTTPException(status_code=403, detail="You can only edit your own posts")
+        
+        # Check user status (suspended/banned)
+        try:
+            violation_service = get_violation_tracking_service()
+            user_status = await violation_service.check_user_status(user_id)
+            
+            if not user_status["is_allowed"]:
+                logger.warning(f"🚫 User {user_id[:8]}... blocked: {user_status['account_status']}")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=user_status["reason"]
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"User status check failed: {str(e)}")
+        
+        # Validate content for promotional material
+        try:
+            promotional_validator = get_promotional_validator()
+            validation_result = await promotional_validator.validate_content(body.body.strip())
+            
+            if not validation_result["is_valid"]:
+                logger.warning(f"🚫 Edit blocked for user {user_id[:8]}: {validation_result['reason']}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "detail": validation_result["details"],
+                        "reason": validation_result["reason"],
+                        "violation_type": validation_result["violation_type"],
+                        "action_taken": "content_blocked"
+                    }
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Promotional validation failed: {str(e)}")
+        
+        # Content moderation
+        try:
+            moderation_service = get_moderation_service()
+            moderation_result = await moderation_service.moderate_content(body.body.strip())
+            
+            if not moderation_service.is_content_safe(moderation_result):
+                logger.warning(f"⚠️ Edit flagged for user {user_id[:8]}: {moderation_result['violation_summary']}")
+                
+                violation_service = get_violation_tracking_service()
+                violation_result = await violation_service.record_violation(
+                    user_id=user_id,
+                    violation_type=ViolationType.FORUM_POST,
+                    content_text=body.body.strip(),
+                    moderation_result=moderation_result,
+                    content_id=post_id
+                )
+                
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "detail": violation_result["message"],
+                        "action_taken": violation_result["action_taken"],
+                        "strike_count": violation_result["strike_count"],
+                        "suspension_count": violation_result["suspension_count"],
+                        "suspension_end": violation_result.get("suspension_end")
+                    }
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Content moderation failed: {str(e)}")
+        
+        # Update the post with is_edited flag and updated_at timestamp
+        from datetime import datetime, timezone
+        update_data = {
+            "body": body.body.strip(),
+            "is_edited": True,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        headers = supabase._get_headers(use_service_key=True)
+        headers["Prefer"] = "return=representation"
+        
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
+            response = await client.patch(
+                f"{supabase.rest_url}/forum_posts?id=eq.{post_id}",
+                json=update_data,
+                headers=headers
+            )
+        
+        if response.status_code not in (200, 204):
+            details = {}
+            try:
+                details = response.json() if response.content else {}
+            except Exception:
+                details = {"raw": response.text}
+            logger.error(f"Update post failed: {response.status_code} - {details}")
+            raise HTTPException(status_code=400, detail="Failed to update post")
+        
+        # Clear cache
+        clear_posts_cache()
+        
+        logger.info(f"✅ Post {post_id} updated successfully")
+        return UpdatePostResponse(success=True, message="Post updated successfully")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update forum post error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+class DeletePostResponse(BaseModel):
+    success: bool
+    message: str
+
+
+@router.delete("/posts/{post_id}", response_model=DeletePostResponse)
+async def delete_post(
+    post_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Soft delete a forum post (own posts only)."""
+    try:
+        user_id = current_user["user"]["id"]
+        logger.info(f"🗑️ Soft deleting post {post_id} from user {user_id[:8]}...")
+        
+        supabase = SupabaseService()
+        
+        # Verify the post exists and belongs to the current user
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
+            check_response = await client.get(
+                f"{supabase.rest_url}/forum_posts?id=eq.{post_id}&select=id,user_id",
+                headers=supabase._get_headers(use_service_key=True)
+            )
+        
+        if check_response.status_code != 200:
+            raise HTTPException(status_code=404, detail="Post not found")
+        
+        post_data = check_response.json()
+        if not post_data or len(post_data) == 0:
+            raise HTTPException(status_code=404, detail="Post not found")
+        
+        if post_data[0].get("user_id") != user_id:
+            raise HTTPException(status_code=403, detail="You can only delete your own posts")
+        
+        # Soft delete: set deleted_at timestamp
+        from datetime import datetime, timezone
+        update_data = {
+            "deleted_at": datetime.now(timezone.utc).isoformat()
+        }
+        headers = supabase._get_headers(use_service_key=True)
+        headers["Prefer"] = "return=representation"
+        
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
+            response = await client.patch(
+                f"{supabase.rest_url}/forum_posts?id=eq.{post_id}",
+                json=update_data,
+                headers=headers
+            )
+        
+        if response.status_code not in (200, 204):
+            details = {}
+            try:
+                details = response.json() if response.content else {}
+            except Exception:
+                details = {"raw": response.text}
+            logger.error(f"Delete post failed: {response.status_code} - {details}")
+            raise HTTPException(status_code=400, detail="Failed to delete post")
+        
+        # Clear cache
+        clear_posts_cache()
+        
+        logger.info(f"✅ Post {post_id} soft deleted successfully")
+        return DeletePostResponse(success=True, message="Post deleted successfully")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete post error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 @router.post("/posts", response_model=CreatePostResponse)
 async def create_post(
     body: CreatePostRequest,
@@ -332,7 +551,7 @@ async def list_my_posts(
         limit_param = f"&limit={limit}" if limit is not None else "&limit=10000"
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{supabase.rest_url}/forum_posts?select=*&user_id=eq.{user_id}&order=created_at.desc{limit_param}",
+                f"{supabase.rest_url}/forum_posts?select=*&user_id=eq.{user_id}&deleted_at=is.null&order=created_at.desc{limit_param}",
                 headers=supabase._get_headers(use_service_key=True)
             )
 
@@ -524,6 +743,7 @@ async def list_recent_posts(
                     f"?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)"
                     f"&order=created_at.desc"
                     f"&or=(is_flagged.is.null,is_flagged.eq.false)"
+                    f"&deleted_at=is.null"
                     f"&limit={limit}&offset={offset}"
                 )
                 posts_response = await client.get(posts_url, headers=posts_headers)
@@ -559,7 +779,7 @@ async def list_recent_posts(
                                                            
                         ids_param = ",".join(post_ids)
                                                                    
-                        replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&post_id=in.({ids_param})&hidden=eq.false&order=created_at.asc"
+                        replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&post_id=in.({ids_param})&hidden=eq.false&deleted_at=is.null&order=created_at.asc"
                         
                         logger.info(f" Fetching replies with URL: {replies_url}")
                         
@@ -576,7 +796,7 @@ async def list_recent_posts(
                             
                                                                    
                             logger.info(" Trying fallback query without users join...")
-                            fallback_url = f"{supabase.rest_url}/forum_replies?select=id,reply_body,created_at,user_id,is_anonymous,post_id&post_id=in.({ids_param})&hidden=eq.false&order=created_at.asc"
+                            fallback_url = f"{supabase.rest_url}/forum_replies?select=id,reply_body,created_at,updated_at,user_id,is_anonymous,is_edited,post_id&post_id=in.({ids_param})&hidden=eq.false&deleted_at=is.null&order=created_at.asc"
                             logger.info(f" Fallback URL: {fallback_url}")
                             
                             async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
@@ -688,7 +908,7 @@ async def get_post(post_id: str, current_user: Dict[str, Any] = Depends(get_curr
                                                   
         async with httpx.AsyncClient(timeout=get_timeout("http_upload")) as client:
             response = await client.get(
-                f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&id=eq.{post_id}&is_flagged=eq.false",
+                f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&id=eq.{post_id}&is_flagged=eq.false&deleted_at=is.null",
                 headers=supabase._get_headers(use_service_key=True)
             )
 
@@ -732,7 +952,7 @@ async def list_replies(post_id: str, current_user: Dict[str, Any] = Depends(get_
         supabase = SupabaseService()
                                                   
                                                    
-        replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&post_id=eq.{post_id}&hidden=eq.false&order=created_at.desc"
+        replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&post_id=eq.{post_id}&hidden=eq.false&deleted_at=is.null&order=created_at.desc"
         logger.info(f" Individual replies URL: {replies_url}")
         
         async with httpx.AsyncClient(timeout=get_timeout("http_upload")) as client:
@@ -762,7 +982,7 @@ async def list_replies(post_id: str, current_user: Dict[str, Any] = Depends(get_
             
                                                    
             logger.info(" Trying fallback individual replies query without users join...")
-            fallback_url = f"{supabase.rest_url}/forum_replies?select=*&post_id=eq.{post_id}&hidden=eq.false&order=created_at.desc"
+            fallback_url = f"{supabase.rest_url}/forum_replies?select=*&post_id=eq.{post_id}&hidden=eq.false&deleted_at=is.null&order=created_at.desc"
             logger.info(f" Fallback individual replies URL: {fallback_url}")
             
             async with httpx.AsyncClient(timeout=get_timeout("http_upload")) as client:
@@ -972,6 +1192,213 @@ async def create_reply(
     except Exception as e:
         logger.error(f"Create reply error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+class UpdateReplyRequest(BaseModel):
+    body: str = Field(..., min_length=1, max_length=5000)
+
+
+class UpdateReplyResponse(BaseModel):
+    success: bool
+    message: str
+
+
+@router.put("/replies/{reply_id}", response_model=UpdateReplyResponse)
+async def update_reply(
+    reply_id: str,
+    body: UpdateReplyRequest,
+    current_user: Dict[str, Any] = Depends(require_role("verified_lawyer"))
+):
+    """Update a forum reply (lawyers only, own replies only)."""
+    try:
+        user_id = current_user["user"]["id"]
+        logger.info(f"📝 Updating reply {reply_id} from lawyer {user_id[:8]}...")
+        
+        supabase = SupabaseService()
+        
+        # Verify the reply exists and belongs to the current user
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
+            check_response = await client.get(
+                f"{supabase.rest_url}/forum_replies?id=eq.{reply_id}&select=id,user_id",
+                headers=supabase._get_headers(use_service_key=True)
+            )
+        
+        if check_response.status_code != 200:
+            raise HTTPException(status_code=404, detail="Reply not found")
+        
+        reply_data = check_response.json()
+        if not reply_data or len(reply_data) == 0:
+            raise HTTPException(status_code=404, detail="Reply not found")
+        
+        if reply_data[0].get("user_id") != user_id:
+            raise HTTPException(status_code=403, detail="You can only edit your own replies")
+        
+        # Validate content for promotional/spam
+        try:
+            promotional_validator = get_promotional_validator()
+            validation_result = await promotional_validator.validate_content(body.body.strip())
+            
+            if not validation_result["is_valid"]:
+                logger.warning(f"🚫 Reply update blocked for lawyer {user_id[:8]}: {validation_result['reason']}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "detail": validation_result["details"],
+                        "reason": validation_result["reason"],
+                        "violation_type": validation_result["violation_type"],
+                        "action_taken": "content_blocked"
+                    }
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"⚠️ Promotional validation failed: {str(e)}")
+            logger.warning("⚠️ Proceeding with reply update (promotional validation failed)")
+        
+        # Moderate content
+        try:
+            moderation_service = get_moderation_service()
+            moderation_result = await moderation_service.moderate_content(body.body.strip())
+            
+            if not moderation_service.is_content_safe(moderation_result):
+                logger.warning(f"⚠️ Reply update flagged for lawyer {user_id[:8]}: {moderation_result['violation_summary']}")
+                
+                violation_service = get_violation_tracking_service()
+                violation_result = await violation_service.record_violation(
+                    user_id=user_id,
+                    violation_type=ViolationType.FORUM_REPLY,
+                    content_text=body.body.strip(),
+                    moderation_result=moderation_result,
+                    content_id=reply_id
+                )
+                
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "detail": violation_result["message"],
+                        "action_taken": violation_result["action_taken"],
+                        "strike_count": violation_result["strike_count"],
+                        "suspension_count": violation_result["suspension_count"],
+                        "suspension_end": violation_result.get("suspension_end")
+                    }
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"⚠️ Content moderation failed: {str(e)}")
+            logger.warning("⚠️ Proceeding with reply update (moderation service failed)")
+        
+        # Update the reply with is_edited flag and updated_at timestamp
+        from datetime import datetime, timezone
+        update_data = {
+            "reply_body": body.body.strip(),
+            "is_edited": True,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        headers = supabase._get_headers(use_service_key=True)
+        headers["Prefer"] = "return=representation"
+        
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
+            response = await client.patch(
+                f"{supabase.rest_url}/forum_replies?id=eq.{reply_id}",
+                json=update_data,
+                headers=headers
+            )
+        
+        if response.status_code not in (200, 204):
+            details = {}
+            try:
+                details = response.json() if response.content else {}
+            except Exception:
+                details = {"raw": response.text}
+            logger.error(f"Update reply failed: {response.status_code} - {details}")
+            raise HTTPException(status_code=400, detail="Failed to update reply")
+        
+        # Clear cache
+        clear_posts_cache()
+        clear_reply_counts_cache()
+        
+        logger.info(f"✅ Reply {reply_id} updated successfully")
+        return UpdateReplyResponse(success=True, message="Reply updated successfully")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update reply error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+class DeleteReplyResponse(BaseModel):
+    success: bool
+    message: str
+
+
+@router.delete("/replies/{reply_id}", response_model=DeleteReplyResponse)
+async def delete_reply(
+    reply_id: str,
+    current_user: Dict[str, Any] = Depends(require_role("verified_lawyer"))
+):
+    """Soft delete a forum reply (lawyers only, own replies only)."""
+    try:
+        user_id = current_user["user"]["id"]
+        logger.info(f"🗑️ Soft deleting reply {reply_id} from lawyer {user_id[:8]}...")
+        
+        supabase = SupabaseService()
+        
+        # Verify the reply exists and belongs to the current user
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
+            check_response = await client.get(
+                f"{supabase.rest_url}/forum_replies?id=eq.{reply_id}&select=id,user_id",
+                headers=supabase._get_headers(use_service_key=True)
+            )
+        
+        if check_response.status_code != 200:
+            raise HTTPException(status_code=404, detail="Reply not found")
+        
+        reply_data = check_response.json()
+        if not reply_data or len(reply_data) == 0:
+            raise HTTPException(status_code=404, detail="Reply not found")
+        
+        if reply_data[0].get("user_id") != user_id:
+            raise HTTPException(status_code=403, detail="You can only delete your own replies")
+        
+        # Soft delete: set deleted_at timestamp
+        from datetime import datetime, timezone
+        update_data = {
+            "deleted_at": datetime.now(timezone.utc).isoformat()
+        }
+        headers = supabase._get_headers(use_service_key=True)
+        headers["Prefer"] = "return=representation"
+        
+        async with httpx.AsyncClient(timeout=get_timeout("http_default")) as client:
+            response = await client.patch(
+                f"{supabase.rest_url}/forum_replies?id=eq.{reply_id}",
+                json=update_data,
+                headers=headers
+            )
+        
+        if response.status_code not in (200, 204):
+            details = {}
+            try:
+                details = response.json() if response.content else {}
+            except Exception:
+                details = {"raw": response.text}
+            logger.error(f"Delete reply failed: {response.status_code} - {details}")
+            raise HTTPException(status_code=400, detail="Failed to delete reply")
+        
+        # Clear cache
+        clear_posts_cache()
+        clear_reply_counts_cache()
+        
+        logger.info(f"✅ Reply {reply_id} soft deleted successfully")
+        return DeleteReplyResponse(success=True, message="Reply deleted successfully")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete reply error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 
 async def _send_forum_reply_notifications(supabase_service: SupabaseService, post_id: str, replier_id: str, reply_id: str):
     """Send notifications to post author and other commenters"""
