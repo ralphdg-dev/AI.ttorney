@@ -1681,8 +1681,9 @@ const ViewPost: React.FC = () => {
               tw`bg-white border-t border-gray-200`, 
               { 
                 paddingHorizontal: responsive.horizontalPadding, 
-                paddingVertical: LAYOUT.SPACING.sm, 
-                paddingBottom: isKeyboardVisible ? 8 : getSafeBottomPosition(insets.bottom, 16),
+                paddingTop: LAYOUT.SPACING.sm,
+                paddingBottom: isKeyboardVisible ? 8 : insets.bottom || 0,
+                marginTop: isKeyboardVisible ? 0 : -12,
               }
             ]}
           >
