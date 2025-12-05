@@ -1682,7 +1682,9 @@ const ViewPost: React.FC = () => {
               { 
                 paddingHorizontal: responsive.horizontalPadding, 
                 paddingTop: LAYOUT.SPACING.sm,
-                paddingBottom: isKeyboardVisible ? 8 : insets.bottom || 0,
+                // Use a consistent small bottom padding and only add safe-area inset on iOS
+                // to avoid leaving a large gap when the keyboard is dismissed on Android.
+                paddingBottom: Platform.OS === 'ios' ? (insets.bottom + 8) : 8,
                 marginTop: isKeyboardVisible ? 0 : -12,
               }
             ]}
