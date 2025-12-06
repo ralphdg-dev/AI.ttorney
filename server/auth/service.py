@@ -341,12 +341,9 @@ class AuthService:
             logger.info(f"📊 Current profile before update: role={current_profile.get('role')}, is_verified={current_profile.get('is_verified')}")
             
             # Step 2: Update user profile in database
+            # Only mark as verified, keep guest role until user selects their role
             profile_update_response = await self.supabase.update_user_profile(
-                {
-                    "is_verified": True,
-                    # Set role to registered_user if it's currently guest
-                    "role": "registered_user" if current_profile.get("role") == "guest" else current_profile.get("role")
-                },
+                {"is_verified": True},
                 {"email": email}
             )
             
