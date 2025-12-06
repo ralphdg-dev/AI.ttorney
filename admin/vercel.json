@@ -9,41 +9,46 @@
       }
     }
   ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        },
-        {
-          "key": "Content-Security-Policy",
-          "value": "frame-ancestors 'none';"
-        }
-      ]
-    }
-  ],
   "routes": [
     {
       "src": "/static/(.*)",
-      "dest": "/static/$1"
+      "dest": "/static/$1",
+      "headers": {
+        "X-Frame-Options": "DENY",
+        "Content-Security-Policy": "frame-ancestors 'none';"
+      }
     },
     {
       "src": "/favicon.ico",
-      "dest": "/favicon.ico"
+      "dest": "/favicon.ico",
+      "headers": {
+        "X-Frame-Options": "DENY",
+        "Content-Security-Policy": "frame-ancestors 'none';"
+      }
     },
     {
       "src": "/manifest.json",
-      "dest": "/manifest.json"
+      "dest": "/manifest.json",
+      "headers": {
+        "X-Frame-Options": "DENY",
+        "Content-Security-Policy": "frame-ancestors 'none';"
+      }
     },
     {
       "src": "/logo(.*)",
-      "dest": "/logo$1"
+      "dest": "/logo$1",
+      "headers": {
+        "X-Frame-Options": "DENY",
+        "Content-Security-Policy": "frame-ancestors 'none';"
+      }
     },
     {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "/index.html",
+      "headers": {
+        "X-Frame-Options": "DENY",
+        "Content-Security-Policy": "frame-ancestors 'none';"
+      }
     }
   ],
   "env": {
