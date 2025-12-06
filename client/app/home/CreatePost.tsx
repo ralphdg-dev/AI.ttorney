@@ -106,6 +106,12 @@ const CreatePost: React.FC = () => {
             </TouchableOpacity>
           </View>
 
+          {/* Anonymous toggle */}
+          <View style={styles.anonRow}>
+            <Text style={styles.anonLabel}>Post anonymously</Text>
+            <CustomToggle value={isAnonymous} onValueChange={setIsAnonymous} size="md" />
+          </View>
+
           {/* Categories - reused design from Legal Guides/Terms */}
           <View style={styles.categoriesWrapper}>
             <View style={styles.chooseCategoryHeader}>
@@ -139,12 +145,6 @@ const CreatePost: React.FC = () => {
               textAlignVertical="top"
               autoFocus
             />
-          </View>
-
-          {/* Anonymous toggle */}
-          <View style={styles.anonRow}>
-            <Text style={styles.anonLabel}>Post anonymously</Text>
-            <CustomToggle value={isAnonymous} onValueChange={setIsAnonymous} size="md" />
           </View>
         </View>
       </KeyboardAvoidingView>
