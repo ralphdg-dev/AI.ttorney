@@ -1,0 +1,44 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # AI.ttorney Server Metrics
+  - job_name: 'ai-attorney-server'
+    static_configs:
+      - targets: ['ai-attorney-server:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # JMeter Metrics (if using JMeter with Prometheus plugin)
+  - job_name: 'jmeter'
+    static_configs:
+      - targets: ['jmeter:9270']
+    scrape_interval: 5s
+
+  # PostgreSQL Exporter (optional)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 10s
+
+  # Redis Exporter (optional)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 10s
+
+  # Node Exporter for system metrics (optional)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 10s
