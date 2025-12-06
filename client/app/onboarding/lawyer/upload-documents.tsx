@@ -103,7 +103,7 @@ export default function LawyerReg() {
           const uploadResult = await lawyerApplicationService.uploadIbpIdCard({
             uri: asset.uri,
             name: asset.name,
-            type: asset.mimeType,
+            type: asset.mimeType || 'image/jpeg',
           });
           
           console.log('Upload result:', uploadResult);
