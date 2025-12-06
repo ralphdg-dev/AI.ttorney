@@ -148,7 +148,8 @@ class ApiClient {
       );
 
       // Retry logic for network errors
-      if (isNetworkError && retryAttempt < this.maxRetries) {
+      // IMPORTANT: Never retry OTP requests as each retry generates a new OTP
+      if (isNetworkError && retryAttempt < this.maxRetries && !endpoint.includes('/auth/send-otp')) {
         console.warn(`⚠️ Network error on attempt ${retryAttempt + 1}, retrying in ${this.retryDelay}ms...`);
         
         // Wait before retrying
