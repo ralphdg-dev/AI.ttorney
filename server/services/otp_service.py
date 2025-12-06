@@ -376,7 +376,8 @@ class OTPService:
                 with smtplib.SMTP_SSL(self.smtp_server, 465, context=context, timeout=get_timeout("smtp")) as server:
                     server.login(self.smtp_username, self.smtp_password)
                     server.sendmail(self.from_email, [email], text)
-                    
+                
+                # Email sent successfully - return immediately to prevent other strategies from running
                 logger.info(f"Strategy 1 SUCCESS: OTP email sent to {email} via secure Gmail SSL")
                 return {
                     "success": True,
@@ -407,7 +408,8 @@ class OTPService:
                     server.starttls(context=context)
                     server.login(self.smtp_username, self.smtp_password)
                     server.sendmail(self.from_email, [email], text)
-                    
+                
+                # Email sent successfully - return immediately to prevent Strategy 3 from running
                 logger.info(f"Strategy 2 SUCCESS: OTP email sent to {email} via Gmail STARTTLS")
                 return {
                     "success": True,
@@ -441,7 +443,8 @@ class OTPService:
                     server.ehlo()
                     server.login(self.smtp_username, self.smtp_password)
                     server.sendmail(self.from_email, [email], text)
-                    
+                
+                # Email sent successfully - return immediately
                 logger.info(f"Strategy 3 SUCCESS: OTP email sent to {email} with maximum compatibility")
                 return {
                     "success": True,
