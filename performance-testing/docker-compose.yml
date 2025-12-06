@@ -1,0 +1,132 @@
+version: '3.8'
+
+services:
+  # AI.ttorney Server
+  ai-attorney-server:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/ai_attorney
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - performance-network
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=ai_attorney
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - performance-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - performance-network
+
+  # JMeter Performance Testing
+  jmeter:
+    image: justb4/jmeter:5.6.3
+    depends_on:
+      ai-attorney-server:
+        condition: service_healthy
+    volumes:
+      - ./ai-attorney-jmeter-test.jmx:/tests/ai-attorney-jmeter-test.jmx
+      - ./performance-results:/results
+      - ./jmeter.properties:/opt/jmeter/jmeter.properties
+    command: >
+      sh -c "
+        echo 'Waiting for AI.ttorney server...' &&
+        until curl -f http://ai-attorney-server:8000/health; do
+          echo 'Server not ready, waiting...'
+          sleep 5
+        done &&
+        echo 'Server is ready, starting performance tests...' &&
+        jmeter -n -t /tests/ai-attorney-jmeter-test.jmx 
+               -JBASE_URL=http://ai-attorney-server:8000 
+               -l /results/results_$(date +%Y%m%d_%H%M%S).jtl 
+               -j /results/jmeter_$(date +%Y%m%d_%H%M%S).log &&
+        echo 'Performance tests completed!' &&
+        jmeter -g /results/results_$(date +%Y%m%d_%H%M%S).jtl -o /results/report_$(date +%Y%m%d_%H%M%S)
+      "
+    networks:
+      - performance-network
+
+  # Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - performance-network
+
+  # Monitoring with Grafana
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - performance-network
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  performance-network:
+    driver: bridge
