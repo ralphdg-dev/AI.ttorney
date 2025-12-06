@@ -361,118 +361,63 @@ class OTPService:
             return {"success": False, "error": str(e)}
     
     def _send_email_blocking(self, email: str, message: MIMEMultipart) -> Dict[str, Any]:
-        """Blocking SMTP email sending - to be run in thread pool"""
-        try:
-            text = message.as_string()
-            
-            # Strategy 1: SMTP_SSL on port 465 (most secure)
+        text = message.as_string()
+        success_response = {"success": True, "message": "OTP email sent successfully"}
+        
+        strategies = [
+            ("SMTP_SSL/465", lambda: self._smtp_ssl_strategy(email, text)),
+            ("STARTTLS/587", lambda: self._starttls_strategy(email, text)),
+            ("Compatibility", lambda: self._compatibility_strategy(email, text))
+        ]
+        
+        for strategy_name, strategy_func in strategies:
             try:
-                logger.info("Strategy 1: Attempting Gmail SMTP_SSL on port 465 (recommended)")
-                
-                context = ssl.create_default_context()
-                context.check_hostname = False
-                context.verify_mode = ssl.CERT_NONE
-                
-                with smtplib.SMTP_SSL(self.smtp_server, 465, context=context, timeout=get_timeout("smtp")) as server:
-                    server.login(self.smtp_username, self.smtp_password)
-                    server.sendmail(self.from_email, [email], text)
-                    
-                logger.info(f"Strategy 1 SUCCESS: OTP email sent to {email} via secure Gmail SSL")
-                return {
-                    "success": True,
-                    "message": "OTP email sent successfully"
-                }
-                
-            except smtplib.SMTPAuthenticationError as auth_error:
-                logger.error(f"SMTP Authentication Error: {auth_error}")
-                return {"success": False, "error": "Email service authentication failed. Please check SMTP credentials."}
-                
-            except smtplib.SMTPException as smtp_error:
-                logger.error(f"Strategy 1 FAILED (SMTP Error): {smtp_error}")
-                # Continue to next strategy
-            except Exception as strategy1_error:
-                logger.error(f"Strategy 1 FAILED: {strategy1_error}")
-                # Continue to next strategy
-            
-            # Strategy 2: STARTTLS on port 587 (standard)
-            try:
-                logger.info("Strategy 2: Attempting Gmail STARTTLS on port 587 with relaxed SSL")
-                
-                context = ssl.create_default_context()
-                context.check_hostname = False
-                context.verify_mode = ssl.CERT_NONE
-                context.minimum_version = ssl.TLSVersion.TLSv1_2
-                
-                with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=get_timeout("smtp")) as server:
-                    server.starttls(context=context)
-                    server.login(self.smtp_username, self.smtp_password)
-                    server.sendmail(self.from_email, [email], text)
-                    
-                logger.info(f"Strategy 2 SUCCESS: OTP email sent to {email} via Gmail STARTTLS")
-                return {
-                    "success": True,
-                    "message": "OTP email sent successfully"
-                }
-                
-            except smtplib.SMTPAuthenticationError as auth_error:
-                logger.error(f"SMTP Authentication Error: {auth_error}")
-                return {"success": False, "error": "Email service authentication failed. Please check SMTP credentials."}
-                
-            except smtplib.SMTPException as smtp_error:
-                logger.error(f"Strategy 2 FAILED (SMTP Error): {smtp_error}")
-                # Continue to next strategy
-            except Exception as strategy2_error:
-                logger.error(f"Strategy 2 FAILED: {strategy2_error}")
-                # Continue to next strategy
-            
-            # Strategy 3: Maximum compatibility mode
-            try:
-                logger.info("Strategy 3: Attempting with maximum SSL compatibility")
-                
-                context = ssl.create_default_context()
-                context.check_hostname = False
-                context.verify_mode = ssl.CERT_NONE
-                context.set_ciphers('DEFAULT@SECLEVEL=1')
-                context.minimum_version = ssl.TLSVersion.TLSv1
-                
-                with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=get_timeout("smtp")) as server:
-                    server.ehlo()
-                    server.starttls(context=context)
-                    server.ehlo()
-                    server.login(self.smtp_username, self.smtp_password)
-                    server.sendmail(self.from_email, [email], text)
-                    
-                logger.info(f"Strategy 3 SUCCESS: OTP email sent to {email} with maximum compatibility")
-                return {
-                    "success": True,
-                    "message": "OTP email sent successfully"
-                }
-                
-            except smtplib.SMTPAuthenticationError as auth_error:
-                logger.error(f"SMTP Authentication Error: {auth_error}")
-                return {"success": False, "error": "Email service authentication failed. Please check SMTP credentials."}
-                
-            except Exception as strategy3_error:
-                logger.error(f"Strategy 3 FAILED: {strategy3_error}")
-                logger.error("ALL SECURE STRATEGIES FAILED")
-                
-                # Detailed error logging
-                logger.error(f"SMTP Server: {self.smtp_server}:{self.smtp_port}")
-                logger.error(f"Username: {self.smtp_username}")
-                logger.error(f"Password configured: {'Yes' if self.smtp_password else 'No'}")
-                logger.error(f"Target email: {email}")
-                logger.error(f"Error type: {type(strategy3_error).__name__}")
-                
-                # Return user-friendly error
-                return {
-                    "success": False, 
-                    "error": "Unable to send verification email. Please check your email address or try again later."
-                }
-                
-        except Exception as e:
-            logger.error(f"Send email blocking error: {str(e)}")
-            logger.error(f"Error type: {type(e).__name__}")
-            return {"success": False, "error": "Failed to send verification email. Please try again later."}
+                logger.info(f"Attempting {strategy_name}")
+                strategy_func()
+                logger.info(f"{strategy_name} SUCCESS")
+                return success_response
+            except smtplib.SMTPAuthenticationError as e:
+                logger.error(f"Auth failed: {e}")
+                return {"success": False, "error": "Email service authentication failed"}
+            except Exception as e:
+                logger.error(f"{strategy_name} failed: {e}")
+                continue
+        
+        return {"success": False, "error": "Unable to send verification email"}
+    
+    def _smtp_ssl_strategy(self, email: str, text: str):
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        
+        with smtplib.SMTP_SSL(self.smtp_server, 465, context=context, timeout=get_timeout("smtp")) as server:
+            server.login(self.smtp_username, self.smtp_password)
+            server.sendmail(self.from_email, [email], text)
+    
+    def _starttls_strategy(self, email: str, text: str):
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        
+        with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=get_timeout("smtp")) as server:
+            server.starttls(context=context)
+            server.login(self.smtp_username, self.smtp_password)
+            server.sendmail(self.from_email, [email], text)
+    
+    def _compatibility_strategy(self, email: str, text: str):
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        context.set_ciphers('DEFAULT@SECLEVEL=1')
+        context.minimum_version = ssl.TLSVersion.TLSv1
+        
+        with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=get_timeout("smtp")) as server:
+            server.ehlo()
+            server.starttls(context=context)
+            server.ehlo()
+            server.login(self.smtp_username, self.smtp_password)
+            server.sendmail(self.from_email, [email], text)
 
     async def send_otp_email(self, email: str, otp_code: str, user_name: str, otp_type: str) -> Dict[str, Any]:
         """Send OTP email using SMTP - properly async by running blocking I/O in thread pool"""

@@ -68,7 +68,7 @@ export default function ConsultationCard({ consultation, index, onViewDetails }:
               color: Colors.text.head,
             }}
           >
-            {lawyerName}
+            Atty. {lawyerName}
           </UIText>
           {/* Specialization badges - same style as Legal Directory */}
           <HStack className="flex-wrap items-center mt-1">

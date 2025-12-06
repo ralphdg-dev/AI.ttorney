@@ -477,54 +477,58 @@ const LawyerProfilePage: React.FC = () => {
     try {
       setIsProfileLoading(true);
       
-      // Use server API instead of direct Supabase queries
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        console.error("No authentication token found");
-        return;
-      }
+      // Direct Supabase queries - faster than going through backend API
+      // Fetch both queries in parallel for maximum speed
+      const [lawyerResult, professionalResult] = await Promise.all([
+        supabase
+          .from("lawyer_info")
+          .select("*")
+          .eq("lawyer_id", user.id)
+          .single(),
+        supabase
+          .from("lawyer_applications")
+          .select("roll_number, roll_signing_date")
+          .eq("user_id", user.id)
+          .single()
+      ]);
 
-      const result = await lawyerProfileService.getLawyerProfile(session.access_token);
+      const lawyerInfo = lawyerResult.data;
+      const professionalInfo = professionalResult.data;
       
-      if (result.success && result.data) {
-        const lawyerInfo = result.data.lawyer_info;
-        const professionalInfo = result.data.professional_info;
-        
-        if (lawyerInfo) {
-          setIsAcceptingConsultations(!!lawyerInfo.accepting_consultations);
-          setLawyerContactInfo({
-            phone_number: lawyerInfo.phone_number || "",
-            location: lawyerInfo.location || "",
-            bio: lawyerInfo.bio || "",
-            specializations: Array.isArray(lawyerInfo.specialization) 
-              ? lawyerInfo.specialization.join(", ")
-              : (typeof lawyerInfo.specialization === 'string' 
-                  ? lawyerInfo.specialization.replace(/[\[\]"]/g, '').replace(/,/g, ', ')
-                  : ""),
-            days: lawyerInfo.days || "",
-            hours_available: lawyerInfo.hours_available || "",
-          });
-        } else {
-          // No lawyer info found - set defaults
-          console.log("No lawyer info found for user:", user.id);
-          setIsAcceptingConsultations(false);
-          setLawyerContactInfo({
-            phone_number: "",
-            location: "",
-            bio: "",
-            specializations: "",
-            days: "",
-            hours_available: "",
-          });
-        }
-        
-        // Update professional info if available
-        if (professionalInfo) {
-          setProfessionalInfo({
-            rollNumber: professionalInfo.roll_number || "",
-            rollSigningDate: professionalInfo.roll_signing_date || "",
-          });
-        }
+      if (lawyerInfo) {
+        setIsAcceptingConsultations(!!lawyerInfo.accepting_consultations);
+        setLawyerContactInfo({
+          phone_number: lawyerInfo.phone_number || "",
+          location: lawyerInfo.location || "",
+          bio: lawyerInfo.bio || "",
+          specializations: Array.isArray(lawyerInfo.specialization) 
+            ? lawyerInfo.specialization.join(", ")
+            : (typeof lawyerInfo.specialization === 'string' 
+                ? lawyerInfo.specialization.replace(/[\[\]"]/g, '').replace(/,/g, ', ')
+                : ""),
+          days: lawyerInfo.days || "",
+          hours_available: lawyerInfo.hours_available || "",
+        });
+      } else {
+        // No lawyer info found - set defaults
+        console.log("No lawyer info found for user:", user.id);
+        setIsAcceptingConsultations(false);
+        setLawyerContactInfo({
+          phone_number: "",
+          location: "",
+          bio: "",
+          specializations: "",
+          days: "",
+          hours_available: "",
+        });
+      }
+      
+      // Update professional info if available
+      if (professionalInfo) {
+        setProfessionalInfo({
+          rollNumber: professionalInfo.roll_number || "",
+          rollSigningDate: professionalInfo.roll_signing_date || "",
+        });
       }
     } catch (error) {
       console.error("Error in fetchLawyerContactInfo:", error);
@@ -888,27 +892,20 @@ const LawyerProfilePage: React.FC = () => {
 
               <View
                 style={[
-                  tw`self-start px-2 py-1 rounded-md`,
+                  tw`self-start px-2 py-0.5 rounded-full`,
                   { 
                     backgroundColor: "#ECFDF5",
                     borderColor: "#A7F3D0",
                     borderWidth: 1,
-                    minWidth: screenWidth * 0.25, // Ensure minimum width for text
-                    maxWidth: screenWidth * 0.4,  // Prevent overflow
                   },
                 ]}
               >
                 <Text 
                   style={[
-                    tw`font-semibold text-green-700`,
-                    { 
-                      fontSize: Math.max(10, screenWidth * 0.028), // Responsive font size with minimum
-                      textAlign: 'center',
-                    }
+                    tw`font-medium text-green-700`,
+                    { fontSize: 11 }
                   ]}
                   numberOfLines={1}
-                  adjustsFontSizeToFit={true}
-                  minimumFontScale={0.8}
                 >
                   {profileData.verificationStatus}
                 </Text>
