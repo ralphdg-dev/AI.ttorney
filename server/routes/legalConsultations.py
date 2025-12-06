@@ -25,7 +25,7 @@ class Lawyer(BaseModel):
     id: uuid.UUID
     lawyer_id: uuid.UUID
     name: str
-    bio: str
+    bio: Optional[str] = None
     specialization: Optional[List[str]] = None                                  
     location: Optional[str] = None
     hours: Optional[str] = None              
@@ -34,7 +34,7 @@ class Lawyer(BaseModel):
     hours_available: Optional[dict] = None
     profile_photo: Optional[str] = None
     photo_url: Optional[str] = None                                                
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
