@@ -17,6 +17,8 @@ import { getContentBottomPadding } from "../../constants/LayoutConstants";
 import Colors from "../../constants/Colors";
 import { apiClient } from "../../lib/api-client";
 import { useAuth } from "../../contexts/AuthContext";
+import { useToast } from "../../components/ui/toast";
+import { createSafeAreaToastRenderer } from "../../components/ui/SafeAreaToast";
 import otpsent from "../../assets/images/otpsent.png";
 
 export default function VerifyOTP() {
@@ -24,6 +26,7 @@ export default function VerifyOTP() {
   const params = useLocalSearchParams();
   const email = typeof params.email === 'string' ? params.email : "user@example.com";
   const { signIn, refreshUserData } = useAuth();
+  const toast = useToast();
 
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
@@ -167,12 +170,17 @@ export default function VerifyOTP() {
         console.log('✅ Email verified successfully!');
         console.log('🔍 Debug - Success result:', result);
 
-        // Show success alert
-        Alert.alert(
-          "✓ Email Verified",
-          "Your email has been successfully verified!",
-          [{ text: "OK" }]
-        );
+        toast.show({
+          placement: 'top',
+          duration: 3000,
+          render: createSafeAreaToastRenderer(
+            'top',
+            'success',
+            'solid',
+            'Email Verified',
+            'Your email has been successfully verified!'
+          ),
+        });
 
         // Store verified email so we can reference it later (e.g., role selection)
         await AsyncStorage.setItem('user_email', email);
