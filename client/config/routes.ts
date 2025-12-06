@@ -359,13 +359,13 @@ export const getRoleBasedRedirect = (role: UserRole, isVerified?: boolean, pendi
     case 'superadmin':
       return '/admin';
     case 'registered_user':
-      return '/home'; // Use the correct Expo Router path
+      return '/home';
     case 'authenticated':
-      return '/home'; // Handle 'authenticated' role properly
+      return '/home';
     case 'guest':
       return isVerified ? '/role-selection' : '/login';
     default:
-      return '/home'; // Use the correct Expo Router path
+      return '/home';
   }
 };
 

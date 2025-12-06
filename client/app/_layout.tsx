@@ -83,7 +83,9 @@ function AppContent() {
                                 <Stack.Screen name="unauthorized" options={{ headerShown: false }} />
 
                                 {/* User Routes */}
-                                <Stack.Screen name="home" options={{ headerShown: false }} />
+                                <Stack.Screen name="home/index" options={{ headerShown: false }} />
+                                <Stack.Screen name="home/CreatePost" options={{ headerShown: false }} />
+                                <Stack.Screen name="home/ViewPost" options={{ headerShown: false }} />
                                 <Stack.Screen name="chatbot" options={{ headerShown: false }} />
                                 <Stack.Screen name="directory" options={{ headerShown: false }} />
                                 <Stack.Screen name="guides" options={{ headerShown: false }} />
@@ -104,21 +106,25 @@ function AppContent() {
                                 <Stack.Screen name="booklawyer" options={{ headerShown: false }} />
                                 <Stack.Screen name="guest-onboarding" options={{ headerShown: false }} />
 
-                                {/* Article Routes */}
-                                <Stack.Screen name="article/[id]" options={{ headerShown: false }} />
+                                {/* Article Routes - has its own _layout.tsx */}
+                                <Stack.Screen name="article" options={{ headerShown: false }} />
 
                                 {/* Auth Routes */}
                                 <Stack.Screen name="auth/forgot-password" options={{ headerShown: false }} />
+                                <Stack.Screen name="auth/forgot-password-supabase-simple" options={{ headerShown: false }} />
 
                                 {/* Lawyer Routes */}
                                 <Stack.Screen name="lawyer/index" options={{ headerShown: false }} />
+                                <Stack.Screen name="lawyer/CreatePost" options={{ headerShown: false }} />
+                                <Stack.Screen name="lawyer/ViewPost" options={{ headerShown: false }} />
                                 <Stack.Screen name="lawyer/forum" options={{ headerShown: false }} />
                                 <Stack.Screen name="lawyer/consult" options={{ headerShown: false }} />
                                 <Stack.Screen name="lawyer/profile" options={{ headerShown: false }} />
+                                <Stack.Screen name="lawyer/consultation/ConsultationCardSkeleton" options={{ headerShown: false }} />
                                 <Stack.Screen name="lawyer/consultation/[id]" options={{ headerShown: false }} />
 
                                 {/* Settings Routes */}
-                                <Stack.Screen name="settings" options={{ headerShown: false }} />
+                                <Stack.Screen name="settings/index" options={{ headerShown: false }} />
                                 <Stack.Screen name="settings/about-us" options={{ headerShown: false }} />
                                 <Stack.Screen name="settings/privacy-policy" options={{ headerShown: false }} />
                                 <Stack.Screen name="settings/terms" options={{ headerShown: false }} />
