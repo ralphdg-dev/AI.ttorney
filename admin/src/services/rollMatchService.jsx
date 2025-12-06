@@ -42,20 +42,50 @@ class RollMatchService {
   }
 
   /**
-   * [NEW] Helper function to convert "August 29, 2024" to "2024-08-29"
+   * [NEW] Helper function to convert "August 29, 2024" or "Aug 29, 2024" to "2024-08-29"
+   * Supports both full month names (January, February, etc.) and abbreviated (Jan, Feb, etc.)
    */
   _normalizeJsonDate(dateString) {
     if (!dateString || dateString.trim() === "") {
       return null;
     }
     try {
+      // Month mapping - supports both full and abbreviated names (case-insensitive)
+      const monthMap = {
+        // Full names
+        'january': '01', 'february': '02', 'march': '03', 'april': '04',
+        'may': '05', 'june': '06', 'july': '07', 'august': '08',
+        'september': '09', 'october': '10', 'november': '11', 'december': '12',
+        // Abbreviated names
+        'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04',
+        'jun': '06', 'jul': '07', 'aug': '08',
+        'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12',
+        // Alternative abbreviations
+        'sept': '09'
+      };
+
+      const trimmed = dateString.trim();
+
+      // Try to parse format: "Month DD, YYYY" or "Mon DD, YYYY"
+      const match = trimmed.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s*(\d{4})$/);
+      if (match) {
+        const monthName = match[1].toLowerCase();
+        const day = match[2].padStart(2, "0");
+        const year = match[3];
+
+        const monthNum = monthMap[monthName];
+        if (monthNum) {
+          return `${year}-${monthNum}-${day}`;
+        }
+      }
+
+      // Fallback to native Date parsing if custom parsing fails
       const date = new Date(dateString);
       if (isNaN(date.getTime())) {
-        // Check for invalid date
         return null;
       }
       const year = date.getFullYear();
-      const month = (date.getMonth() + 1).toString().padStart(2, "0"); // getMonth() is 0-indexed
+      const month = (date.getMonth() + 1).toString().padStart(2, "0");
       const day = date.getDate().toString().padStart(2, "0");
       return `${year}-${month}-${day}`;
     } catch (error) {
