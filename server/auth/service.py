@@ -129,20 +129,6 @@ class AuthService:
                                         
             final_profile = await self.supabase.get_user_profile(auth_user["id"])
             
-            # Send verification OTP immediately after successful registration
-            try:
-                from services.otp_service import OTPService
-                otp_service = OTPService()
-                logger.info(f"Sending verification OTP for new registration: {user_data.email}")
-                
-                otp_result = await otp_service.send_verification_otp(user_data.email, user_data.full_name)
-                if otp_result["success"]:
-                    logger.info(f"✅ Verification OTP sent to {user_data.email}")
-                else:
-                    logger.error(f"❌ Failed to send verification OTP: {otp_result.get('error', 'Unknown error')}")
-            except Exception as otp_error:
-                logger.error(f"❌ Error sending verification OTP: {str(otp_error)}")
-            
             return {
                 "success": True,
                 "user": auth_user,
