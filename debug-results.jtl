@@ -1,0 +1,3 @@
+timeStamp,elapsed,label,responseCode,responseMessage,threadName,dataType,success,failureMessage,bytes,sentBytes,grpThreads,allThreads,URL,Latency,IdleTime,Connect
+1765120430559,1122,Health Check,200,OK,Single User Test 1-1,text,true,,634,144,1,1,https://aittorney-production.up.railway.app/health,1118,0,593
+1765120451907,1095,Health Check,200,OK,Single User Test 1-1,text,true,,634,144,1,1,https://aittorney-production.up.railway.app/health,1092,0,513
