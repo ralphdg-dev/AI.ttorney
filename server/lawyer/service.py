@@ -577,20 +577,36 @@ class LawyerApplicationService:
             if application.get("status") != "rejected":
                 return {"success": False, "error": "Application is not rejected"}
             
-            # Update acknowledged field
+            # Update acknowledged field and clear pending_lawyer flag
             async with httpx.AsyncClient() as client:
-                response = await client.patch(
+                # Update application acknowledged status
+                app_response = await client.patch(
                     f"{self.supabase.rest_url}/lawyer_applications?id=eq.{application['id']}",
                     json={"acknowledged": True},
                     headers=self.supabase._get_headers(use_service_key=True)
                 )
                 
-                if response.status_code in [200, 204]:
-                    logger.info(f"✅ User {user_id[:8]}... acknowledged rejection for application {application['id']}")
-                    return {
-                        "success": True,
-                        "message": "Rejection acknowledged successfully"
-                    }
+                if app_response.status_code in [200, 204]:
+                    # Clear pending_lawyer flag since user has acknowledged
+                    user_response = await client.patch(
+                        f"{self.supabase.rest_url}/users?id=eq.{user_id}",
+                        json={"pending_lawyer": False},
+                        headers=self.supabase._get_headers(use_service_key=True)
+                    )
+                    
+                    if user_response.status_code in [200, 204]:
+                        logger.info(f"✅ User {user_id[:8]}... acknowledged rejection for application {application['id']}")
+                        return {
+                            "success": True,
+                            "message": "Rejection acknowledged successfully"
+                        }
+                    else:
+                        logger.error(f"Failed to clear pending_lawyer flag: {user_response.status_code}")
+                        # Still return success since the main acknowledgment worked
+                        return {
+                            "success": True,
+                            "message": "Rejection acknowledged successfully"
+                        }
                 else:
                     logger.error(f"Failed to acknowledge rejection: {response.status_code}")
                     return {"success": False, "error": "Failed to acknowledge rejection"}
