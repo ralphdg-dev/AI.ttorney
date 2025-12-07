@@ -1154,6 +1154,19 @@ const ViewPost: React.FC = () => {
         throw new Error(errorData?.detail || 'Failed to delete post');
       }
       
+      // Show success toast before navigating
+      toast.show({
+        placement: 'top',
+        duration: 3000,
+        render: createSafeAreaToastRenderer(
+          'top',
+          'success',
+          'solid',
+          'Success',
+          'Post deleted successfully'
+        ),
+      });
+      
       // Close modal and navigate back
       setDeletePostModalVisible(false);
       router.back();
@@ -1164,7 +1177,7 @@ const ViewPost: React.FC = () => {
     } finally {
       setIsDeletingPost(false);
     }
-  }, [post?.id, session?.access_token, router]);
+  }, [post?.id, session?.access_token, router, toast]);
   
   // Wait for post to be ready before showing content
   React.useEffect(() => {

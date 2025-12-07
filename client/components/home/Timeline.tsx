@@ -15,6 +15,8 @@ import { SkeletonList } from '@/components/ui/SkeletonLoader';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getResponsiveValue } from '@/constants/LayoutConstants';
 import { Text } from '@/components/ui/text';
+import { useToast } from '@/components/ui/toast';
+import { createSafeAreaToastRenderer } from '@/components/ui/SafeAreaToast';
 
 interface PostData {
   id: string;
@@ -73,6 +75,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
 
   const router = useRouter();
   const { session, isAuthenticated, user: currentUser } = useAuth();
+  const toast = useToast();
   const { getCachedPosts, setCachedPosts, isCacheValid, updatePostBookmark, setLastFetchTime, prefetchPost, setCachedPost } = useForumCache();
   const [posts, setPosts] = useState<PostData[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -80,11 +83,6 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
   const [initialLoading, setInitialLoading] = useState(true);
   const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
   const [, setError] = useState<string | null>(null);
-
-  // Toast state for edit success
-  const [showEditToast, setShowEditToast] = useState(false);
-  const editToastOpacity = useRef(new Animated.Value(0)).current;
-  const editToastTranslateY = useRef(new Animated.Value(-20)).current;
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -554,50 +552,39 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
 
   // Show success toast when backend confirms save
   const handleSaveConfirmed = useCallback(() => {
-    setShowEditToast(true);
-    
-    // Animate in
-    Animated.parallel([
-      Animated.timing(editToastOpacity, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(editToastTranslateY, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    // Auto hide after 2.5 seconds
-    setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(editToastOpacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(editToastTranslateY, {
-          toValue: -20,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setShowEditToast(false);
-        // Reset animation values for next time
-        editToastOpacity.setValue(0);
-        editToastTranslateY.setValue(-20);
-      });
-    }, 2500);
-  }, [editToastOpacity, editToastTranslateY]);
+    // Show success toast using standard design
+    toast.show({
+      placement: 'top',
+      duration: 3000,
+      render: createSafeAreaToastRenderer(
+        'top',
+        'success',
+        'solid',
+        'Success',
+        'Post edited successfully'
+      ),
+    });
+  }, [toast]);
 
   const handleDeleteSuccess = useCallback((postId: string) => {
     setPosts(prev => prev.filter(post => post.id !== postId));
     // Also update the cache
     setCachedPosts(posts.filter(post => post.id !== postId));
     if (__DEV__) console.log('Post deleted:', postId);
-  }, [posts, setCachedPosts]);
+    
+    // Show success toast
+    toast.show({
+      placement: 'top',
+      duration: 3000,
+      render: createSafeAreaToastRenderer(
+        'top',
+        'success',
+        'solid',
+        'Success',
+        'Post deleted successfully'
+      ),
+    });
+  }, [posts, setCachedPosts, toast]);
 
   const handleReportPress = useCallback((postId: string) => {
     // The Post component handles the actual report logic
@@ -1007,27 +994,10 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         accessibilityLabel="Create new post"
         accessibilityRole="button"
         accessibilityHint="Tap to create a new forum post"
-        testID="create-post-button"
       >
         <Plus size={iconSize} color="#FFFFFF" strokeWidth={2.5} />
       </TouchableOpacity>
 
-      {/* Success Toast for Edit */}
-      {showEditToast && (
-        <Animated.View
-          style={[
-            styles.editToast,
-            {
-              top: insets.top + 10,
-              opacity: editToastOpacity,
-              transform: [{ translateY: editToastTranslateY }],
-            },
-          ]}
-        >
-          <CheckCircle size={20} color="#FFFFFF" />
-          <Text style={styles.editToastText}>Post edited successfully</Text>
-        </Animated.View>
-      )}
     </View>
   );
 });
@@ -1110,28 +1080,6 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  editToast: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
-    backgroundColor: '#10B981',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-    zIndex: 9999,
-  },
-  editToastText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    marginLeft: 10,
-    fontSize: 14,
   },
 });
 
