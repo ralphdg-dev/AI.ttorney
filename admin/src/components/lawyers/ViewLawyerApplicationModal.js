@@ -46,7 +46,7 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
           const rollCheck = await rollMatchService.checkApplicationDetails({
             rollNumber: applicationData.roll_number,
             fullName: applicationData.full_name,
-            rollSignDate: applicationData.roll_sign_date,
+            rollSignDate: applicationData.roll_sign_date || applicationData.roll_signing_date,
           });
           // Use state setters to trigger re-render
           setPraStatus(rollCheck.status);
