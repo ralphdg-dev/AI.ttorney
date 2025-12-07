@@ -387,12 +387,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
         
-        // Don't auto-redirect to status screens on login
-        // Users should access status screens manually via sidebar "Apply to be a Lawyer"
-        // Just proceed with normal role-based redirect
+        // Check for unacknowledged lawyer applications before role-based redirect
+        // This ensures users see result screens before accessing lawyer features
         {
           // For unverified users (guest role + is_verified=false), redirect to OTP verification
-          // For others, use normal role-based redirect
           let redirectPath: string;
           if (profile.role === 'guest' && !profile.is_verified) {
             // Pass email as parameter for OTP verification
@@ -400,8 +398,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             redirectPath = `/onboarding/verify-otp?email=${encodeURIComponent(email)}`;
             console.log(`🚀 Navigating to: ${redirectPath} (unverified user - needs OTP verification)`);
           } else {
-            redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
-            console.log(`🚀 Navigating to: ${redirectPath} (role: ${profile.role}, verified: ${profile.is_verified})`);
+            // Check for lawyer applications that need acknowledgment BEFORE role-based redirect
+            try {
+              console.log('🔍 DEBUG: Starting lawyer application check in AuthContext...');
+              console.log('🔍 DEBUG: Session available:', !!authState.session?.access_token);
+              
+              if (!authState.session?.access_token) {
+                console.log('🔍 DEBUG: No session available, skipping application check');
+                redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
+                console.log(`🚀 Navigating to: ${redirectPath} (role: ${profile.role}, verified: ${profile.is_verified}, no session)`);
+              } else {
+                const applicationData = await checkLawyerApplicationStatus();
+                console.log('🔍 DEBUG: Application data received:', applicationData);
+                
+                if (applicationData && applicationData.has_application && applicationData.application) {
+                  const application = applicationData.application;
+                  const status = application.status;
+                  const acknowledged = application.acknowledged || false;
+                  
+                  console.log('📋 Found lawyer application:', { status, acknowledged });
+                  
+                  // If application is not acknowledged, redirect to appropriate status screen
+                  if (!acknowledged) {
+                    switch (status) {
+                      case 'pending':
+                        redirectPath = '/onboarding/lawyer/lawyer-status/pending';
+                        console.log(`🚀 Navigating to: ${redirectPath} (unacknowledged pending application)`);
+                        break;
+                      case 'accepted':
+                        redirectPath = '/onboarding/lawyer/lawyer-status/accepted';
+                        console.log(`🚀 Navigating to: ${redirectPath} (unacknowledged accepted application)`);
+                        break;
+                      case 'rejected':
+                        redirectPath = '/onboarding/lawyer/lawyer-status/rejected';
+                        console.log(`🚀 Navigating to: ${redirectPath} (unacknowledged rejected application)`);
+                        break;
+                      case 'resubmission':
+                        redirectPath = '/onboarding/lawyer/lawyer-status/resubmission';
+                        console.log(`🚀 Navigating to: ${redirectPath} (unacknowledged resubmission application)`);
+                        break;
+                      default:
+                        redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
+                        console.log(`🚀 Navigating to: ${redirectPath} (role: ${profile.role}, verified: ${profile.is_verified})`);
+                    }
+                  } else {
+                    // Application acknowledged, proceed with normal role-based redirect
+                    redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
+                    console.log(`🚀 Navigating to: ${redirectPath} (role: ${profile.role}, verified: ${profile.is_verified}, application acknowledged)`);
+                  }
+                } else {
+                  // No lawyer application, proceed with normal role-based redirect
+                  console.log('🔍 DEBUG: No lawyer application found in AuthContext check');
+                  console.log('🔍 DEBUG: applicationData structure:', {
+                    hasData: !!applicationData,
+                    hasApplication: applicationData?.has_application,
+                    applicationExists: !!applicationData?.application
+                  });
+                  redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
+                  console.log(`🚀 Navigating to: ${redirectPath} (role: ${profile.role}, verified: ${profile.is_verified}, no application)`);
+                }
+              }
+            } catch (error) {
+              console.error('❌ Error checking lawyer application status during auth:', error);
+              console.error('🔍 DEBUG: Full error details:', error);
+              // On error, proceed with normal role-based redirect
+              redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
+              console.log(`🚀 Navigating to: ${redirectPath} (role: ${profile.role}, verified: ${profile.is_verified}, error checking application)`);
+            }
           }
           
           setIsLoading(false);
@@ -413,10 +476,131 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
       } else {
-        // Token refresh - just update state, don't navigate
-        console.log('🔄 Token refreshed, keeping user on current page');
-        setIsLoading(false);
-        clearTimeout(authTimeoutId);
+        // Token refresh or initial session - check for unacknowledged applications
+        console.log('🔄 Token refresh/initial session - checking for unacknowledged applications');
+        
+        // Check if already on a lawyer status screen to prevent infinite loops
+          const currentRoute = getCurrentRoute();
+          if (currentRoute.includes('/onboarding/lawyer/lawyer-status/')) {
+            console.log('🔍 DEBUG: Already on lawyer status screen, skipping application check to prevent infinite loop');
+            console.log('🔄 Token refreshed, keeping user on current page');
+            setIsLoading(false);
+            clearTimeout(authTimeoutId);
+            return;
+          }
+          
+          // Check for lawyer applications that need acknowledgment BEFORE deciding to navigate
+          try {
+            console.log('🔍 DEBUG: Starting lawyer application check in AuthContext (token refresh path)...');
+            console.log('🔍 DEBUG: Session available:', !!session?.access_token);
+          
+          if (!session?.access_token) {
+            console.log('🔍 DEBUG: No session available, skipping application check');
+            console.log('🔄 Token refreshed, keeping user on current page');
+            setIsLoading(false);
+            clearTimeout(authTimeoutId);
+          } else {
+            // Create a temporary checkLawyerApplicationStatus that uses the session parameter
+            const checkApplicationWithSession = async (): Promise<any> => {
+              try {
+                const { NetworkConfig } = await import('../utils/networkConfig');
+                const apiUrl = await NetworkConfig.getBestApiUrl();
+
+                const response: any = await fetch(`${apiUrl}/api/lawyer-applications/me`, {
+                  headers: {
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'Content-Type': 'application/json',
+                  },
+                });
+
+                if (response.ok) {
+                  const data = await response.json();
+                  return data;
+                }
+                
+                return null;
+              } catch (error) {
+                console.warn('⚠️ Lawyer application status check failed, proceeding without application data', error);
+                return null;
+              }
+            };
+            
+            const applicationData = await checkApplicationWithSession();
+            console.log('🔍 DEBUG: Application data received:', applicationData);
+            
+            if (applicationData && applicationData.has_application && applicationData.application) {
+              const application = applicationData.application;
+              const status = application.status;
+              const acknowledged = application.acknowledged || false;
+              
+              console.log('📋 Found lawyer application:', { status, acknowledged });
+              
+              // If application is not acknowledged, redirect to appropriate status screen
+              if (!acknowledged) {
+                // Skip automatic redirect for pending status - only show when user clicks "Apply as Lawyer"
+                if (status === 'pending') {
+                  console.log('� DEBUG: Pending application found, but not redirecting on startup (user must click Apply as Lawyer)');
+                  console.log('🔄 Token refreshed, keeping user on current page');
+                  setIsLoading(false);
+                  clearTimeout(authTimeoutId);
+                  return;
+                }
+                
+                switch (status) {
+                  case 'accepted':
+                    console.log('🚀 Navigating to: /onboarding/lawyer/lawyer-status/accepted (unacknowledged accepted application)');
+                    setIsLoading(false);
+                    clearTimeout(authTimeoutId);
+                    try {
+                      router.replace('/onboarding/lawyer/lawyer-status/accepted' as any);
+                    } catch (routerError) {
+                      console.warn('Router not ready during application redirect:', routerError);
+                    }
+                    return;
+                  case 'rejected':
+                    console.log('🚀 Navigating to: /onboarding/lawyer/lawyer-status/rejected (unacknowledged rejected application)');
+                    setIsLoading(false);
+                    clearTimeout(authTimeoutId);
+                    try {
+                      router.replace('/onboarding/lawyer/lawyer-status/rejected' as any);
+                    } catch (routerError) {
+                      console.warn('Router not ready during application redirect:', routerError);
+                    }
+                    return;
+                  case 'resubmission':
+                    console.log('🚀 Navigating to: /onboarding/lawyer/lawyer-status/resubmission (unacknowledged resubmission application)');
+                    setIsLoading(false);
+                    clearTimeout(authTimeoutId);
+                    try {
+                      router.replace('/onboarding/lawyer/lawyer-status/resubmission' as any);
+                    } catch (routerError) {
+                      console.warn('Router not ready during application redirect:', routerError);
+                    }
+                    return;
+                  default:
+                    console.log('🔍 DEBUG: Unknown application status, keeping user on current page');
+                    break;
+                }
+              } else {
+                console.log('🔍 DEBUG: Application already acknowledged, keeping user on current page');
+              }
+            } else {
+              console.log('🔍 DEBUG: No lawyer application found, keeping user on current page');
+            }
+            
+            // No unacknowledged application, keep user on current page
+            console.log('🔄 Token refreshed, keeping user on current page');
+            setIsLoading(false);
+            clearTimeout(authTimeoutId);
+          }
+        } catch (error) {
+          console.error('❌ Error checking lawyer application status during token refresh:', error);
+          console.error('🔍 DEBUG: Full error details:', error);
+          // On error, keep user on current page
+          console.log('🔄 Token refreshed, keeping user on current page (error occurred)');
+          setIsLoading(false);
+          clearTimeout(authTimeoutId);
+        }
       }
     } catch (error) {
       console.error('Error handling auth state change:', error);
@@ -425,7 +609,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsProcessingAuth(false);
       clearTimeout(authTimeoutId);
     }
-  }, [checkLawyerApplicationStatus, checkSuspensionStatus, getCurrentRoute, toast, isProcessingAuth]);
+  }, [checkLawyerApplicationStatus, checkSuspensionStatus, getCurrentRoute, toast, isProcessingAuth, clearGuestSessionOnAuth, authState.session?.access_token]);
 
   useEffect(() => {
     // Initialize auth state and listen for auth changes
@@ -467,7 +651,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               console.log(`📍 SIGNED_IN event - shouldNavigate: ${shouldNavigate} (login: ${isOnLoginPage}, otp: ${isOnOTPPage})`);
               await handleAuthStateChange(session, shouldNavigate);
             } else if (event === 'TOKEN_REFRESHED' && session) {
-              console.log('📍 TOKEN_REFRESHED event - will NOT navigate');
+              console.log('📍 TOKEN_REFRESHED event - checking for unacknowledged applications');
               await handleAuthStateChange(session, false);
             } else if (event === 'SIGNED_OUT') {
               console.log('📍 SIGNED_OUT event');

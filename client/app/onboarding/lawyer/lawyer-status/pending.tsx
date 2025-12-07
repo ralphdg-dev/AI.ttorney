@@ -3,7 +3,6 @@ import { router } from 'expo-router';
 import { View, Text } from 'react-native';
 import { lawyerApplicationService, LawyerApplicationStatus } from '../../../../services/lawyerApplicationService';
 import StatusScreen from '../../../../components/ui/StatusScreen';
-import LawyerStatusGuard from '../../../../components/LawyerStatusGuard';
 import { LoadingWithTrivia } from '../../../../components/LoadingWithTrivia';
 
 export default function PendingStatus() {
@@ -60,7 +59,6 @@ export default function PendingStatus() {
     : "Your application is currently being reviewed by our team. We'll notify you once the review is complete.";
 
   return (
-    <LawyerStatusGuard requiredStatus="pending">
       <StatusScreen
         image={require('../../../../assets/images/lawyer-registration/pending.png')}
         title={title}
@@ -70,6 +68,5 @@ export default function PendingStatus() {
         showBackButton={false}
         imageAlt="Lawyer application pending review"
       />
-    </LawyerStatusGuard>
   );
 }

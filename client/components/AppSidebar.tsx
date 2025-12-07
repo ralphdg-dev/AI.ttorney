@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, ReactNode, useCallback, useMemo } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, Dimensions, Platform, Image, Easing } from "react-native";
 import { useRouter } from "expo-router";
 import { useFavorites } from "../contexts/FavoritesContext";
@@ -481,9 +481,9 @@ export const SidebarWrapper: React.FC<{
 }> = ({ userInfo }) => {
   const sidebarContext = useSidebar();
   const isVisible = sidebarContext?.isVisible || false;
-  const closeSidebar = sidebarContext?.closeSidebar || (() => {
+  const closeSidebar = useMemo(() => sidebarContext?.closeSidebar || (() => {
     console.warn('Sidebar context not available, closeSidebar disabled');
-  });
+  }), [sidebarContext?.closeSidebar]);
   const router = useRouter();
   const { user } = useAuth();
 
@@ -533,8 +533,8 @@ export const SidebarWrapper: React.FC<{
         router.push("/about");
         break;
       case "apply-lawyer":
-        // Navigate directly to verification instructions to avoid redirect loop
-        router.push("/onboarding/lawyer/verification-instructions");
+        // Navigate to apply-lawyer to check application status and route appropriately
+        router.push("/apply-lawyer");
         break;
       case "profile":
         // Route lawyers to lawyer profile, regular users to regular profile
@@ -547,7 +547,7 @@ export const SidebarWrapper: React.FC<{
       default:
         console.log(`Route ${route} not implemented yet`);
     }
-  }, [router, isLawyerRole]);
+  }, [router, isLawyerRole, closeSidebar]);
 
   // Performance optimization: Extract primitive values to prevent unnecessary re-renders
   const userName = user?.full_name || "User";

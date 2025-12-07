@@ -1,5 +1,6 @@
 import React from 'react';
-import { StatusBar, SafeAreaView } from 'react-native';
+import { StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import BackButton from './BackButton';
 import StickyFooterButton from './StickyFooterButton';
@@ -35,7 +36,7 @@ export default function StatusScreen({ image, title, description, buttonLabel, o
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
       {/* Header with BackButton */}
@@ -45,8 +46,8 @@ export default function StatusScreen({ image, title, description, buttonLabel, o
         </Box>
       )}
 
-      {/* Centered content with bottom padding to prevent overlap */}
-      <Box className="flex-1 items-center justify-center px-6 pb-32">
+      {/* Centered content with minimal bottom padding */}
+      <Box className="flex-1 items-center justify-center px-6 pb-6">
         <Image 
           source={image} 
           className="w-[180px] h-[180px] mb-5" 
@@ -61,7 +62,7 @@ export default function StatusScreen({ image, title, description, buttonLabel, o
       <StickyFooterButton
         title={buttonLabel}
         disabled={false}
-        bottomOffset={16}
+        bottomOffset={0}
         onPress={onPress}
       />
     </SafeAreaView>

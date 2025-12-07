@@ -26,13 +26,17 @@ export default function ApplyLawyer() {
       }
 
       // Check if user has pending_lawyer flag
-      if (user.pending_lawyer) {
+      console.log('🔍 Checking pending_lawyer flag:', user?.pending_lawyer);
+      console.log('👤 User data:', user);
+      
+      if (user?.pending_lawyer) {
         console.log('⏳ User has pending_lawyer flag, checking application status...');
         setIsCheckingStatus(true);
         
         try {
           // Use the AuthContext method which has proper token handling
           const applicationData = await checkLawyerApplicationStatus();
+          console.log('📄 Application data received:', applicationData);
           
           if (applicationData && applicationData.has_application && applicationData.application) {
             const application = applicationData.application;
@@ -53,38 +57,38 @@ export default function ApplyLawyer() {
             switch (status) {
               case 'pending':
                 console.log('⏳ Redirecting to pending screen');
-                router.push('/onboarding/lawyer/lawyer-status/pending');
+                router.replace('/onboarding/lawyer/lawyer-status/pending');
                 break;
               case 'accepted':
                 console.log('✅ Redirecting to accepted screen');
-                router.push('/onboarding/lawyer/lawyer-status/accepted');
+                router.replace('/onboarding/lawyer/lawyer-status/accepted');
                 break;
               case 'rejected':
                 console.log('❌ Redirecting to rejected screen');
-                router.push('/onboarding/lawyer/lawyer-status/rejected');
+                router.replace('/onboarding/lawyer/lawyer-status/rejected');
                 break;
               case 'resubmission':
                 console.log('🔄 Redirecting to resubmission screen');
-                router.push('/onboarding/lawyer/lawyer-status/resubmission');
+                router.replace('/onboarding/lawyer/lawyer-status/resubmission');
                 break;
               default:
                 console.log('❓ Unknown status, redirecting to verification instructions');
-                router.push('/onboarding/lawyer/verification-instructions');
+                router.replace('/onboarding/lawyer/verification-instructions');
             }
           } else {
             console.log('⚠️ No application found but user has pending_lawyer flag, redirecting to pending');
-            router.push('/onboarding/lawyer/lawyer-status/pending');
+            router.replace('/onboarding/lawyer/lawyer-status/pending');
           }
         } catch (error) {
           console.error('❌ Error checking application status:', error);
           // Fallback: go to verification instructions if status check fails
-          router.push('/onboarding/lawyer/verification-instructions');
+          router.replace('/onboarding/lawyer/verification-instructions');
         } finally {
           setIsCheckingStatus(false);
         }
       } else {
-        console.log('📝 User does not have pending_lawyer flag, redirecting to verification instructions');
-        router.push('/onboarding/lawyer/verification-instructions');
+        console.log('� User does not have pending_lawyer flag, redirecting to verification instructions');
+        router.replace('/onboarding/lawyer/verification-instructions');
       }
     };
 

@@ -150,17 +150,24 @@ class LawyerApplicationService:
             return {"success": False, "error": str(e)}
     
     async def get_user_application_status(self, user_id: str) -> Dict[str, Any]:
-        """Get user's current application status"""
+        """Get user's application status"""
         try:
-                           
+            # DEBUG: Log incoming request
+            logger.info(f"🔍 DEBUG: get_user_application_status called for user {user_id[:8]}...")
+            
+            # Get user data first
             user_result = await self.supabase.get_user_profile(user_id)
             if not user_result["success"]:
                 return {"success": False, "error": "User not found"}
             
             user_data = user_result["data"]
-            
+            logger.info(f"🔍 DEBUG: User data: role={user_data.get('role')}, pending_lawyer={user_data.get('pending_lawyer')}")
                                     
             application_result = await self._get_latest_user_application(user_id)
+            logger.info(f"🔍 DEBUG: Application result: success={application_result['success']}")
+            if application_result["success"]:
+                app_data = application_result["data"]
+                logger.info(f"🔍 DEBUG: Application: status={app_data.get('status')}, acknowledged={app_data.get('acknowledged')}")
             
             status_response = LawyerApplicationStatusResponse(
                 has_application=application_result["success"],
@@ -309,6 +316,11 @@ class LawyerApplicationService:
         Role changes only happen when user acknowledges the result.
         """
         try:
+            # DEBUG: Get current user role before update
+            current_user_result = await self.supabase.get_user_profile(user_id)
+            current_role = current_user_result["data"].get("role", "unknown") if current_user_result["success"] else "error"
+            logger.info(f"🔍 DEBUG: Current user role before review: {current_role}")
+            
             if status == "accepted":
                 # Keep pending_lawyer=TRUE, don't change role yet
                 # User must acknowledge acceptance before becoming verified_lawyer
@@ -316,6 +328,7 @@ class LawyerApplicationService:
                     "pending_lawyer": True,  # Keep TRUE to show result screen
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }
+                logger.info(f"🔍 DEBUG: For accepted status, update_data = {update_data} (role unchanged)")
                 
             elif status == "rejected":
                 # Get current reject count
@@ -351,10 +364,20 @@ class LawyerApplicationService:
             else:
                 return {"success": False, "error": "Invalid status"}
             
-            return await self.supabase.update_user_profile(
+            result = await self.supabase.update_user_profile(
                 update_data,
                 {"id": user_id}
             )
+            
+            # DEBUG: Verify role after update
+            if result["success"]:
+                updated_user_result = await self.supabase.get_user_profile(user_id)
+                updated_role = updated_user_result["data"].get("role", "unknown") if updated_user_result["success"] else "error"
+                logger.info(f"🔍 DEBUG: User role after review: {updated_role}")
+            else:
+                logger.error(f"🔍 DEBUG: Failed to update user profile: {result}")
+            
+            return result
             
         except Exception as e:
             logger.error(f"Apply review logic error: {str(e)}")

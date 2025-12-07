@@ -44,6 +44,8 @@ const RegisteredOnboardingOverlay: React.FC = () => {
   const isEligible = useMemo(() => {
     if (!user) return false;
     if (user.role !== 'registered_user' && user.role !== 'verified_lawyer') return false;
+    // Don't show walkthrough guides during lawyer application flow
+    if (user.pending_lawyer === true) return false;
     return user.onboard === false;
   }, [user]);
 
@@ -365,8 +367,7 @@ const RegisteredOnboardingOverlay: React.FC = () => {
     };
   };
 
-  const { style: cardPositionStyle, cardBelowHighlight } = getCardPosition();
-  const pointerDirection: 'up' | 'down' = cardBelowHighlight ? 'up' : 'down';
+  const { style: cardPositionStyle } = getCardPosition();
 
   const renderSpotlightMask = () => {
     const padding = (() => {
