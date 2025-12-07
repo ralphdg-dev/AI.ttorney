@@ -9,6 +9,7 @@ import StatusBadge from './StatusBadge';
 import RollMatchBadge from './RollMatchBadge';
 import { exportApplicationHistoryPDF, exportAuditTrailPDF } from './PDFExportUtils';
 import lawyerApplicationsService from '../../services/lawyerApplicationsService';
+import rollMatchService from '../../services/rollMatchService';
 import { useAuth } from '../../contexts/AuthContext';
 
 // Note: StableSecureImage component moved to separate SecureImage.js file
@@ -38,6 +39,29 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
   // Extract the actual application data from the API response
   const applicationData = application?.data || application;
 
+  // Check roll number and add pra_status like the table does
+  React.useEffect(() => {
+    if (open && applicationData && !applicationData.pra_status) {
+      const checkRollNumber = async () => {
+        try {
+          const rollCheck = await rollMatchService.checkApplicationDetails({
+            rollNumber: applicationData.roll_number,
+            fullName: applicationData.full_name,
+            rollSignDate: applicationData.roll_sign_date,
+          });
+          // Add pra_status and pra_match_details to the application data
+          applicationData.pra_status = rollCheck.status;
+          applicationData.pra_match_details = rollCheck.lawyer || null;
+        } catch (error) {
+          console.error('Failed to check roll number:', error);
+          applicationData.pra_status = 'not_found';
+          applicationData.pra_match_details = null;
+        }
+      };
+      checkRollNumber();
+    }
+  }, [open, applicationData]);
+
 
   // Memoize extracted values to prevent unnecessary re-renders
   const extractedData = React.useMemo(() => {
@@ -48,7 +72,6 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
       submitted_at: registered,
       ibp_id: ibpCardPath,
       selfie: selfiePath,
-      matched_roll_id: matchedRollId,
       status,
       pra_status: praStatus,
     } = applicationData || {};
@@ -64,7 +87,6 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
       registered,
       ibpCardPath,
       selfiePath,
-      matchedRollId,
       status,
       email,
       fullName,
@@ -201,7 +223,6 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
     registered,
     ibpCardPath,
     selfiePath,
-    matchedRollId,
     status,
     email,
     fullName,

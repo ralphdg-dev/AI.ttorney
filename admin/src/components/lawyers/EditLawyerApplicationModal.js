@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Modal from '../ui/Modal';
 import { Save, X } from 'lucide-react';
 import lawyerApplicationsService from '../../services/lawyerApplicationsService';
+import rollMatchService from '../../services/rollMatchService';
 import RollMatchBadge from './RollMatchBadge';
 
 const EditLawyerApplicationModal = ({ open, onClose, application, onSave }) => {
@@ -75,6 +76,30 @@ const EditLawyerApplicationModal = ({ open, onClose, application, onSave }) => {
   const applicationData = application?.data || application;
   const fullName = applicationData?.users?.full_name || applicationData?.full_name;
   const rollNumber = applicationData?.roll_number;
+
+  // Check roll number and add pra_status like the table does
+  useEffect(() => {
+    if (open && applicationData && !applicationData.pra_status) {
+      const checkRollNumber = async () => {
+        try {
+          const rollCheck = await rollMatchService.checkApplicationDetails({
+            rollNumber: applicationData.roll_number,
+            fullName: applicationData.full_name,
+            rollSignDate: applicationData.roll_sign_date,
+          });
+          // Add pra_status and pra_match_details to the application data
+          applicationData.pra_status = rollCheck.status;
+          applicationData.pra_match_details = rollCheck.lawyer || null;
+        } catch (error) {
+          console.error('Failed to check roll number:', error);
+          applicationData.pra_status = 'not_found';
+          applicationData.pra_match_details = null;
+        }
+      };
+      checkRollNumber();
+    }
+  }, [open, applicationData]);
+
   const praStatus = applicationData?.pra_status;
 
   return (
