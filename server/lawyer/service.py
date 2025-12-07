@@ -201,13 +201,14 @@ class LawyerApplicationService:
             application = app_result["data"]
             user_id = application["user_id"]
             
-                                            
+            # Build review record - CRITICAL: Set acknowledged=FALSE so user sees result screen
             review_record = {
                 "status": review_data.status,
                 "reviewed_by": admin_id,
                 "reviewed_at": datetime.now(timezone.utc).isoformat(),
                 "admin_notes": review_data.admin_notes,
                 "matched_roll_id": review_data.matched_roll_id,
+                "acknowledged": False,  # CRITICAL: User must acknowledge the result
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }
             
@@ -299,18 +300,22 @@ class LawyerApplicationService:
         )
     
     async def _apply_review_logic(self, user_id: str, status: str) -> Dict[str, Any]:
-        """Apply role/pending logic based on review status"""
+        """Apply role/pending logic based on review status
+        
+        CRITICAL: Keep pending_lawyer=TRUE so user can see result screen.
+        Role changes only happen when user acknowledges the result.
+        """
         try:
             if status == "accepted":
-                                                                            
+                # Keep pending_lawyer=TRUE, don't change role yet
+                # User must acknowledge acceptance before becoming verified_lawyer
                 update_data = {
-                    "role": "verified_lawyer",
-                    "pending_lawyer": False,
+                    "pending_lawyer": True,  # Keep TRUE to show result screen
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }
                 
             elif status == "rejected":
-                                                                 
+                # Get current reject count
                 user_result = await self.supabase.get_user_profile(user_id)
                 if not user_result["success"]:
                     return {"success": False, "error": "User not found"}
@@ -319,24 +324,24 @@ class LawyerApplicationService:
                 current_reject_count = user_data.get("reject_count", 0)
                 new_reject_count = current_reject_count + 1
                 
-                                                                                                    
+                # Keep pending_lawyer=TRUE so user can see rejection screen
                 update_data = {
                     "role": "registered_user",
-                    "pending_lawyer": False,
+                    "pending_lawyer": True,  # Keep TRUE to show result screen
                     "reject_count": new_reject_count,
                     "last_rejected_at": datetime.now(timezone.utc).isoformat(),
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }
                 
-                                            
+                # Block after 3 rejections
                 if new_reject_count >= 3:
                     update_data["is_blocked_from_applying"] = True
                     
             elif status == "resubmission":
-                                                                                
+                # Keep pending_lawyer=TRUE so user can see resubmission screen
                 update_data = {
                     "role": "registered_user",
-                    "pending_lawyer": False,
+                    "pending_lawyer": True,  # Keep TRUE to show result screen
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }
             
@@ -494,9 +499,13 @@ class LawyerApplicationService:
             return None
 
     async def activate_verified_lawyer(self, user_id: str) -> Dict[str, Any]:
-        """Update user role to verified_lawyer after accepting application approval"""
+        """Update user role to verified_lawyer after user acknowledges acceptance
+        
+        This is called when user clicks "Continue as Lawyer" on the accepted screen.
+        Sets acknowledged=TRUE on application and role=verified_lawyer on user.
+        """
         try:
-                                                                
+            # Get user's application
             application = await self.get_user_application(user_id)
             
             if not application or application.get("status") != "accepted":
@@ -505,7 +514,17 @@ class LawyerApplicationService:
                     "error": "No accepted application found for this user"
                 }
             
-                                                                         
+            # Step 1: Set acknowledged=TRUE on the application
+            application_id = application.get("id")
+            acknowledge_result = await self._set_application_acknowledged(application_id)
+            
+            if not acknowledge_result["success"]:
+                return {
+                    "success": False,
+                    "error": "Failed to acknowledge application"
+                }
+            
+            # Step 2: Update user role to verified_lawyer and clear pending_lawyer
             update_data = {
                 "role": "verified_lawyer",
                 "pending_lawyer": False,
@@ -518,6 +537,7 @@ class LawyerApplicationService:
             )
             
             if result["success"]:
+                logger.info(f"✅ User {user_id[:8]}... activated as verified_lawyer and acknowledged acceptance")
                 return {
                     "success": True,
                     "message": "User role updated to verified lawyer successfully"
@@ -558,37 +578,73 @@ class LawyerApplicationService:
             logger.error(f"Get user application history error: {str(e)}")
             return {"success": False, "error": str(e)}
 
-    async def acknowledge_rejection(self, user_id: str) -> Dict[str, Any]:
-        """Acknowledge that user has seen their rejection"""
+    async def _set_application_acknowledged(self, application_id: str) -> Dict[str, Any]:
+        """DRY helper: Set acknowledged=TRUE on an application
+        
+        Used by both acceptance and rejection acknowledgment flows.
+        """
         try:
-                                        
+            async with httpx.AsyncClient() as client:
+                response = await client.patch(
+                    f"{self.supabase.rest_url}/lawyer_applications?id=eq.{application_id}",
+                    json={"acknowledged": True},
+                    headers=self.supabase._get_headers(use_service_key=True)
+                )
+                
+                if response.status_code in [200, 204]:
+                    logger.info(f"✅ Application {application_id[:8]}... marked as acknowledged")
+                    return {"success": True}
+                else:
+                    logger.error(f"❌ Failed to acknowledge application: {response.status_code}")
+                    return {"success": False, "error": "Failed to update application"}
+                    
+        except Exception as e:
+            logger.error(f"❌ Set application acknowledged error: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def acknowledge_rejection(self, user_id: str) -> Dict[str, Any]:
+        """Acknowledge that user has seen their rejection
+        
+        Sets acknowledged=TRUE on application and clears pending_lawyer flag.
+        """
+        try:
+            # Get user's application
             app_result = await self._get_latest_user_application(user_id)
             if not app_result["success"]:
                 return {"success": False, "error": "No application found"}
             
             application = app_result["data"]
             
-                                              
+            # Verify it's rejected
             if application.get("status") != "rejected":
                 return {"success": False, "error": "Application is not rejected"}
             
-                                       
-            async with httpx.AsyncClient() as client:
-                response = await client.patch(
-                    f"{self.supabase.rest_url}/lawyer_applications?id=eq.{application['id']}",
-                    json={"acknowledged": True},
-                    headers=self.supabase._get_headers(use_service_key=True)
-                )
-                
-                if response.status_code in [200, 204]:
-                    logger.info(f" User {user_id[:8]}... acknowledged rejection for application {application['id']}")
-                    return {
-                        "success": True,
-                        "message": "Rejection acknowledged successfully"
-                    }
-                else:
-                    logger.error(f"Failed to acknowledge rejection: {response.status_code}")
-                    return {"success": False, "error": "Failed to acknowledge rejection"}
+            # Step 1: Set acknowledged=TRUE on the application
+            application_id = application.get("id")
+            acknowledge_result = await self._set_application_acknowledged(application_id)
+            
+            if not acknowledge_result["success"]:
+                return {"success": False, "error": "Failed to acknowledge rejection"}
+            
+            # Step 2: Clear pending_lawyer flag so user can navigate normally
+            update_data = {
+                "pending_lawyer": False,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            result = await self.supabase.update_user_profile(
+                update_data,
+                {"id": user_id}
+            )
+            
+            if result["success"]:
+                logger.info(f"✅ User {user_id[:8]}... acknowledged rejection and cleared pending_lawyer")
+                return {
+                    "success": True,
+                    "message": "Rejection acknowledged successfully"
+                }
+            else:
+                return {"success": False, "error": "Failed to update user profile"}
                     
         except Exception as e:
             logger.error(f"Acknowledge rejection error: {str(e)}")

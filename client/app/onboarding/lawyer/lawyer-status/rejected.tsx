@@ -4,9 +4,10 @@ import { Alert } from 'react-native';
 import { lawyerApplicationService, LawyerApplicationStatus } from '../../../../services/lawyerApplicationService';
 import StatusScreen from '../../../../components/ui/StatusScreen';
 import LawyerStatusGuard from '../../../../components/LawyerStatusGuard';
-import { LoadingWithTrivia } from '../../../../components/LoadingWithTrivia';
+import { useAuth } from '../../../../contexts/AuthContext';
 
 export default function RejectedStatus() {
+  const { refreshUserData } = useAuth();
   const [applicationData, setApplicationData] = useState<LawyerApplicationStatus | null>(null);
   const [isAcknowledging, setIsAcknowledging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -37,20 +38,24 @@ export default function RejectedStatus() {
     try {
       setIsAcknowledging(true);
       
+      console.log('🔄 Acknowledging rejection...');
       // Call API to acknowledge the rejection
       const result = await lawyerApplicationService.acknowledgeRejection();
       
       if (result.success) {
-        // Refresh the application data to get updated acknowledged status
-        await loadApplicationStatus();
+        console.log('✅ Rejection acknowledged, refreshing user data...');
+        // Refresh user data in AuthContext to clear pending_lawyer flag
+        await refreshUserData();
+        console.log('✅ User data refreshed, navigating to home...');
         
-        // Navigate to home instead of a separate acknowledged page
+        // Navigate to home
         router.replace('/home');
       } else {
+        console.error('❌ Failed to acknowledge rejection:', result.message);
         Alert.alert('Error', result.message || 'Failed to acknowledge rejection. Please try again.');
       }
     } catch (error) {
-      console.error('Error acknowledging rejection:', error);
+      console.error('❌ Error acknowledging rejection:', error);
       Alert.alert('Error', 'An error occurred. Please try again.');
     } finally {
       setIsAcknowledging(false);
