@@ -3,7 +3,6 @@ import React from 'react';
 const StatusBadge = ({ status }) => {
   const getStatusStyles = (status) => {
     switch (status?.toLowerCase()) {
-      case 'approved':
       case 'accepted':
         return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
       case 'rejected':
@@ -18,7 +17,6 @@ const StatusBadge = ({ status }) => {
 
   const getStatusLabel = (status) => {
     switch (status?.toLowerCase()) {
-      case 'approved': return 'Approved';
       case 'accepted': return 'Accepted';
       case 'rejected': return 'Rejected';
       case 'resubmission': return 'Resubmission';

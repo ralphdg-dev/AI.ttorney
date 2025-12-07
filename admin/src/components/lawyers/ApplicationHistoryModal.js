@@ -8,14 +8,7 @@ const ApplicationHistoryModal = ({ open, onClose, applicationId, onViewApplicati
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
 
-  // Load application history when modal opens
-  React.useEffect(() => {
-    if (open && applicationId) {
-      loadHistory();
-    }
-  }, [open, applicationId]);
-
-  const loadHistory = async () => {
+  const loadHistory = React.useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -26,7 +19,14 @@ const ApplicationHistoryModal = ({ open, onClose, applicationId, onViewApplicati
     } finally {
       setLoading(false);
     }
-  };
+  }, [applicationId]);
+
+  // Load application history when modal opens
+  React.useEffect(() => {
+    if (open && applicationId) {
+      loadHistory();
+    }
+  }, [open, applicationId, loadHistory]);
 
   // Format date for display
   const formatDate = (dateString) => {
@@ -44,7 +44,6 @@ const ApplicationHistoryModal = ({ open, onClose, applicationId, onViewApplicati
   // Get status icon and color
   const getStatusDisplay = (status) => {
     switch (status?.toLowerCase()) {
-      case 'approved':
       case 'accepted':
         return {
           icon: <CheckCircle size={16} />,

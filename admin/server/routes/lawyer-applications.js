@@ -224,7 +224,8 @@ router.get("/", authenticateAdmin, async (req, res) => {
       });
     }
 
-    // Helper function to get ordinal suffix
+    // Helper function to get ordinal suffix (currently unused but kept for potential future use)
+    // eslint-disable-next-line no-unused-vars
     function getOrdinalSuffix(num) {
       const j = num % 10;
       const k = num % 100;
@@ -470,7 +471,7 @@ router.patch("/:id", authenticateAdmin, async (req, res) => {
           created_at: new Date().toISOString(),
         };
 
-        const { data, error } = await supabaseAdmin
+        const { error } = await supabaseAdmin
           .from("admin_audit_logs")
           .insert(auditData)
           .select();
@@ -545,18 +546,21 @@ router.patch("/:id", authenticateAdmin, async (req, res) => {
     if (filteredUpdateData.status) {
       const status = filteredUpdateData.status;
 
-      if (status === "approved") {
-        // Only update pending_lawyer flag, do not change role
+      if (status === "accepted") {
+        // Accepted: role = 'registered_user', pending_lawyer = true
+        // User must acknowledge acceptance before becoming verified_lawyer
         const { error: userError } = await supabaseAdmin
           .from("users")
           .update({
-            pending_lawyer: false,
+            role: "registered_user",
+            pending_lawyer: true,
             updated_at: new Date().toISOString(),
           })
           .eq("id", application.user_id);
 
         if (userError) {
-          // Failed to update user pending_lawyer flag
+          // Failed to update user for accepted application
+          console.error("Failed to update user for accepted application:", userError);
         }
       } else if (status === "rejected") {
         // Get current user data to check rejection count
@@ -723,7 +727,7 @@ router.patch("/:id/status", authenticateAdmin, async (req, res) => {
           created_at: new Date().toISOString(),
         };
 
-        const { data, error } = await supabaseAdmin
+        const { error } = await supabaseAdmin
           .from("admin_audit_logs")
           .insert(auditData)
           .select();
@@ -797,18 +801,21 @@ router.patch("/:id/status", authenticateAdmin, async (req, res) => {
     }
 
     // Handle user table updates based on status
-    if (status === "approved") {
-      // Only update pending_lawyer flag, do not change role
+    if (status === "accepted") {
+      // Accepted: role = 'registered_user', pending_lawyer = true
+      // User must acknowledge acceptance before becoming verified_lawyer
       const { error: userError } = await supabaseAdmin
         .from("users")
         .update({
-          pending_lawyer: false,
+          role: "registered_user",
+          pending_lawyer: true,
           updated_at: new Date().toISOString(),
         })
         .eq("id", application.user_id);
 
       if (userError) {
         // Don't fail the whole operation, just log the error
+        console.error("Failed to update user for accepted application:", userError);
       }
     } else if (status === "rejected") {
       // Get current user data to check rejection count
@@ -943,10 +950,10 @@ router.get("/stats/overview", authenticateAdmin, async (req, res) => {
       .select("*", { count: "exact", head: true })
       .eq("status", "pending");
 
-    const { count: approvedApplications } = await supabaseAdmin
+    const { count: acceptedApplications } = await supabaseAdmin
       .from("lawyer_applications")
       .select("*", { count: "exact", head: true })
-      .eq("status", "approved");
+      .eq("status", "accepted");
 
     const { count: rejectedApplications } = await supabaseAdmin
       .from("lawyer_applications")
@@ -975,7 +982,7 @@ router.get("/stats/overview", authenticateAdmin, async (req, res) => {
       data: {
         total_applications: totalApplications || 0,
         pending_applications: pendingApplications || 0,
-        approved_applications: approvedApplications || 0,
+        accepted_applications: acceptedApplications || 0,
         rejected_applications: rejectedApplications || 0,
         resubmission_applications: resubmissionApplications || 0,
         new_this_month: newThisMonth || 0,
@@ -1136,13 +1143,13 @@ router.post("/:id/audit-logs", authenticateAdmin, async (req, res) => {
     const adminId = req.admin.id; // From authenticateAdmin middleware
 
     // Debug: Log what we're receiving
-    const debugData = {
+    console.log("Creating audit log:", {
       applicationId: id,
       action,
       metadata,
       adminId,
       adminInfo: req.admin,
-    };
+    });
 
     // Validate required fields
     if (!action) {

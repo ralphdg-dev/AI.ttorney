@@ -32,14 +32,11 @@ const ConfirmationModal = ({
     // Handle specific status values
     const statusMap = {
       'pending': 'Pending',
-      'approved': 'Approved',
-      'rejected': 'Rejected',
       'accepted': 'Accepted',
       'resubmission': 'Resubmission',
       'active': 'Active',
       'inactive': 'Inactive',
       'suspended': 'Suspended',
-      'archived': 'Archived'
     };
     
     return statusMap[value.toLowerCase()] || value.charAt(0).toUpperCase() + value.slice(1);
