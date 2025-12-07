@@ -50,14 +50,12 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
       selfie: selfiePath,
       matched_roll_id: matchedRollId,
       status,
+      pra_status: praStatus,
     } = applicationData || {};
 
     // Get email and name from nested users object or direct field (for historical applications)
     const email = applicationData?.users?.email || applicationData?.email;
     const fullName = applicationData?.users?.full_name || applicationData?.full_name || name;
-    
-    // Set PRA status based on whether roll is matched
-    const praStatus = matchedRollId ? 'matched' : 'not_found';
 
     return {
       name,
