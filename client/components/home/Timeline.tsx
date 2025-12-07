@@ -514,9 +514,11 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     updatePostBookmark(postId, isBookmarked);
   }, [updatePostBookmark]);
 
-  const handleEditSuccess = useCallback((postId: string, newContent: string) => {
-    // Optimistic update: update the post content immediately with is_edited flag
-    const now = new Date().toISOString();
+  const handleEditSuccess = useCallback((postId: string, newContent: string, updatedPost?: any) => {
+    // Use the server response data if available, otherwise use optimistic update
+    const serverUpdatedAt = updatedPost?.updated_at || updatedPost?.data?.updated_at;
+    const now = serverUpdatedAt || new Date().toISOString();
+    
     setPosts(prev => prev.map(post => 
       post.id === postId ? { 
         ...post, 
@@ -536,8 +538,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         updated_at: now
       } : post
     ));
-    if (__DEV__) console.log('Post edited (optimistic):', postId);
-  }, [posts, setCachedPosts]);
+  }, [setCachedPosts, posts]);
 
   const handleEditError = useCallback((postId: string, originalContent: string) => {
     // Revert the optimistic update if backend fails
@@ -802,7 +803,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         onReportPress={() => handleReportPress(item.id)}
         onBookmarkPress={() => handleBookmarkPress(item.id)}
         onPostPress={() => handlePostPress(item.id)}
-        onEditSuccess={(postId, newContent) => handleEditSuccess(postId, newContent)}
+        onEditSuccess={(postId, newContent, updatedPost) => handleEditSuccess(postId, newContent, updatedPost)}
         onEditError={(postId, originalContent) => handleEditError(postId, originalContent)}
         onSaveConfirmed={handleSaveConfirmed}
         onDeleteSuccess={handleDeleteSuccess}

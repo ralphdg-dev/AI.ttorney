@@ -38,7 +38,7 @@ interface PostProps {
   onReportPress?: () => void;
   onBookmarkPress?: () => void;
   onPostPress?: () => void;
-  onEditSuccess?: (postId: string, newContent: string) => void; // Callback when edit is successful
+  onEditSuccess?: (postId: string, newContent: string, updatedPost?: any) => void; // Callback when edit is successful
   onEditError?: (postId: string, originalContent: string) => void; // Callback to revert if edit fails
   onSaveConfirmed?: () => void; // Called when backend confirms save (for toast)
   onDeleteSuccess?: (postId: string) => void; // Callback when delete is successful
@@ -132,43 +132,65 @@ const Post: React.FC<PostProps> = React.memo(({
     
     return fullName;
   }, [responsive.useCompactName, isDeactivated]);
-  // Helper function to format relative time
-  const formatRelativeTime = (dateString: string | undefined) => {
-    if (!dateString) return 'now';
+  // Helper function to format timestamp - same logic as ViewPost for consistency
+  const formatTimestamp = useCallback((timestamp: string | null): string => {
+    if (!timestamp) return 'Unknown time';
+    
     try {
-      const dateMs = new Date(dateString).getTime();
-      if (Number.isNaN(dateMs)) return 'now';
-      const now = Date.now();
-      const diffSec = Math.max(0, Math.floor((now - dateMs) / 1000));
-      if (diffSec < 60) return `${diffSec}s`;
-      const diffMin = Math.floor(diffSec / 60);
-      if (diffMin < 60) return `${diffMin}m`;
-      const diffHr = Math.floor(diffMin / 60);
-      if (diffHr < 24) return `${diffHr}h`;
-      const diffDay = Math.floor(diffHr / 24);
-      if (diffDay < 7) return `${diffDay}d`;
-      const diffWeek = Math.floor(diffDay / 7);
-      if (diffWeek < 4) return `${diffWeek}w`;
-      const diffMonth = Math.floor(diffDay / 30);
-      if (diffMonth < 12) return `${diffMonth}mo`;
-      const diffYear = Math.floor(diffDay / 365);
-      return `${diffYear}y`;
+      // Parse the timestamp - ensure proper UTC handling
+      const postDate = new Date(timestamp);
+      const now = new Date();
+      
+      // Check if the date is valid
+      if (isNaN(postDate.getTime())) return 'Invalid time';
+      
+      // For recent posts (less than 24 hours old), show relative time
+      const diffInMs = now.getTime() - postDate.getTime();
+      const diffInSeconds = Math.floor(diffInMs / 1000);
+      
+      // If the timestamp is in the future or very recent (within 1 second)
+      if (diffInSeconds < 1) return 'Just now';
+      
+      if (diffInSeconds < 60) return `${diffInSeconds}s ago`;
+      
+      const diffInMinutes = Math.floor(diffInSeconds / 60);
+      if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+      
+      const diffInHours = Math.floor(diffInMinutes / 60);
+      if (diffInHours < 24) return `${diffInHours}h ago`;
+      
+      // For posts less than 7 days old, show "X days ago"
+      const diffInDays = Math.floor(diffInHours / 24);
+      if (diffInDays < 7) return `${diffInDays}d ago`;
+      
+      // For posts older than 7 days, show absolute date in a clearer format
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = months[postDate.getMonth()];
+      const day = postDate.getDate();
+      const year = postDate.getFullYear();
+      const currentYear = now.getFullYear();
+      
+      // If it's this year, show "Month Day" (e.g., "Dec 7")
+      // If it's a different year, show "Month Day, Year" (e.g., "Dec 7, 2023")
+      return year === currentYear ? `${month} ${day}` : `${month} ${day}, ${year}`;
+      
     } catch {
-      return 'now';
+      // Fallback for any parsing errors
+      return 'Unknown time';
     }
-  };
+  }, []);
 
   const [displayTime, setDisplayTime] = useState(() => {
     // Initialize with formatted time
     const dateToFormat = created_at || timestamp;
-    return formatRelativeTime(dateToFormat);
+    return formatTimestamp(dateToFormat);
   });
   
   // Calculate edited time display
   const editedTimeDisplay = useMemo(() => {
     if (!isEdited || !updated_at) return null;
-    return `Edited ${formatRelativeTime(updated_at)} ago`;
-  }, [isEdited, updated_at]);
+    return `Edited ${formatTimestamp(updated_at)}`;
+  }, [isEdited, updated_at, formatTimestamp]);
   
   const [showAlreadyReported, setShowAlreadyReported] = useState(false);
 
@@ -197,36 +219,16 @@ const Post: React.FC<PostProps> = React.memo(({
     if (!created_at) return;
     
     const updateTime = () => {
-      try {
-        const createdMs = new Date(created_at).getTime();
-        if (Number.isNaN(createdMs)) return 'now';
-        const now = Date.now();
-        const diffSec = Math.max(0, Math.floor((now - createdMs) / 1000));
-        if (diffSec < 60) return `${diffSec}s`;
-        const diffMin = Math.floor(diffSec / 60);
-        if (diffMin < 60) return `${diffMin}m`;
-        const diffHr = Math.floor(diffMin / 60);
-        if (diffHr < 24) return `${diffHr}h`;
-        const diffDay = Math.floor(diffHr / 24);
-        if (diffDay < 7) return `${diffDay}d`;
-        const diffWeek = Math.floor(diffDay / 7);
-        if (diffWeek < 4) return `${diffWeek}w`;
-        const diffMonth = Math.floor(diffDay / 30);
-        if (diffMonth < 12) return `${diffMonth}mo`;
-        const diffYear = Math.floor(diffDay / 365);
-        return `${diffYear}y`;
-      } catch {
-        return 'now';
-      }
+      return formatTimestamp(created_at);
     };
     
     // Update immediately
     setDisplayTime(updateTime());
     
-    // Update every 30 seconds for real-time feel
+    // Update every 10 seconds to match ViewPost for consistency
     const timer = setInterval(() => {
       setDisplayTime(updateTime());
-    }, 30000);
+    }, 10000);
     
     return () => clearInterval(timer);
   }, [created_at]);
@@ -440,9 +442,9 @@ const Post: React.FC<PostProps> = React.memo(({
     onMenuToggle?.(id); // Close the menu
   }, [id, onMenuToggle]);
 
-  const handleEditSuccess = useCallback((newContent: string) => {
+  const handleEditSuccess = useCallback((newContent: string, updatedPost?: any) => {
     setEditModalVisible(false);
-    onEditSuccess?.(id, newContent);
+    onEditSuccess?.(id, newContent, updatedPost);
   }, [id, onEditSuccess]);
 
   const handleDeletePress = useCallback(() => {
@@ -880,11 +882,15 @@ const styles = StyleSheet.create({
   timestamp: {
     fontSize: 12, // Will be overridden by responsive value
     color: '#536471',
+    minWidth: 50, // Ensure minimum width for "Just now" text
+    flexShrink: 0, // Prevent shrinking
   },
   editedIndicator: {
     fontSize: 12, // Will be overridden by responsive value
     color: '#6B7280', // Slightly lighter gray for edited indicator
     fontStyle: 'italic',
+    minWidth: 80, // Ensure minimum width for "Edited X time ago" text
+    flexShrink: 0, // Prevent shrinking
   },
   moreButton: {
     padding: 4,
