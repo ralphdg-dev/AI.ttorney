@@ -1,13 +1,11 @@
 import React from 'react';
 import Modal from '../ui/Modal';
-import Tooltip from '../ui/Tooltip';
-import { History, FileText } from 'lucide-react';
 import SecureImage from './SecureImage';
 import ApplicationHistory from './ApplicationHistory';
 import AuditTrail from './AuditTrail';
 import StatusBadge from './StatusBadge';
 import RollMatchBadge from './RollMatchBadge';
-import { exportApplicationHistoryPDF, exportAuditTrailPDF } from './PDFExportUtils';
+// PDF export utilities can be imported here when needed
 import lawyerApplicationsService from '../../services/lawyerApplicationsService';
 import rollMatchService from '../../services/rollMatchService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -15,24 +13,25 @@ import { useAuth } from '../../contexts/AuthContext';
 // Note: StableSecureImage component moved to separate SecureImage.js file
 
 const ViewLawyerApplicationModal = ({ open, onClose, application, loading = false, onViewHistoricalApplication, isHistoricalView = false, isEditMode = false, onSave }) => {
-  // Get current admin info from auth context
-  const { admin } = useAuth();
+  // Auth context available for future admin features
+  useAuth();
   
   // State for application history - must be at the top before any returns
   const [history, setHistory] = React.useState([]);
+  const [auditLogs, setAuditLogs] = React.useState([]);
   const [historyLoading, setHistoryLoading] = React.useState(false);
+  const [auditLogsLoading, setAuditLogsLoading] = React.useState(false);
   const [historyError, setHistoryError] = React.useState(null);
+  const [auditError, setAuditError] = React.useState(null);
   const [currentApplicationId, setCurrentApplicationId] = React.useState(null);
   
-  // State for audit logs
-  const [auditLogs, setAuditLogs] = React.useState([]);
-  const [auditLoading, setAuditLoading] = React.useState(false);
-  const [auditError, setAuditError] = React.useState(null);
-
+  // State for roll verification status
+  const [praStatus, setPraStatus] = React.useState('unknown');
+  
   // State for edit mode
   const [editStatus, setEditStatus] = React.useState('');
   const [editNotes, setEditNotes] = React.useState('');
-  const [saveLoading, setSaveLoading] = React.useState(false);
+  const [saveLoading] = React.useState(false);
   const [saveError, setSaveError] = React.useState(null);
 
 
@@ -41,7 +40,7 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
 
   // Check roll number and add pra_status like the table does
   React.useEffect(() => {
-    if (open && applicationData && !applicationData.pra_status) {
+    if (open && applicationData) {
       const checkRollNumber = async () => {
         try {
           const rollCheck = await rollMatchService.checkApplicationDetails({
@@ -49,13 +48,11 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
             fullName: applicationData.full_name,
             rollSignDate: applicationData.roll_sign_date,
           });
-          // Add pra_status and pra_match_details to the application data
-          applicationData.pra_status = rollCheck.status;
-          applicationData.pra_match_details = rollCheck.lawyer || null;
+          // Use state setters to trigger re-render
+          setPraStatus(rollCheck.status);
         } catch (error) {
           console.error('Failed to check roll number:', error);
-          applicationData.pra_status = 'not_found';
-          applicationData.pra_match_details = null;
+          setPraStatus('not_found');
         }
       };
       checkRollNumber();
@@ -73,7 +70,6 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
       ibp_id: ibpCardPath,
       selfie: selfiePath,
       status,
-      pra_status: praStatus,
     } = applicationData || {};
 
     // Get email and name from nested users object or direct field (for historical applications)
@@ -90,7 +86,6 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
       status,
       email,
       fullName,
-      praStatus
     };
   }, [applicationData]);
 
@@ -115,14 +110,14 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
     if (!applicationData?.id) return;
     
     try {
-      setAuditLoading(true);
+      setAuditLogsLoading(true);
       setAuditError(null);
       const response = await lawyerApplicationsService.getApplicationAuditLogs(applicationData.id);
       setAuditLogs(response.data || []);
     } catch (err) {
       setAuditError(err.message);
     } finally {
-      setAuditLoading(false);
+      setAuditLogsLoading(false);
     }
   }, [applicationData?.id]);
 
@@ -170,15 +165,7 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
     }
   }, [open, isEditMode, applicationData, isInitialized]);
 
-  // Handle PDF export for application history
-  const handleExportHistoryPDF = async () => {
-    await exportApplicationHistoryPDF(history, fullName, email, applicationData, admin);
-  };
-
-  // Handle PDF export for audit trail
-  const handleExportAuditPDF = () => {
-    exportAuditTrailPDF(auditLogs, fullName, email, admin, applicationData?.id);
-  };
+  // PDF export functions can be added here when needed
 
 
   // Handle save in edit mode - show confirmation first
@@ -217,7 +204,6 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
   
   // Extract values from memoized data
   const {
-    name,
     rollNumber,
     rollSignDate,
     registered,
@@ -226,7 +212,6 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
     status,
     email,
     fullName,
-    praStatus
   } = extractedData;
 
   // Format date for display
@@ -261,10 +246,10 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
       <div className="space-y-4">
         {/* Informational Note */}
         {!isHistoricalView && !isEditMode && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mb-3">
+          <div className="p-2 mb-3 border border-blue-200 rounded-lg bg-blue-50">
             <div className="flex items-start gap-2">
               <div className="flex-shrink-0 mt-0.5">
-                <div className="w-3 h-3 bg-blue-500 rounded-sm flex items-center justify-center">
+                <div className="flex items-center justify-center w-3 h-3 bg-blue-500 rounded-sm">
                   <span className="text-white text-[8px] font-bold">!</span>
                 </div>
               </div>
@@ -275,7 +260,7 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
             </div>
           </div>
         )}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
             <div className="text-[9px] text-gray-500">Full Name</div>
             <div className="text-xs font-medium text-gray-900">{fullName || '-'}</div>
@@ -347,20 +332,20 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
                 placeholder="Edit notes for this application..."
               />
             ) : (
-              <div className="text-xs font-medium text-gray-900 mt-1">
+              <div className="mt-1 text-xs font-medium text-gray-900">
                 {applicationData?.admin_notes || applicationData?.notes || 'No notes available'}
               </div>
             )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <div className="text-[9px] font-medium text-gray-700 mb-1">IBP Card</div>
             <SecureImage 
               imagePath={ibpCardPath}
               alt="IBP Card"
-              className="w-full h-40 object-cover rounded-md border border-gray-200"
+              className="object-cover w-full h-40 border border-gray-200 rounded-md"
               primaryBucket="ibp-ids"
             />
           </div>
@@ -369,7 +354,7 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
             <SecureImage 
               imagePath={selfiePath}
               alt="Live Selfie"
-              className="w-full h-40 object-cover rounded-md border border-gray-200"
+              className="object-cover w-full h-40 border border-gray-200 rounded-md"
               primaryBucket="selfie-ids"
             />
           </div>
@@ -377,7 +362,7 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
 
         {/* Save Error Display */}
         {isEditMode && saveError && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-3">
+          <div className="p-3 border border-red-200 rounded-md bg-red-50">
             <p className="text-sm text-red-600">{saveError}</p>
           </div>
         )}
@@ -401,7 +386,7 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
             >
               {saveLoading ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white inline mr-2"></div>
+                  <div className="inline w-4 h-4 mr-2 border-b-2 border-white rounded-full animate-spin"></div>
                   Saving...
                 </>
               ) : (
@@ -413,8 +398,8 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
 
         {/* Application History & Audit Trail Section - Only show for main view, not historical view, not edit mode */}
         {!isHistoricalView && !isEditMode && (
-          <div className="border-t border-gray-200 pt-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="pt-4 border-t border-gray-200">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               
               {/* Application History Column */}
               <div>
@@ -434,7 +419,7 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
               <div>
                 <AuditTrail 
                   auditLogs={auditLogs}
-                  auditLoading={auditLoading}
+                  auditLoading={auditLogsLoading}
                   auditError={auditError}
                   fullName={fullName}
                   email={email}

@@ -10,6 +10,9 @@ const EditLawyerApplicationModal = ({ open, onClose, application, onSave }) => {
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // State for roll verification status
+  const [praStatus, setPraStatus] = useState('unknown');
 
   // Initialize form data when modal opens
   useEffect(() => {
@@ -79,7 +82,7 @@ const EditLawyerApplicationModal = ({ open, onClose, application, onSave }) => {
 
   // Check roll number and add pra_status like the table does
   useEffect(() => {
-    if (open && applicationData && !applicationData.pra_status) {
+    if (open && applicationData) {
       const checkRollNumber = async () => {
         try {
           const rollCheck = await rollMatchService.checkApplicationDetails({
@@ -87,20 +90,16 @@ const EditLawyerApplicationModal = ({ open, onClose, application, onSave }) => {
             fullName: applicationData.full_name,
             rollSignDate: applicationData.roll_sign_date,
           });
-          // Add pra_status and pra_match_details to the application data
-          applicationData.pra_status = rollCheck.status;
-          applicationData.pra_match_details = rollCheck.lawyer || null;
+          // Use state setters to trigger re-render
+          setPraStatus(rollCheck.status);
         } catch (error) {
           console.error('Failed to check roll number:', error);
-          applicationData.pra_status = 'not_found';
-          applicationData.pra_match_details = null;
+          setPraStatus('not_found');
         }
       };
       checkRollNumber();
     }
   }, [open, applicationData]);
-
-  const praStatus = applicationData?.pra_status;
 
   return (
     <Modal 
