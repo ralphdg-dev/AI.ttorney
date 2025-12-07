@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { View, FlatList, RefreshControl, TouchableOpacity, Animated, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Plus } from 'lucide-react-native';
+import { Plus, CheckCircle } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import Post from '../../home/Post';
 import Colors from '../../../constants/Colors';
@@ -13,8 +13,10 @@ import { shouldUseNativeDriver } from '../../../utils/animations';
 import { NetworkConfig } from '../../../utils/networkConfig';
 import { useList } from '@/hooks/useOptimizedList';
 import { SkeletonList } from '@/components/ui/SkeletonLoader';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getResponsiveValue } from '@/constants/LayoutConstants';
 import { supabase } from '@/lib/supabase';
+import { Text } from '@/components/ui/text';
 
 
 type ForumPostWithUser = {
@@ -65,11 +67,25 @@ const LawyerTimeline: React.FC = React.memo(() => {
   const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
   const [, setError] = useState<string | null>(null);
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  
   // Refs for optimization
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isComponentMounted = useRef(true);
-    const refreshingRef = useRef(false);
+  const refreshingRef = useRef(false);
+  const loadingMoreRef = useRef(false);
+  const hasMoreRef = useRef(true);
+  const currentPageRef = useRef(1);
   const listRef = useRef<FlatList>(null);
+  const loadMoreDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastLoadTimeRef = useRef(0);
+  // Track last scroll Y position to detect scroll direction
+  const lastScrollYRef = useRef(0);
+  // Track if we've already triggered at current bottom position
+  const hasTriggeredAtBottomRef = useRef(false);
 
   // Optimized auth headers helper with minimal logging
   const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
@@ -154,24 +170,33 @@ const LawyerTimeline: React.FC = React.memo(() => {
     return postData;
   }, []);
 
-  // Optimized loadPosts - now fetches all posts at once with retry logic
-  const loadPosts = useCallback(async (force = false, retryCount = 0) => {
+  // Keep current page in sync between state and ref for stable pagination
+  const updateCurrentPage = useCallback((page: number) => {
+    setCurrentPage(page);
+    currentPageRef.current = page;
+  }, []);
+
+  // Optimized loadPosts with pagination support
+  const loadPosts = useCallback(async (force = false, retryCount = 0, loadMore = false) => {
     const MAX_RETRIES = 2;
     const RETRY_DELAY = 1000 * Math.pow(2, retryCount); // Exponential backoff: 1s, 2s, 4s
 
-    // Check cache first (only for initial load)
-    if (!force && isCacheValid()) {
+    // Check cache first (only for initial load, not for load more)
+    if (!force && !loadMore && isCacheValid()) {
       const cachedPosts = getCachedPosts();
       if (cachedPosts && cachedPosts.length > 0) {
         if (__DEV__) console.log('LawyerTimeline: Using cached posts, skipping fetch');
         setPosts(cachedPosts);
         setInitialLoading(false);
+        setError(null);
         return;
       }
     }
 
     // Close any open dropdown menus when refreshing
-    setOpenMenuPostId(null);
+    if (!loadMore) {
+      setOpenMenuPostId(null);
+    }
     setError(null);
 
     if (!isAuthenticated) {
@@ -183,8 +208,19 @@ const LawyerTimeline: React.FC = React.memo(() => {
     }
 
     // Set loading state before making request
-    setRefreshing(true);
-    refreshingRef.current = true;
+    if (retryCount === 0) {
+      if (loadMore) {
+        setLoadingMore(true);
+        loadingMoreRef.current = true;
+      } else {
+        setRefreshing(true);
+        refreshingRef.current = true;
+        // Reset pagination for fresh load
+        updateCurrentPage(1);
+        setHasMore(true);
+        hasMoreRef.current = true;
+      }
+    }
 
     const now = Date.now();
     setLastFetchTime(now);
@@ -193,11 +229,14 @@ const LawyerTimeline: React.FC = React.memo(() => {
       const headers = await getAuthHeaders();
       const API_BASE_URL = await NetworkConfig.getBestApiUrl();
 
+      // Calculate page for API call
+      const pageToFetch = loadMore ? currentPageRef.current + 1 : 1;
+
       if (__DEV__) {
-        console.log('LawyerTimeline: Fetching all posts from database');
+        console.log(`LawyerTimeline: Fetching posts page ${pageToFetch} (attempt ${retryCount + 1}/${MAX_RETRIES + 1}), loadMore: ${loadMore}`);
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/forum/posts/recent`, {
+      const response = await fetch(`${API_BASE_URL}/api/forum/posts/recent?page=${pageToFetch}&limit=15`, {
         method: 'GET',
         headers,
       });
@@ -219,10 +258,9 @@ const LawyerTimeline: React.FC = React.memo(() => {
       if (__DEV__) {
         console.log('LawyerTimeline: Raw API response:', {
           success: data?.success,
-          dataType: Array.isArray(data?.data) ? 'array' : typeof data?.data,
           dataLength: Array.isArray(data?.data) ? data.data.length : 'not array',
-          directArray: Array.isArray(data),
-          directLength: Array.isArray(data) ? data.length : 'not array'
+          hasMore: data?.hasMore,
+          page: data?.page,
         });
       }
 
@@ -230,23 +268,44 @@ const LawyerTimeline: React.FC = React.memo(() => {
         mapped = data.data.map(mapApiToPost);
       } else if (Array.isArray(data)) {
         mapped = data.map(mapApiToPost);
+      } else {
+        if (__DEV__) console.warn('LawyerTimeline: Unexpected response format', data);
       }
 
       if (__DEV__) {
-        console.log(`LawyerTimeline: Mapped ${mapped.length} posts from API response - all posts loaded`);
+        console.log(`LawyerTimeline: Successfully mapped ${mapped.length} posts`);
       }
 
       // Only update if component is still mounted
       if (isComponentMounted.current) {
-        setPosts(mapped);
-        setCachedPosts(mapped); // Cache the posts
+        if (loadMore) {
+          const newPagePosts = mapped.map((post, index) => ({
+            ...post,
+            isNewlyLoaded: true,
+            loadedIndex: index,
+          }));
 
-        if (__DEV__ && mapped.length === 0) {
-          console.log('LawyerTimeline: No posts found after mapping');
+          const newPosts = [...posts, ...newPagePosts];
+          setPosts(newPosts);
+          setCachedPosts(newPosts);
+          updateCurrentPage(pageToFetch);
+        } else {
+          setPosts(mapped);
+          setCachedPosts(mapped);
+          updateCurrentPage(pageToFetch);
         }
-
-        // Clear any error state on successful load
+        
+        // Update hasMore based on API response and page size
+        const backendHasMore = data?.hasMore === true;
+        const inferredHasMore = mapped.length === 15;
+        const hasMorePosts = backendHasMore || inferredHasMore;
+        setHasMore(hasMorePosts);
+        hasMoreRef.current = hasMorePosts;
         setError(null);
+
+        if (mapped.length === 0 && __DEV__) {
+          console.log('LawyerTimeline: No posts available');
+        }
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
@@ -280,9 +339,13 @@ const LawyerTimeline: React.FC = React.memo(() => {
         setRefreshing(false);
         refreshingRef.current = false;
         setInitialLoading(false);
+        setLoadingMore(false);
+        loadingMoreRef.current = false;
+        // Reset trigger flag after load completes so it can trigger again
+        hasTriggeredAtBottomRef.current = false;
       }
     }
-  }, [isAuthenticated, getAuthHeaders, mapApiToPost, isCacheValid, getCachedPosts, setCachedPosts, setLastFetchTime]);
+  }, [isAuthenticated, getAuthHeaders, mapApiToPost, isCacheValid, getCachedPosts, setCachedPosts, setLastFetchTime, posts, updateCurrentPage]);
 
   // Initial load with cache check
   useEffect(() => {
@@ -303,13 +366,28 @@ const LawyerTimeline: React.FC = React.memo(() => {
         return;
       }
 
-      // Refresh from cache on focus to get updated comment counts
-      // ViewPost updates the cache, but we need to read the fresh data
-      const cachedPosts = getCachedPosts();
-      if (cachedPosts && cachedPosts.length > 0) {
-        setPosts(cachedPosts);
+      // Check if we have valid cached data
+      if (isCacheValid()) {
+        if (__DEV__) console.log('📱 LawyerTimeline: Screen focused, cache valid - using cached data');
+        const cachedPosts = getCachedPosts();
+        if (cachedPosts && cachedPosts.length > 0) {
+          setPosts(cachedPosts);
+          setInitialLoading(false);
+
+          // Reconstruct pagination state from cached posts
+          const totalPosts = cachedPosts.length;
+          const approxPage = Math.max(1, Math.ceil(totalPosts / 15));
+          updateCurrentPage(approxPage);
+
+          const inferredHasMore = totalPosts % 15 === 0;
+          setHasMore(inferredHasMore);
+          hasMoreRef.current = inferredHasMore;
+        }
+      } else {
+        if (__DEV__) console.log('📱 LawyerTimeline: Screen focused, cache invalid - refreshing');
+        loadPosts(true); // Force refresh
       }
-    }, [getCachedPosts])
+    }, [loadPosts, isCacheValid, getCachedPosts, updateCurrentPage])
   );
 
   // Real-time subscription for comment count updates (optimized with debouncing)
@@ -439,6 +517,9 @@ const LawyerTimeline: React.FC = React.memo(() => {
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
       }
+      if (loadMoreDebounceRef.current) {
+        clearTimeout(loadMoreDebounceRef.current);
+      }
     };
   }, []);
 
@@ -480,7 +561,46 @@ const LawyerTimeline: React.FC = React.memo(() => {
   
   // Manual refresh handler
   const handleRefresh = useCallback(() => {
+    if (__DEV__) console.log('LawyerTimeline: Manual refresh triggered');
     loadPosts(true); // Force refresh
+  }, [loadPosts]);
+
+  // Load more handler for infinite scrolling with debouncing and guards
+  const handleLoadMore = useCallback(() => {
+    // Clear any pending debounce
+    if (loadMoreDebounceRef.current) {
+      clearTimeout(loadMoreDebounceRef.current);
+    }
+
+    // Debounce to prevent rapid consecutive calls
+    loadMoreDebounceRef.current = setTimeout(() => {
+      // Use refs to check current state and prevent stale closures
+      if (loadingMoreRef.current) {
+        if (__DEV__) console.log('LawyerTimeline: Already loading more, skipping');
+        return;
+      }
+
+      if (refreshingRef.current) {
+        if (__DEV__) console.log('LawyerTimeline: Currently refreshing, skipping load more');
+        return;
+      }
+
+      if (!hasMoreRef.current) {
+        if (__DEV__) console.log('LawyerTimeline: No more posts to load');
+        return;
+      }
+
+      // Prevent loading if we just loaded recently (within 500ms)
+      const now = Date.now();
+      if (now - lastLoadTimeRef.current < 500) {
+        if (__DEV__) console.log('LawyerTimeline: Throttling load more (too soon)');
+        return;
+      }
+
+      lastLoadTimeRef.current = now;
+      if (__DEV__) console.log('LawyerTimeline: Loading more posts...', { currentPage: currentPageRef.current, hasMore: hasMoreRef.current });
+      loadPosts(false, 0, true); // loadMore = true
+    }, 100); // 100ms debounce
   }, [loadPosts]);
 
   // Function to add optimistic post
@@ -684,11 +804,30 @@ const LawyerTimeline: React.FC = React.memo(() => {
 
   // Render footer component
   const renderFooter = useCallback(() => {
+    if (loadingMore) {
+      return (
+        <View style={styles.footerLoader}>
+          <LoadingSpinner size="small" />
+          <Text style={styles.loadingText}>Loading more posts...</Text>
+        </View>
+      );
+    }
+
+    if (!hasMore && allPosts.length > 0) {
+      return (
+        <View style={styles.endOfPostsContainer}>
+          <CheckCircle size={20} color={Colors.text.secondary} />
+          <Text style={styles.endOfPostsText}>You've seen all posts</Text>
+        </View>
+      );
+    }
+
     if (allPosts.length > 0) {
       return <View style={{ height: 80 }} />;
     }
+
     return null;
-  }, [allPosts.length]);
+  }, [loadingMore, allPosts.length, hasMore]);
 
   return (
     <View style={{ flex: 1, backgroundColor: 'white' }}>
@@ -707,14 +846,47 @@ const LawyerTimeline: React.FC = React.memo(() => {
           refreshControl={refreshControl}
           ListHeaderComponent={null}
           ListFooterComponent={renderFooter}
-          onScroll={() => setOpenMenuPostId(null)}
-          scrollEventThrottle={400}
+          onScroll={(event) => {
+            const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+            const currentScrollY = contentOffset.y;
+            
+            // Close any open menus when scrolling
+            setOpenMenuPostId(null);
+            
+            // Manual check as backup for onEndReached (more reliable)
+            const distanceFromBottom = contentSize.height - (currentScrollY + layoutMeasurement.height);
+            const isScrollingDown = currentScrollY > lastScrollYRef.current;
+            
+            // Only trigger if:
+            // 1. Within 500px of bottom
+            // 2. Scrolling DOWN (not up)
+            // 3. Haven't already triggered at this bottom position
+            // 4. Not currently loading
+            if (distanceFromBottom < 500 && isScrollingDown && !hasTriggeredAtBottomRef.current && !loadingMoreRef.current) {
+              hasTriggeredAtBottomRef.current = true;
+              handleLoadMore();
+            }
+            
+            // Reset trigger flag when scrolling away from bottom (more than 800px)
+            if (distanceFromBottom > 800) {
+              hasTriggeredAtBottomRef.current = false;
+            }
+            
+            lastScrollYRef.current = currentScrollY;
+          }}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.1}
+          scrollEventThrottle={200}
           scrollEnabled={allPosts.length > 0 || initialLoading}
           removeClippedSubviews={true}
-          maxToRenderPerBatch={10}
+          maxToRenderPerBatch={15}
           updateCellsBatchingPeriod={50}
           windowSize={10}
-          initialNumToRender={10}
+          initialNumToRender={15}
+          maintainVisibleContentPosition={{
+            minIndexForVisible: 0,
+            autoscrollToTopThreshold: 10,
+          }}
         />
       )}
 
@@ -777,6 +949,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
     paddingTop: 10,
+  },
+  footerLoader: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 13,
+    color: Colors.text.secondary,
+    fontWeight: '500',
+    marginTop: 8,
+  },
+  endOfPostsContainer: {
+    paddingVertical: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  endOfPostsText: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+    fontWeight: '500',
+    marginTop: 4,
   },
 });
 

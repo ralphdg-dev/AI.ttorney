@@ -99,6 +99,14 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
   const listRef = useRef<FlatList>(null);
   // Add scroll position tracking
   const scrollPositionRef = useRef(0);
+  // Debounce timer for load more
+  const loadMoreDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track last load time to prevent rapid consecutive loads
+  const lastLoadTimeRef = useRef(0);
+  // Track last scroll Y position to detect scroll direction
+  const lastScrollYRef = useRef(0);
+  // Track if we've already triggered at current bottom position
+  const hasTriggeredAtBottomRef = useRef(false);
 
   useImperativeHandle(ref, () => ({
     scrollToTop: () => {
@@ -378,6 +386,8 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         setInitialLoading(false);
         setLoadingMore(false);
         loadingMoreRef.current = false;
+        // Reset trigger flag after load completes so it can trigger again
+        hasTriggeredAtBottomRef.current = false;
       }
     }
   }, [isAuthenticated, getAuthHeaders, mapApiToPost, isCacheValid, getCachedPosts, setCachedPosts, setLastFetchTime, posts, updateCurrentPage]);
@@ -488,6 +498,9 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       isComponentMounted.current = false;
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
+      }
+      if (loadMoreDebounceRef.current) {
+        clearTimeout(loadMoreDebounceRef.current);
       }
     };
   }, []);
@@ -616,26 +629,42 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     loadPosts(true); // Force refresh
   }, [loadPosts]);
 
-  // Load more handler for infinite scrolling with ref-based guards
+  // Load more handler for infinite scrolling with debouncing and guards
   const handleLoadMore = useCallback(() => {
-    // Use refs to check current state and prevent stale closures
-    if (loadingMoreRef.current) {
-      if (__DEV__) console.log('Timeline: Already loading more, skipping');
-      return;
+    // Clear any pending debounce
+    if (loadMoreDebounceRef.current) {
+      clearTimeout(loadMoreDebounceRef.current);
     }
 
-    if (refreshingRef.current) {
-      if (__DEV__) console.log('Timeline: Currently refreshing, skipping load more');
-      return;
-    }
+    // Debounce to prevent rapid consecutive calls
+    loadMoreDebounceRef.current = setTimeout(() => {
+      // Use refs to check current state and prevent stale closures
+      if (loadingMoreRef.current) {
+        if (__DEV__) console.log('Timeline: Already loading more, skipping');
+        return;
+      }
 
-    if (!hasMoreRef.current) {
-      if (__DEV__) console.log('Timeline: No more posts to load');
-      return;
-    }
+      if (refreshingRef.current) {
+        if (__DEV__) console.log('Timeline: Currently refreshing, skipping load more');
+        return;
+      }
 
-    if (__DEV__) console.log('Timeline: Loading more posts...', { currentPage: currentPageRef.current, hasMore: hasMoreRef.current });
-    loadPosts(false, 0, true); // loadMore = true
+      if (!hasMoreRef.current) {
+        if (__DEV__) console.log('Timeline: No more posts to load');
+        return;
+      }
+
+      // Prevent loading if we just loaded recently (within 500ms)
+      const now = Date.now();
+      if (now - lastLoadTimeRef.current < 500) {
+        if (__DEV__) console.log('Timeline: Throttling load more (too soon)');
+        return;
+      }
+
+      lastLoadTimeRef.current = now;
+      if (__DEV__) console.log('Timeline: Loading more posts...', { currentPage: currentPageRef.current, hasMore: hasMoreRef.current });
+      loadPosts(false, 0, true); // loadMore = true
+    }, 100); // 100ms debounce
   }, [loadPosts]);
 
   const handleCreatePost = useCallback(() => {
@@ -933,39 +962,61 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
           onScroll={(event) => {
             // Track scroll position as user scrolls
             const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-            scrollPositionRef.current = contentOffset.y;
+            const currentScrollY = contentOffset.y;
+            scrollPositionRef.current = currentScrollY;
+            
             // Close any open menus when scrolling
             setOpenMenuPostId(null);
-
-            // Proactively trigger load more when the user is near the bottom.
-            // Clamp distanceFromBottom to avoid negative values from overscroll
-            // on some devices which can make it feel like the page "breaks".
-            const rawDistance = contentSize.height - (contentOffset.y + layoutMeasurement.height);
-            const distanceFromBottom = Math.max(0, rawDistance);
-            if (distanceFromBottom < 300) {
+            
+            // Manual check as backup for onEndReached (more reliable)
+            const distanceFromBottom = contentSize.height - (currentScrollY + layoutMeasurement.height);
+            const isScrollingDown = currentScrollY > lastScrollYRef.current;
+            
+            // Only trigger if:
+            // 1. Within 500px of bottom
+            // 2. Scrolling DOWN (not up)
+            // 3. Haven't already triggered at this bottom position
+            // 4. Not currently loading
+            if (distanceFromBottom < 500 && isScrollingDown && !hasTriggeredAtBottomRef.current && !loadingMoreRef.current) {
+              hasTriggeredAtBottomRef.current = true;
               handleLoadMore();
             }
+            
+            // Reset trigger flag when scrolling away from bottom (more than 800px)
+            if (distanceFromBottom > 800) {
+              hasTriggeredAtBottomRef.current = false;
+            }
+            
+            lastScrollYRef.current = currentScrollY;
           }}
           contentContainerStyle={allPosts.length === 0 ? styles.emptyContent : [styles.timelineContent, { paddingBottom: 56 + (insets.bottom || 0) + 20 }]}
           refreshControl={refreshControl}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.1}
-          scrollEventThrottle={16}
-          removeClippedSubviews={false}
+          scrollEventThrottle={200}
+          removeClippedSubviews={true}
           windowSize={10}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
+          initialNumToRender={15}
+          maxToRenderPerBatch={15}
           updateCellsBatchingPeriod={50}
           showsVerticalScrollIndicator={false}
+          maintainVisibleContentPosition={{
+            minIndexForVisible: 0,
+            autoscrollToTopThreshold: 10,
+          }}
           ListFooterComponent={loadingMore ? (
             <View style={styles.footerLoader}>
               <LoadingSpinner size="small" />
+              <Text style={styles.loadingText}>Loading more posts...</Text>
             </View>
-          ) : hasMore ? null : (
+          ) : hasMore ? (
+            <View style={styles.bottomSpacer} />
+          ) : allPosts.length > 0 ? (
             <View style={styles.endOfPostsContainer}>
+              <CheckCircle size={20} color={Colors.text.secondary} />
               <Text style={styles.endOfPostsText}>You've seen all posts</Text>
             </View>
-          )}
+          ) : null}
           ListEmptyComponent={!initialLoading ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No posts yet. Be the first to share!</Text>
@@ -1045,16 +1096,25 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 13,
+    color: Colors.text.secondary,
+    fontWeight: '500',
+    marginTop: 8,
   },
   endOfPostsContainer: {
     paddingVertical: 30,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
   },
   endOfPostsText: {
     fontSize: 14,
     color: Colors.text.secondary,
     fontWeight: '500',
+    marginTop: 4,
   },
   createPostButton: {
     position: 'absolute',
