@@ -387,23 +387,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
         
-        let applicationStatus = null;
-        if (profile.role === 'lawyer' || profile.pending_lawyer) {
-          applicationStatus = await checkLawyerApplicationStatus();
-        }
-        
-        if (profile.pending_lawyer && applicationStatus === 'accepted') {
-          // Only auto-redirect to status page if application is accepted
-          const redirectPath = `/onboarding/lawyer/lawyer-status/accepted`;
-          console.log(`🚀 Navigating to: ${redirectPath} (accepted lawyer)`);
-          setIsLoading(false);
-          clearTimeout(authTimeoutId);
-          try {
-            router.replace(redirectPath as any);
-          } catch (routerError) {
-            console.warn('Router not ready during lawyer redirect:', routerError);
-          }
-        } else {
+        // Don't auto-redirect to status screens on login
+        // Users should access status screens manually via sidebar "Apply to be a Lawyer"
+        // Just proceed with normal role-based redirect
+        {
           // For unverified users (guest role + is_verified=false), redirect to OTP verification
           // For others, use normal role-based redirect
           let redirectPath: string;

@@ -225,6 +225,9 @@ class LawyerApplicationService:
             if not user_update_result["success"]:
                 return user_update_result
             
+            # Send real-time notification to user about application status change
+            await self._send_application_status_notification(user_id, review_data.status, application_id)
+            
             return {
                 "success": True,
                 "message": f"Application {review_data.status} successfully"
@@ -577,6 +580,48 @@ class LawyerApplicationService:
         except Exception as e:
             logger.error(f"Get user application history error: {str(e)}")
             return {"success": False, "error": str(e)}
+
+    async def _send_application_status_notification(self, user_id: str, status: str, application_id: str) -> None:
+        """Send real-time notification to user about application status change
+        
+        Follows industry standards (LinkedIn, Stripe, Upwork) for immediate feedback.
+        """
+        try:
+            from services.notification_service import NotificationService
+            notification_service = NotificationService()
+            
+            # Prepare notification content based on status
+            if status == "accepted":
+                title = "🎉 Lawyer Application Accepted!"
+                message = "Congratulations! Your lawyer application has been approved. Click to view details and continue as a verified lawyer."
+            elif status == "rejected":
+                title = "❌ Lawyer Application Update"
+                message = "Your lawyer application has been reviewed. Please check your application status for more information."
+            elif status == "resubmission":
+                title = "📋 Lawyer Application Update"
+                message = "Your lawyer application requires resubmission. Please review the feedback and submit an updated application."
+            else:
+                title = "📄 Lawyer Application Update"
+                message = "Your lawyer application status has been updated. Please check your application for details."
+            
+            # Send notification with deep link to application status
+            await notification_service.create_notification(
+                user_id=user_id,
+                type="lawyer_application_update",
+                title=title,
+                message=message,
+                data={
+                    "application_id": application_id,
+                    "status": status,
+                    "deep_link": "/apply-lawyer"  # Routes to appropriate status screen
+                }
+            )
+            
+            logger.info(f"✅ Notification sent to user {user_id[:8]}... for application {status}")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to send application status notification: {str(e)}")
+            # Don't fail the review process if notification fails
 
     async def _set_application_acknowledged(self, application_id: str) -> Dict[str, Any]:
         """DRY helper: Set acknowledged=TRUE on an application

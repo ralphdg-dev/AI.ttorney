@@ -1,13 +1,16 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { LoadingWithTrivia } from '../components/LoadingWithTrivia';
+import { supabase } from '../config/supabase';
 
 export default function ApplyLawyer() {
   const insets = useSafeAreaInsets();
-  const { user, session, checkLawyerApplicationStatus } = useAuth();
+  const { user, session, checkLawyerApplicationStatus, refreshUserData } = useAuth();
+  const [hasRealtimeUpdate, setHasRealtimeUpdate] = useState(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
   useEffect(() => {
     const checkApplicationStatus = async () => {
@@ -25,6 +28,7 @@ export default function ApplyLawyer() {
       // Check if user has pending_lawyer flag
       if (user.pending_lawyer) {
         console.log('⏳ User has pending_lawyer flag, checking application status...');
+        setIsCheckingStatus(true);
         
         try {
           // Use the AuthContext method which has proper token handling
@@ -73,8 +77,10 @@ export default function ApplyLawyer() {
           }
         } catch (error) {
           console.error('❌ Error checking application status:', error);
-          // Fallback: go to pending status
-          router.push('/onboarding/lawyer/lawyer-status/pending');
+          // Fallback: go to verification instructions if status check fails
+          router.push('/onboarding/lawyer/verification-instructions');
+        } finally {
+          setIsCheckingStatus(false);
         }
       } else {
         console.log('📝 User does not have pending_lawyer flag, redirecting to verification instructions');
@@ -84,14 +90,74 @@ export default function ApplyLawyer() {
 
     // Execute immediately without delay to prevent double loading
     checkApplicationStatus();
-  }, [user, session, checkLawyerApplicationStatus]);
+    
+    // Set up real-time subscription for application updates
+    if (user && session) {
+      console.log('🔔 Setting up real-time subscription for user:', user.id);
+      
+      const subscription = supabase
+        .channel(`lawyer_applications_${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'lawyer_applications',
+            filter: `user_id=eq.${user.id}`
+          },
+          async (payload: any) => {
+            try {
+              console.log('🔔 Real-time application update received:', payload.new.status);
+              
+              // Check if this is a status change (admin review)
+              if (payload.new.status && payload.new.status !== payload.old?.status) {
+                console.log('📋 Application status changed from', payload.old?.status, 'to', payload.new.status);
+                
+                // Add small delay to ensure database is fully updated
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Refresh user data to get updated pending_lawyer flag
+                await refreshUserData();
+                
+                // Re-check application status to route to correct screen
+                await checkApplicationStatus();
+                
+                setHasRealtimeUpdate(true);
+              }
+            } catch (error) {
+              console.error('❌ Error handling real-time update:', error);
+              // Don't break the subscription, just log the error
+            }
+          }
+        )
+        .subscribe((status: any) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Real-time subscription active');
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('❌ Real-time subscription error');
+          }
+        });
+      
+      // Cleanup subscription on unmount
+      return () => {
+        console.log('🔕 Cleaning up real-time subscription');
+        subscription.unsubscribe();
+      };
+    }
+  }, [user, session, checkLawyerApplicationStatus, refreshUserData]);
 
   // Show loading immediately to prevent white page flash
+  const loadingMessage = isCheckingStatus 
+    ? "CHECKING APPLICATION STATUS..." 
+    : hasRealtimeUpdate 
+      ? "UPDATING APPLICATION STATUS..." 
+      : "LOADING...";
+
   return (
     <View style={{ flex: 1, paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right }}>
       <View style={{ flex: 1, backgroundColor: '#1F2937' }}>
         <LoadingWithTrivia 
-          message="LOADING..."
+          message={loadingMessage}
           showTrivia={true}
         />
       </View>
