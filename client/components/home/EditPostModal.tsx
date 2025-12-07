@@ -9,7 +9,7 @@ import { NetworkConfig } from '../../utils/networkConfig';
 interface EditPostModalProps {
   visible: boolean;
   onClose: () => void;
-  onSuccess: (newContent: string) => void;
+  onSuccess: (newContent: string, updatedPost?: any) => void;
   onError?: (originalContent: string) => void; // Called if backend fails, to revert
   onSaveConfirmed?: () => void; // Called when backend confirms save (for toast)
   postId: string;
@@ -58,9 +58,8 @@ const EditPostModal: React.FC<EditPostModalProps> = ({
     const trimmedContent = content.trim();
     const originalContent = initialContent;
 
-    // Optimistic update: close modal and update UI immediately
-    onSuccess(trimmedContent);
-    onClose();
+    // Set loading state and keep modal open
+    setIsSubmitting(true);
 
     // Process in background
     try {
@@ -84,12 +83,23 @@ const EditPostModal: React.FC<EditPostModalProps> = ({
       if (!result.success) {
         throw new Error(result.message || 'Failed to update post');
       }
-      // Success - notify parent to show toast
+      
+      // Success - update parent with the new content and server data
+      const updatedPost = result.data || result;
+      onSuccess(trimmedContent, updatedPost);
+      
+      // Notify parent to show toast
       onSaveConfirmed?.();
+      
+      // Close modal only after successful update
+      onClose();
     } catch (error: any) {
       // Revert the optimistic update
       onError?.(originalContent);
       Alert.alert('Error', error.message || 'Failed to update post. Your changes have been reverted.');
+    } finally {
+      // Reset loading state
+      setIsSubmitting(false);
     }
   };
 

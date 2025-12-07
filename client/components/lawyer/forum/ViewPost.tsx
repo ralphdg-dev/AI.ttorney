@@ -20,6 +20,7 @@ import { shouldUseNativeDriver } from '../../../utils/animations';
 import { NetworkConfig } from '../../../utils/networkConfig';
 import { useModerationStatus } from '../../../contexts/ModerationContext';
 import { useToast } from '../../ui/toast';
+import { createSafeAreaToastRenderer } from '../../ui/SafeAreaToast';
 import { parseModerationError } from '../../../services/moderationService';
 import { showStrikeAddedToast, showSuspendedToast, showBannedToast, showAccessDeniedToast, showContentValidationToast } from '../../../utils/moderationToastUtils';
 import { validatePostContent } from '../../../utils/contentValidation';
@@ -229,6 +230,7 @@ const ViewPost: React.FC = () => {
   const [isDeletingReply, setIsDeletingReply] = useState(false);
   const [deletePostModalVisible, setDeletePostModalVisible] = useState(false);
   const [isDeletingPost, setIsDeletingPost] = useState(false);
+  const [renderKey, setRenderKey] = useState(0); // Force re-render for timestamp updates
   
   // Check if current user is a lawyer
   const isLawyer = currentUser?.role === 'verified_lawyer';
@@ -314,24 +316,24 @@ const ViewPost: React.FC = () => {
     setReportModalVisible(false);
   }, [postId]);
 
-  // Helper function to format timestamp with real-time updates using device time
+  // Helper function to format timestamp with improved accuracy
   const formatTimestamp = useCallback((timestamp: string | null): string => {
     if (!timestamp) return 'Unknown time';
     
     try {
-      // Parse the timestamp
+      // Parse the timestamp - ensure proper UTC handling
       const postDate = new Date(timestamp);
       const now = new Date();
       
       // Check if the date is valid
       if (isNaN(postDate.getTime())) return 'Invalid time';
       
-      // For recent posts (less than 7 days old), show relative time
+      // For recent posts (less than 24 hours old), show relative time
       const diffInMs = now.getTime() - postDate.getTime();
       const diffInSeconds = Math.floor(diffInMs / 1000);
       
       // If the timestamp is in the future or very recent (within 1 second)
-      if (diffInSeconds <= 0) return 'Just now';
+      if (diffInSeconds < 1) return 'Just now';
       
       if (diffInSeconds < 60) return `${diffInSeconds}s ago`;
       
@@ -341,24 +343,33 @@ const ViewPost: React.FC = () => {
       const diffInHours = Math.floor(diffInMinutes / 60);
       if (diffInHours < 24) return `${diffInHours}h ago`;
       
+      // For posts less than 7 days old, show "X days ago"
       const diffInDays = Math.floor(diffInHours / 24);
       if (diffInDays < 7) return `${diffInDays}d ago`;
       
-      // For posts older than a week but less than a month, show weeks
-      if (diffInDays < 30) return `${Math.floor(diffInDays / 7)}w ago`;
+      // For posts older than 7 days, show absolute date in a clearer format
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = months[postDate.getMonth()];
+      const day = postDate.getDate();
+      const year = postDate.getFullYear();
+      const currentYear = now.getFullYear();
       
-      // For posts older than 7 days, display the date in MM/DD/YYYY format
-      return `${postDate.getMonth() + 1}/${postDate.getDate()}/${postDate.getFullYear()}`;
+      // If it's this year, show "Month Day" (e.g., "Dec 7")
+      // If it's a different year, show "Month Day, Year" (e.g., "Dec 7, 2023")
+      return year === currentYear ? `${month} ${day}` : `${month} ${day}, ${year}`;
+      
     } catch {
       // Fallback for any parsing errors
       return 'Unknown time';
     }
   }, []);
 
-  // Real-time timer effect - update more frequently for better responsiveness
+  // Real-time timer effect - update timestamps for better responsiveness
   useEffect(() => {
     const timer = setInterval(() => {
-      // Removed setCurrentTime as it's not being used
+      // Force re-render to update timestamp displays
+      // This will trigger formatTimestamp to recalculate with current time
+      setRenderKey(prev => prev + 1);
     }, 10000); // Update every 10 seconds for real-time feel
 
     return () => clearInterval(timer);
@@ -1020,17 +1031,34 @@ const ViewPost: React.FC = () => {
   const editedTimeDisplay = post?.is_edited && post?.updated_at ? `Edited ${formatTimestamp(post.updated_at)}` : null;
   const displayContent = post?.body || '';
   
-  // Handle edit success - update local state
-  const handleEditSuccess = useCallback((newContent: string) => {
+  // Handle edit success - update local state with server data
+  const handleEditSuccess = useCallback((newContent: string, updatedPost?: any) => {
     if (post) {
+      // Use the server response data if available, otherwise use optimistic update
+      const serverUpdatedAt = updatedPost?.updated_at || updatedPost?.data?.updated_at;
+      const now = serverUpdatedAt || new Date().toISOString();
+      
       setPost({
         ...post,
         body: newContent,
         is_edited: true,
-        updated_at: new Date().toISOString()
+        updated_at: now
+      });
+      
+      // Show success toast
+      toast.show({
+        placement: 'top',
+        duration: 3000,
+        render: createSafeAreaToastRenderer(
+          'top',
+          'success',
+          'solid',
+          'Success',
+          'Post edited successfully'
+        ),
       });
     }
-  }, [post]);
+  }, [post, toast]);
   
   // Handle edit press
   const handleEditPress = useCallback(() => {
@@ -1296,23 +1324,26 @@ const ViewPost: React.FC = () => {
             zIndex: 1000,
             width: responsive.dropdownWidth
           }}>
-            <TouchableOpacity
-              style={tw`flex-row items-center px-4 py-3`}
-              onPress={handleBookmarkPress}
-              disabled={isBookmarkLoading}
-            >
-              <Bookmark 
-                size={16} 
-                color={bookmarked ? '#F59E0B' : '#374151'} 
-                fill={bookmarked ? '#F59E0B' : 'none'} 
-              />
-              <Text style={[tw`ml-3 text-gray-700`, isBookmarkLoading && tw`opacity-50`]}>
-                {isBookmarkLoading 
-                  ? (bookmarked ? 'Unbookmarking...' : 'Bookmarking...') 
-                  : (bookmarked ? 'Unbookmark post' : 'Bookmark post')
-                }
-              </Text>
-            </TouchableOpacity>
+            {/* Only show bookmark option for other users' posts */}
+            {!isOwnPost && (
+              <TouchableOpacity
+                style={tw`flex-row items-center px-4 py-3`}
+                onPress={handleBookmarkPress}
+                disabled={isBookmarkLoading}
+              >
+                <Bookmark 
+                  size={16} 
+                  color={bookmarked ? '#F59E0B' : '#374151'} 
+                  fill={bookmarked ? '#F59E0B' : 'none'} 
+                />
+                <Text style={[tw`ml-3 text-gray-700`, isBookmarkLoading && tw`opacity-50`]}>
+                  {isBookmarkLoading 
+                    ? (bookmarked ? 'Unbookmarking...' : 'Bookmarking...') 
+                    : (bookmarked ? 'Unbookmark post' : 'Bookmark post')
+                  }
+                </Text>
+              </TouchableOpacity>
+            )}
             {isOwnPost && (
               <>
                 <View style={tw`h-px mx-2 bg-gray-200`} />
@@ -1320,8 +1351,8 @@ const ViewPost: React.FC = () => {
                   style={tw`flex-row items-center px-4 py-3`}
                   onPress={handleEditPress}
                 >
-                  <Pencil size={16} color="#3B82F6" />
-                  <Text style={[tw`ml-3`, { color: '#3B82F6' }]}>Edit post</Text>
+                  <Pencil size={16} color="#374151" />
+                  <Text style={[tw`ml-3`, { color: '#374151' }]}>Edit post</Text>
                 </TouchableOpacity>
                 <View style={tw`h-px mx-2 bg-gray-200`} />
                 <TouchableOpacity
@@ -1333,7 +1364,8 @@ const ViewPost: React.FC = () => {
                 </TouchableOpacity>
               </>
             )}
-            <View style={tw`h-px mx-2 bg-gray-200`} />
+            {isOwnPost && <View style={tw`h-px mx-2 bg-gray-200`} />}
+            {!isOwnPost && <View style={tw`h-px mx-2 bg-gray-200`} />}
             <TouchableOpacity
               style={tw`flex-row items-center px-4 py-3`}
               onPress={handleReportPress}

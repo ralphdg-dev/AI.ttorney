@@ -514,9 +514,11 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     updatePostBookmark(postId, isBookmarked);
   }, [updatePostBookmark]);
 
-  const handleEditSuccess = useCallback((postId: string, newContent: string) => {
-    // Optimistic update: update the post content immediately with is_edited flag
-    const now = new Date().toISOString();
+  const handleEditSuccess = useCallback((postId: string, newContent: string, updatedPost?: any) => {
+    // Use the server response data if available, otherwise use optimistic update
+    const serverUpdatedAt = updatedPost?.updated_at || updatedPost?.data?.updated_at;
+    const now = serverUpdatedAt || new Date().toISOString();
+    
     setPosts(prev => prev.map(post => 
       post.id === postId ? { 
         ...post, 
@@ -536,8 +538,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         updated_at: now
       } : post
     ));
-    if (__DEV__) console.log('Post edited (optimistic):', postId);
-  }, [posts, setCachedPosts]);
+  }, [setCachedPosts, posts]);
 
   const handleEditError = useCallback((postId: string, originalContent: string) => {
     // Revert the optimistic update if backend fails
@@ -802,7 +803,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         onReportPress={() => handleReportPress(item.id)}
         onBookmarkPress={() => handleBookmarkPress(item.id)}
         onPostPress={() => handlePostPress(item.id)}
-        onEditSuccess={(postId, newContent) => handleEditSuccess(postId, newContent)}
+        onEditSuccess={(postId, newContent, updatedPost) => handleEditSuccess(postId, newContent, updatedPost)}
         onEditError={(postId, originalContent) => handleEditError(postId, originalContent)}
         onSaveConfirmed={handleSaveConfirmed}
         onDeleteSuccess={handleDeleteSuccess}
@@ -929,12 +930,10 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       return <View style={styles.bottomSpacer} />;
     }
 
-    return null;
   }, [loadingMore, allPosts.length, hasMore]);
 
   return (
     <View style={styles.container}>
-      {/* Show skeleton loading for initial load */}
       {initialLoading && allPosts.length === 0 ? (
         <View style={[styles.timeline, styles.skeletonContainer, { paddingBottom: 56 + (insets.bottom || 0) + 20 }]}>
           <SkeletonList itemCount={8} itemHeight={200} spacing={12} />
@@ -961,26 +960,35 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
             }
           }}
           contentContainerStyle={allPosts.length === 0 ? styles.emptyContent : [styles.timelineContent, { paddingBottom: 56 + (insets.bottom || 0) + 20 }]}
-          showsVerticalScrollIndicator={false}
           refreshControl={refreshControl}
-          ListHeaderComponent={null}
-          ListFooterComponent={renderFooter}
-          scrollEventThrottle={64}
-          onEndReached={allPosts.length > 0 ? handleLoadMore : undefined}
-          // Start fetching the next page when the user is a bit further
-          // from the end so new posts arrive more seamlessly.
-          onEndReachedThreshold={0.6}
-          bounces={false}
-          overScrollMode="never"
-          scrollEnabled={allPosts.length > 0 || initialLoading}
-          removeClippedSubviews={true}
-          maxToRenderPerBatch={10}
-          updateCellsBatchingPeriod={50}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.1}
+          scrollEventThrottle={16}
+          removeClippedSubviews={false}
           windowSize={10}
           initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          showsVerticalScrollIndicator={false}
+          ListFooterComponent={loadingMore ? (
+            <View style={styles.footerLoader}>
+              <LoadingSpinner size="small" />
+            </View>
+          ) : hasMore ? null : (
+            <View style={styles.endOfPostsContainer}>
+              <Text style={styles.endOfPostsText}>You've seen all posts</Text>
+            </View>
+          )}
+          ListEmptyComponent={!initialLoading ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No posts yet. Be the first to share!</Text>
+            </View>
+          ) : undefined}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          data={allPosts}
         />
       )}
-
       {/* Floating Create Post Button */}
       <TouchableOpacity 
         style={[
@@ -1042,6 +1050,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingTop: 10,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 50,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: Colors.text.secondary,
+    fontWeight: '500',
+    textAlign: 'center',
   },
   skeletonContainer: {
     backgroundColor: Colors.background.primary,
