@@ -302,10 +302,11 @@ class LawyerApplicationService:
         """Apply role/pending logic based on review status"""
         try:
             if status == "accepted":
-                # Accepted: role = 'verified_lawyer', pending_lawyer = false
+                # Accepted: role = 'registered_user', pending_lawyer = true
+                # User must acknowledge acceptance before becoming verified_lawyer
                 update_data = {
-                    "role": "verified_lawyer",
-                    "pending_lawyer": False,
+                    "role": "registered_user",
+                    "pending_lawyer": True,
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }
                 

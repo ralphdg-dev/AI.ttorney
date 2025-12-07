@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Modal from '../ui/Modal';
 import { Save, X } from 'lucide-react';
 import lawyerApplicationsService from '../../services/lawyerApplicationsService';
+import RollMatchBadge from './RollMatchBadge';
 
 const EditLawyerApplicationModal = ({ open, onClose, application, onSave }) => {
   const [status, setStatus] = useState('');
@@ -73,6 +74,8 @@ const EditLawyerApplicationModal = ({ open, onClose, application, onSave }) => {
 
   const applicationData = application?.data || application;
   const fullName = applicationData?.users?.full_name || applicationData?.full_name;
+  const rollNumber = applicationData?.roll_number;
+  const praStatus = applicationData?.pra_status;
 
   return (
     <Modal 
@@ -83,14 +86,28 @@ const EditLawyerApplicationModal = ({ open, onClose, application, onSave }) => {
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-3">
+          <div className="p-3 border border-red-200 rounded-md bg-red-50">
             <p className="text-sm text-red-600">{error}</p>
           </div>
         )}
         
+        {/* Roll Number Display */}
+        <div>
+          <label className="block mb-1 text-sm font-medium text-gray-700">
+            Roll Number
+          </label>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-900">{rollNumber || 'N/A'}</span>
+            <RollMatchBadge
+              status={praStatus}
+              isArchived={applicationData?.archived === true}
+            />
+          </div>
+        </div>
+        
         {/* Application Status */}
         <div>
-          <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="status" className="block mb-1 text-sm font-medium text-gray-700">
             Application Status
           </label>
           <select
@@ -110,7 +127,7 @@ const EditLawyerApplicationModal = ({ open, onClose, application, onSave }) => {
 
         {/* Notes */}
         <div>
-          <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="notes" className="block mb-1 text-sm font-medium text-gray-700">
             Notes
           </label>
           <textarea
@@ -141,7 +158,7 @@ const EditLawyerApplicationModal = ({ open, onClose, application, onSave }) => {
           >
             {loading ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white inline mr-1"></div>
+                <div className="inline w-4 h-4 mr-1 border-b-2 border-white rounded-full animate-spin"></div>
                 Saving...
               </>
             ) : (
