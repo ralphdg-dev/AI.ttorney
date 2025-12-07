@@ -481,6 +481,40 @@ async def test_supabase_connection():
             detail="Database connection test failed"
         )
 
+# Loader.io verification endpoints
+@app.get("/loaderio-d8aa43148942493d07128d6abe18264b.txt")
+async def loaderio_verification_txt():
+    """Loader.io verification endpoint - TXT format"""
+    from fastapi.responses import PlainTextResponse
+    verification_token = "loaderio-d8aa43148942493d07128d6abe18264b"
+    return PlainTextResponse(content=verification_token, media_type="text/plain")
+
+@app.get("/loaderio-d8aa43148942493d07128d6abe18264b.html")
+async def loaderio_verification_html():
+    """Loader.io verification endpoint - HTML format"""
+    from fastapi.responses import HTMLResponse
+    verification_token = "loaderio-d8aa43148942493d07128d6abe18264b"
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Loader.io Verification</title>
+    </head>
+    <body>
+        <h1>Loader.io Verification Token</h1>
+        <p>{verification_token}</p>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content.strip())
+
+@app.get("/loaderio-d8aa43148942493d07128d6abe18264b/")
+async def loaderio_verification_slash():
+    """Loader.io verification endpoint - Directory format"""
+    from fastapi.responses import PlainTextResponse
+    verification_token = "loaderio-d8aa43148942493d07128d6abe18264b"
+    return PlainTextResponse(content=verification_token, media_type="text/plain")
+
 if __name__ == "__main__":
     import uvicorn
     import asyncio
