@@ -241,6 +241,8 @@ class LawyerApplicationService:
     async def _can_user_apply(self, user_id: str) -> Dict[str, Any]:
         """Check if user can submit an application"""
         try:
+            from datetime import datetime, timezone, timedelta
+            
             # Get user profile
             user_result = await self.supabase.get_user_profile(user_id)
             if not user_result["success"]:
@@ -250,10 +252,42 @@ class LawyerApplicationService:
             
             # Check if blocked from applying
             if user_data.get("is_blocked_from_applying", False):
-                return {
-                    "can_apply": False,
-                    "reason": "You are blocked from applying due to multiple rejections"
-                }
+                # Check if 1 year has passed since last rejection
+                last_rejected_at = user_data.get("last_rejected_at")
+                if last_rejected_at:
+                    try:
+                        # Parse the rejection date
+                        rejection_date = datetime.fromisoformat(last_rejected_at.replace('Z', '+00:00'))
+                        # Calculate 1 year from rejection
+                        one_year_after_rejection = rejection_date + timedelta(days=365)
+                        current_time = datetime.now(timezone.utc)
+                        
+                        if current_time < one_year_after_rejection:
+                            # Calculate remaining time
+                            remaining_time = one_year_after_rejection - current_time
+                            remaining_days = remaining_time.days
+                            return {
+                                "can_apply": False,
+                                "reason": f"You must wait {remaining_days} more days before reapplying (1-year ban after rejection)"
+                            }
+                        else:
+                            # 1 year has passed, unblock the user
+                            await self.supabase.client.table("users").update({
+                                "is_blocked_from_applying": False
+                            }).eq("id", user_id)
+                    except (ValueError, TypeError) as e:
+                        logger.error(f"Error parsing rejection date: {e}")
+                        # If we can't parse the date, assume still blocked
+                        return {
+                            "can_apply": False,
+                            "reason": "Unable to verify eligibility. Please contact support."
+                        }
+                else:
+                    # Blocked but no rejection date - contact support
+                    return {
+                        "can_apply": False,
+                        "reason": "You are blocked from applying. Please contact support for details."
+                    }
             
             # Check if user has pending application
             if user_data.get("pending_lawyer", False):

@@ -23,6 +23,8 @@ export interface User {
   account_status?: 'active' | 'suspended' | 'banned' | 'deactivated';
   profile_photo?: string;
   pending_lawyer?: boolean;
+  is_blocked_from_applying?: boolean;
+  last_rejected_at?: string;
   birthdate?: string;
   created_at?: string;
   updated_at?: string;
@@ -792,7 +794,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           const { data: profileData, error: profileError } = await supabase
             .from('users')
-            .select('id, is_verified, role, full_name, email')
+            .select('id, is_verified, role, full_name, email, is_blocked_from_applying, last_rejected_at, pending_lawyer')
             .eq('email', email)
             .single();
           
@@ -947,7 +949,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           const { data: profileData } = await supabase
             .from('users')
-            .select('is_verified, role, full_name, email')
+            .select('is_verified, role, full_name, email, is_blocked_from_applying, last_rejected_at, pending_lawyer')
             .eq('id', data.user.id)
             .single();
           
