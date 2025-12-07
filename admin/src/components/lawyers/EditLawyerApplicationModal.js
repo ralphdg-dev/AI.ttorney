@@ -82,13 +82,16 @@ const EditLawyerApplicationModal = ({ open, onClose, application, onSave }) => {
 
   // Check roll number and add pra_status like the table does
   useEffect(() => {
-    if (open && applicationData) {
+    if (open && applicationData?.id) {
       const checkRollNumber = async () => {
         try {
+          // Fetch fresh data like the table does
+          const freshApplicationData = await lawyerApplicationsService.getLawyerApplication(applicationData.id);
+          
           const rollCheck = await rollMatchService.checkApplicationDetails({
-            rollNumber: applicationData.roll_number,
-            fullName: applicationData.full_name,
-            rollSignDate: applicationData.roll_sign_date || applicationData.roll_signing_date,
+            rollNumber: freshApplicationData.roll_number,
+            fullName: freshApplicationData.full_name,
+            rollSignDate: freshApplicationData.roll_sign_date,
           });
           // Use state setters to trigger re-render
           setPraStatus(rollCheck.status);
@@ -99,7 +102,7 @@ const EditLawyerApplicationModal = ({ open, onClose, application, onSave }) => {
       };
       checkRollNumber();
     }
-  }, [open, applicationData]);
+  }, [open, applicationData?.id]);
 
   return (
     <Modal 
