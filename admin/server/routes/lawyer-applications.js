@@ -850,10 +850,11 @@ router.patch("/:id/status", authenticateAdmin, async (req, res) => {
         }
       }
     } else if (status === "resubmission") {
-      // For resubmission, keep pending_lawyer as true so they can resubmit
+      // For resubmission, set pending_lawyer to true so they can resubmit
       const { error: userError } = await supabaseAdmin
         .from("users")
         .update({
+          pending_lawyer: true,
           updated_at: new Date().toISOString(),
         })
         .eq("id", application.user_id);
