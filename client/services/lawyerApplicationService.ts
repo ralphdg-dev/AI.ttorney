@@ -322,9 +322,8 @@ class LawyerApplicationService {
     selfie: string;
   }): Promise<SubmitApplicationResponse> {
     try {
-      // Convert date string to YYYY-MM-DD format for backend
-      const dateObj = new Date(applicationData.roll_signing_date);
-      const formattedDate = dateObj.toISOString().split('T')[0];
+      // Date is already in YYYY-MM-DD format from client, use it directly to avoid timezone issues
+      const formattedDate = applicationData.roll_signing_date;
       
       const formData = new FormData();
       formData.append('full_name', applicationData.full_name);
@@ -557,9 +556,8 @@ class LawyerApplicationService {
     selfie: string;
   }): Promise<SubmitApplicationResponse> {
     try {
-      // Convert date string to YYYY-MM-DD format for backend
-      const dateObj = new Date(applicationData.roll_signing_date);
-      const formattedDate = dateObj.toISOString().split('T')[0];
+      // Date is already in YYYY-MM-DD format from client, use it directly to avoid timezone issues
+      const formattedDate = applicationData.roll_signing_date;
       
       const formData = new FormData();
       formData.append('full_name', applicationData.full_name);

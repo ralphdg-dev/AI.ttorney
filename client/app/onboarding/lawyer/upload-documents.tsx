@@ -774,7 +774,12 @@ export default function LawyerReg() {
           
           // Store data in AsyncStorage
           await AsyncStorage.setItem('lawyer_roll_number', rollNumber);
-          await AsyncStorage.setItem('lawyer_roll_sign_date', rollSignDate.toISOString());
+          // Format date as YYYY-MM-DD without timezone conversion to prevent date shifting
+          const year = rollSignDate.getFullYear();
+          const month = String(rollSignDate.getMonth() + 1).padStart(2, '0');
+          const day = String(rollSignDate.getDate()).padStart(2, '0');
+          const formattedDate = `${year}-${month}-${day}`;
+          await AsyncStorage.setItem('lawyer_roll_sign_date', formattedDate);
           await AsyncStorage.setItem('lawyer_full_name', fullName);
           await AsyncStorage.setItem('lawyer_ibp_card_path', ibpCardPath);
           router.push('/onboarding/lawyer/lawyer-face-verification');
