@@ -23,6 +23,8 @@ export interface User {
   account_status?: 'active' | 'suspended' | 'banned' | 'deactivated';
   profile_photo?: string;
   pending_lawyer?: boolean;
+  is_blocked_from_applying?: boolean;
+  last_rejected_at?: string;
   birthdate?: string;
   created_at?: string;
   updated_at?: string;
@@ -481,8 +483,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Check if already on a lawyer status screen to prevent infinite loops
           const currentRoute = getCurrentRoute();
-          if (currentRoute.includes('/onboarding/lawyer/lawyer-status/')) {
+          console.log('🔍 DEBUG: Current route for infinite loop check:', currentRoute);
+          
+          // More robust check for lawyer status screens
+          const isOnLawyerStatusScreen = 
+            currentRoute.includes('/onboarding/lawyer/lawyer-status/') ||
+            currentRoute.includes('onboarding/lawyer/lawyer-status/') ||
+            currentRoute.includes('lawyer-status/');
+            
+          if (isOnLawyerStatusScreen) {
             console.log('🔍 DEBUG: Already on lawyer status screen, skipping application check to prevent infinite loop');
+            console.log('🔄 Token refreshed, keeping user on current page');
+            setIsLoading(false);
+            clearTimeout(authTimeoutId);
+            return;
+          }
+          
+          // Check if we've already redirected to a status screen in this session
+          if (hasRedirectedToStatus) {
+            console.log('🔍 DEBUG: Already redirected to status screen in this session, skipping application check');
             console.log('🔄 Token refreshed, keeping user on current page');
             setIsLoading(false);
             clearTimeout(authTimeoutId);
@@ -549,6 +568,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 switch (status) {
                   case 'accepted':
                     console.log('🚀 Navigating to: /onboarding/lawyer/lawyer-status/accepted (unacknowledged accepted application)');
+                    setHasRedirectedToStatus(true);
                     setIsLoading(false);
                     clearTimeout(authTimeoutId);
                     try {
@@ -559,6 +579,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     return;
                   case 'rejected':
                     console.log('🚀 Navigating to: /onboarding/lawyer/lawyer-status/rejected (unacknowledged rejected application)');
+                    setHasRedirectedToStatus(true);
                     setIsLoading(false);
                     clearTimeout(authTimeoutId);
                     try {
@@ -569,6 +590,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     return;
                   case 'resubmission':
                     console.log('🚀 Navigating to: /onboarding/lawyer/lawyer-status/resubmission (unacknowledged resubmission application)');
+                    setHasRedirectedToStatus(true);
                     setIsLoading(false);
                     clearTimeout(authTimeoutId);
                     try {
@@ -609,7 +631,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsProcessingAuth(false);
       clearTimeout(authTimeoutId);
     }
-  }, [checkLawyerApplicationStatus, checkSuspensionStatus, getCurrentRoute, toast, isProcessingAuth, clearGuestSessionOnAuth, authState.session?.access_token]);
+  }, [checkLawyerApplicationStatus, checkSuspensionStatus, getCurrentRoute, toast, isProcessingAuth, clearGuestSessionOnAuth, authState.session?.access_token, hasRedirectedToStatus]);
 
   useEffect(() => {
     // Initialize auth state and listen for auth changes
@@ -772,7 +794,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           const { data: profileData, error: profileError } = await supabase
             .from('users')
-            .select('id, is_verified, role, full_name, email')
+            .select('id, is_verified, role, full_name, email, is_blocked_from_applying, last_rejected_at, pending_lawyer')
             .eq('email', email)
             .single();
           
@@ -927,7 +949,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           const { data: profileData } = await supabase
             .from('users')
-            .select('is_verified, role, full_name, email')
+            .select('is_verified, role, full_name, email, is_blocked_from_applying, last_rejected_at, pending_lawyer')
             .eq('id', data.user.id)
             .single();
           

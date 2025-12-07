@@ -734,6 +734,52 @@ class LawyerApplicationService {
       };
     }
   }
+
+  // Acknowledge resubmission - sets acknowledged flag to true
+  async acknowledgeResubmission(): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log('🔄 Starting acknowledge resubmission request');
+      
+      // Get auth token directly
+      const token = await this.getAuthToken();
+      console.log('🔧 Auth token obtained:', token ? 'YES' : 'NO');
+      
+      // Use NetworkConfig for proper API URL
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const url = `${apiUrl}/api/lawyer-applications/acknowledge-resubmission`;
+      console.log('🔧 Making direct fetch to:', url);
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
+      });
+
+      console.log('🔧 Response status:', response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('🔧 Error response:', errorData);
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('🔧 Success response:', data);
+      
+      // Clear cache after successful acknowledgment
+      this.clearCache();
+      
+      return data;
+    } catch (error) {
+      console.error('🔧 Acknowledge resubmission error:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to acknowledge resubmission',
+      };
+    }
+  }
 }
 
 export const lawyerApplicationService = new LawyerApplicationService();

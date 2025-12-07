@@ -218,16 +218,6 @@ router.get('/', authenticateAdmin, async (req, res) => {
       });
     }
 
-    // Helper function to get ordinal suffix
-    function getOrdinalSuffix(num) {
-      const j = num % 10;
-      const k = num % 100;
-      if (j === 1 && k !== 11) return 'st';
-      if (j === 2 && k !== 12) return 'nd';
-      if (j === 3 && k !== 13) return 'rd';
-      return 'th';
-    }
-
     const transformedApplications = applicationsWithType;
 
     // Get total count for pagination - use the searchFilteredIds which already includes search filtering
@@ -451,7 +441,7 @@ router.patch('/:id', authenticateAdmin, async (req, res) => {
         };
         
                 
-        const { data, error } = await supabaseAdmin
+        const { error } = await supabaseAdmin
           .from('admin_audit_logs')
           .insert(auditData)
           .select();
@@ -687,7 +677,7 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
         };
         
                 
-        const { data, error } = await supabaseAdmin
+        const { error } = await supabaseAdmin
           .from('admin_audit_logs')
           .insert(auditData)
           .select();
@@ -783,16 +773,15 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
       } else {
         const currentRejectCount = userData.reject_count || 0;
         const newRejectCount = currentRejectCount + 1;
-        const isBlocked = newRejectCount >= 3;
 
-        // Update user with rejection tracking
+        // Update user with rejection tracking - always block for 1 year after ANY rejection
         const { error: userError } = await supabaseAdmin
           .from('users')
           .update({ 
-            pending_lawyer: false,
+            pending_lawyer: false, // Clear pending flag on rejection
+            is_blocked_from_applying: true, // Always block after rejection
             reject_count: newRejectCount,
             last_rejected_at: new Date().toISOString(),
-            is_blocked_from_applying: isBlocked,
             updated_at: new Date().toISOString()
           })
           .eq('id', application.user_id);
@@ -1040,13 +1029,13 @@ router.post('/:id/audit-logs', authenticateAdmin, async (req, res) => {
     const adminId = req.admin.id; // From authenticateAdmin middleware
 
     // Debug: Log what we're receiving
-    const debugData = {
+    console.log("Creating audit log:", {
       applicationId: id,
       action,
       metadata,
       adminId,
       adminInfo: req.admin
-    };
+    });
 
     // Validate required fields
     if (!action) {

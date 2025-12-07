@@ -270,8 +270,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       icon: View,
       divider: true,
     },
-    // Apply to be a Lawyer - Only for regular users
-    ...(!isLawyerMemo ? [{
+    // Apply to be a Lawyer - Only for regular users who are not blocked and don't have pending application
+    ...(!isLawyerMemo && !(user?.is_blocked_from_applying || user?.pending_lawyer) ? [{
       id: "apply-lawyer",
       label: "Apply as Lawyer",
       icon: Briefcase,
@@ -303,7 +303,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         setShowSignoutModal(true);
       },
     },
-  ], [badgeCounts, isLawyerMemo]);
+  ], [badgeCounts, isLawyerMemo, user?.is_blocked_from_applying, user?.pending_lawyer]);
 
   const handleMenuItemPress = useCallback((item: MenuItem) => {
     if (item.action) {
