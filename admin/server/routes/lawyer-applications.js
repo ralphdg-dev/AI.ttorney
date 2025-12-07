@@ -775,6 +775,7 @@ router.patch("/:id/status", authenticateAdmin, async (req, res) => {
 
     const updateData = {
       status,
+      acknowledged: false, // Reset acknowledged to false whenever status changes
       updated_at: new Date().toISOString(),
       reviewed_by: req.admin.id,
       reviewed_at: new Date().toISOString(),
