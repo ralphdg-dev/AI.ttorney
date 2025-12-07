@@ -573,16 +573,18 @@ router.patch("/:id", authenticateAdmin, async (req, res) => {
         if (!getUserError && userData) {
           const currentRejectCount = userData.reject_count || 0;
           const newRejectCount = currentRejectCount + 1;
-          const isBlocked = newRejectCount >= 3;
+          
+          // Always block user immediately on any rejection (1-year ban)
+          const isBlocked = true;
 
-          // Update user with rejection tracking
+          // Update user with rejection tracking and immediate block
           const { error: userError } = await supabaseAdmin
             .from("users")
             .update({
               pending_lawyer: true, // Keep true so frontend can show rejected status screen
               reject_count: newRejectCount,
               last_rejected_at: new Date().toISOString(),
-              is_blocked_from_applying: isBlocked,
+              is_blocked_from_applying: isBlocked, // Always true on rejection
               updated_at: new Date().toISOString(),
             })
             .eq("id", application.user_id);
@@ -831,22 +833,24 @@ router.patch("/:id/status", authenticateAdmin, async (req, res) => {
       } else {
         const currentRejectCount = userData.reject_count || 0;
         const newRejectCount = currentRejectCount + 1;
-        const isBlocked = newRejectCount >= 3;
+        
+        // Always block user immediately on any rejection (1-year ban)
+        const isBlocked = true;
 
-        // Update user with rejection tracking
+        // Update user with rejection tracking and immediate block
         const { error: userError } = await supabaseAdmin
           .from("users")
           .update({
             pending_lawyer: true, // Keep true so frontend can show rejected status screen
             reject_count: newRejectCount,
             last_rejected_at: new Date().toISOString(),
-            is_blocked_from_applying: isBlocked,
+            is_blocked_from_applying: isBlocked, // Always true on rejection
             updated_at: new Date().toISOString(),
           })
           .eq("id", application.user_id);
 
         if (userError) {
-          // Failed to update user for resubmission
+          // Failed to update user for rejection
         }
       }
     } else if (status === "resubmission") {
