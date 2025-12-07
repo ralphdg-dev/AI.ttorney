@@ -1296,23 +1296,26 @@ const ViewPost: React.FC = () => {
             zIndex: 1000,
             width: responsive.dropdownWidth
           }}>
-            <TouchableOpacity
-              style={tw`flex-row items-center px-4 py-3`}
-              onPress={handleBookmarkPress}
-              disabled={isBookmarkLoading}
-            >
-              <Bookmark 
-                size={16} 
-                color={bookmarked ? '#F59E0B' : '#374151'} 
-                fill={bookmarked ? '#F59E0B' : 'none'} 
-              />
-              <Text style={[tw`ml-3 text-gray-700`, isBookmarkLoading && tw`opacity-50`]}>
-                {isBookmarkLoading 
-                  ? (bookmarked ? 'Unbookmarking...' : 'Bookmarking...') 
-                  : (bookmarked ? 'Unbookmark post' : 'Bookmark post')
-                }
-              </Text>
-            </TouchableOpacity>
+            {/* Only show bookmark option for other users' posts */}
+            {!isOwnPost && (
+              <TouchableOpacity
+                style={tw`flex-row items-center px-4 py-3`}
+                onPress={handleBookmarkPress}
+                disabled={isBookmarkLoading}
+              >
+                <Bookmark 
+                  size={16} 
+                  color={bookmarked ? '#F59E0B' : '#374151'} 
+                  fill={bookmarked ? '#F59E0B' : 'none'} 
+                />
+                <Text style={[tw`ml-3 text-gray-700`, isBookmarkLoading && tw`opacity-50`]}>
+                  {isBookmarkLoading 
+                    ? (bookmarked ? 'Unbookmarking...' : 'Bookmarking...') 
+                    : (bookmarked ? 'Unbookmark post' : 'Bookmark post')
+                  }
+                </Text>
+              </TouchableOpacity>
+            )}
             {isOwnPost && (
               <>
                 <View style={tw`h-px mx-2 bg-gray-200`} />
@@ -1320,8 +1323,8 @@ const ViewPost: React.FC = () => {
                   style={tw`flex-row items-center px-4 py-3`}
                   onPress={handleEditPress}
                 >
-                  <Pencil size={16} color="#3B82F6" />
-                  <Text style={[tw`ml-3`, { color: '#3B82F6' }]}>Edit post</Text>
+                  <Pencil size={16} color="#374151" />
+                  <Text style={[tw`ml-3`, { color: '#374151' }]}>Edit post</Text>
                 </TouchableOpacity>
                 <View style={tw`h-px mx-2 bg-gray-200`} />
                 <TouchableOpacity
@@ -1333,7 +1336,8 @@ const ViewPost: React.FC = () => {
                 </TouchableOpacity>
               </>
             )}
-            <View style={tw`h-px mx-2 bg-gray-200`} />
+            {isOwnPost && <View style={tw`h-px mx-2 bg-gray-200`} />}
+            {!isOwnPost && <View style={tw`h-px mx-2 bg-gray-200`} />}
             <TouchableOpacity
               style={tw`flex-row items-center px-4 py-3`}
               onPress={handleReportPress}

@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, useWindowDimensions, Modal, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, useWindowDimensions, Modal, ActivityIndicator, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Bookmark, MoreHorizontal, User, MessageCircle, Flag, ChevronRight, Pencil, Trash2 } from 'lucide-react-native';
 import { getCategoryColors, getCategoryDisplayText } from '@/utils/categoryUtils';
 import ReportModal from '../common/ReportModal';
@@ -88,6 +89,7 @@ const Post: React.FC<PostProps> = React.memo(({
   const { user: currentUser, session } = useAuth();
   const { loadBookmarks: refreshBookmarkContext } = usePostBookmarks();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [isBookmarked, setIsBookmarked] = useState(propIsBookmarked || false);
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
@@ -238,6 +240,9 @@ const Post: React.FC<PostProps> = React.memo(({
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [dropdownMenuVisible, setDropdownMenuVisible] = useState(false);
+  const [dropdownMenuPosition, setDropdownMenuPosition] = useState({ x: 0, y: 0, width: 0 });
+  const moreButtonRef = useRef<View>(null);
 
   // Check if the current user owns this post
   const isOwnPost = currentUser?.id && userId && currentUser.id === userId;
@@ -293,8 +298,74 @@ const Post: React.FC<PostProps> = React.memo(({
 
 
   const handleMorePress = useCallback(() => {
-    onMenuToggle?.(id);
-  }, [onMenuToggle, id]);
+    // Get screen dimensions for boundary checking
+    const screenHeight = Dimensions.get('window').height;
+    const screenWidth = Dimensions.get('window').width;
+    
+    // Calculate actual menu height dynamically based on menu items
+    const baseItemHeight = 44; // Height of each menu item
+    const dividerHeight = 1;   // Height of divider
+    const menuWidth = 160;
+    
+    // Calculate menu height based on whether user owns the post
+    let menuHeight = baseItemHeight * 2 + dividerHeight; // Bookmark + Report + 1 divider
+    if (isOwnPost) {
+      menuHeight = baseItemHeight * 4 + dividerHeight * 3; // Bookmark + Edit + Delete + Report + 3 dividers
+    }
+    
+    // Use measureInWindow to get absolute screen coordinates
+    moreButtonRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
+      console.log('Dropdown positioning debug:', {
+        buttonX: x,
+        buttonY: y,
+        buttonWidth: width,
+        buttonHeight: height,
+        screenHeight,
+        screenWidth,
+        menuHeight,
+        menuWidth,
+        isOwnPost,
+        safeAreaInsets: insets
+      });
+      
+      // Calculate dropdown position with boundary checking
+      let dropdownX = x - menuWidth + width; // Align right edge with button
+      let dropdownY = y + height + 4; // Position below button with small gap
+      
+      // Ensure menu doesn't go off left screen
+      if (dropdownX < 8) {
+        dropdownX = 8;
+      }
+      
+      // Ensure menu doesn't go off right screen
+      if (dropdownX + menuWidth > screenWidth - 8) {
+        dropdownX = screenWidth - menuWidth - 8;
+      }
+      
+      // Check if menu would go below screen - flip to above if needed
+      // Fixed: Use total screen height including safe areas
+      if (dropdownY + menuHeight > screenHeight - insets.bottom - 20) {
+        // Position above button instead
+        dropdownY = y - menuHeight - 4;
+        
+        // Ensure menu doesn't go off top of screen (account for status bar)
+        if (dropdownY < insets.top + 20) {
+          dropdownY = insets.top + 20; // Minimum margin from top
+        }
+      }
+      
+      const finalPosition = { 
+        x: dropdownX, 
+        y: dropdownY, 
+        width 
+      };
+      
+      console.log('Final dropdown position:', finalPosition);
+      
+      setDropdownMenuPosition(finalPosition);
+      setDropdownMenuVisible(true);
+    });
+  }, [isOwnPost, insets]);
 
 
   const handlePostPress = useCallback(() => {
@@ -411,6 +482,16 @@ const Post: React.FC<PostProps> = React.memo(({
   // Clean category text by removing "Related Post" and simplifying names
   const cleanCategory = category?.trim() || '';
 
+  // Calculate menu position to avoid cutoff
+  const getMenuPosition = useCallback(() => {
+    // Default position (top-right of post)
+    return {
+      top: 40,
+      right: 16,
+      bottom: undefined,
+    };
+  }, []);
+
 
   // Get category colors and display text using shared utility
   const categoryColors = getCategoryColors(cleanCategory);
@@ -519,6 +600,7 @@ const Post: React.FC<PostProps> = React.memo(({
           </View>
           
           <TouchableOpacity
+            ref={moreButtonRef}
             style={styles.moreButton}
             onPress={handleMorePress}
           >
@@ -532,58 +614,6 @@ const Post: React.FC<PostProps> = React.memo(({
           <Text style={styles.content}>{content}</Text>
           {/* Removed publishing indicator - just use opacity */}
         </View>
-
-
-        {/* More Menu */}
-        {isMenuOpen && (
-          <View style={styles.moreMenu}>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={handleBookmarkPress}
-              disabled={isBookmarkLoading}
-            >
-              <Bookmark 
-                size={16} 
-                color={isBookmarked ? '#F59E0B' : '#374151'} 
-                fill={isBookmarked ? '#F59E0B' : 'none'} 
-              />
-              <Text style={[styles.menuText, isBookmarkLoading && { opacity: 0.5 }]}>
-                {isBookmarkLoading 
-                  ? (isBookmarked ? 'Unbookmarking...' : 'Bookmarking...') 
-                  : (isBookmarked ? 'Unbookmark post' : 'Bookmark post')
-                }
-              </Text>
-            </TouchableOpacity>
-            {isOwnPost && (
-              <>
-                <View style={styles.menuDivider} />
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleEditPress}
-                >
-                  <Pencil size={16} color="#3B82F6" />
-                  <Text style={[styles.menuText, { color: '#3B82F6' }]}>Edit post</Text>
-                </TouchableOpacity>
-                <View style={styles.menuDivider} />
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleDeletePress}
-                >
-                  <Trash2 size={16} color="#EF4444" />
-                  <Text style={[styles.menuText, { color: '#EF4444' }]}>Delete post</Text>
-                </TouchableOpacity>
-              </>
-            )}
-            <View style={styles.menuDivider} />
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={handleReportPress}
-            >
-              <Flag size={16} color="#EF4444" />
-              <Text style={[styles.menuText, { color: '#EF4444' }]}>Report post</Text>
-            </TouchableOpacity>
-          </View>
-        )}
 
 
         {/* Engagement Actions */}
@@ -685,6 +715,87 @@ const Post: React.FC<PostProps> = React.memo(({
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Dropdown Menu Modal - traditional dropdown style with fixed positioning */}
+      <Modal
+        visible={dropdownMenuVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setDropdownMenuVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.dropdownOverlay} 
+          activeOpacity={1} 
+          onPress={() => setDropdownMenuVisible(false)}
+        >
+          <View style={[styles.dropdownMenu, { 
+            left: dropdownMenuPosition.x, 
+            top: dropdownMenuPosition.y 
+          }]}>
+            {/* Only show bookmark option for other users' posts */}
+            {!isOwnPost && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setDropdownMenuVisible(false);
+                  handleBookmarkPress();
+                }}
+                disabled={isBookmarkLoading}
+              >
+                <Bookmark 
+                  size={16} 
+                  color={isBookmarked ? '#F59E0B' : '#374151'} 
+                  fill={isBookmarked ? '#F59E0B' : 'none'} 
+                />
+                <Text style={[styles.menuText, isBookmarkLoading && { opacity: 0.5 }]}>
+                  {isBookmarkLoading 
+                    ? (isBookmarked ? 'Unbookmarking...' : 'Bookmarking...') 
+                    : (isBookmarked ? 'Unbookmark post' : 'Bookmark post')
+                  }
+                </Text>
+              </TouchableOpacity>
+            )}
+            {isOwnPost && (
+              <>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setDropdownMenuVisible(false);
+                    handleEditPress();
+                  }}
+                >
+                  <Pencil size={16} color="#374151" />
+                  <Text style={[styles.menuText, { color: '#374151' }]}>Edit post</Text>
+                </TouchableOpacity>
+                <View style={styles.menuDivider} />
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setDropdownMenuVisible(false);
+                    handleDeletePress();
+                  }}
+                >
+                  <Trash2 size={16} color="#EF4444" />
+                  <Text style={[styles.menuText, { color: '#EF4444' }]}>Delete post</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            {/* Always show report option with proper divider */}
+            {isOwnPost && <View style={styles.menuDivider} />}
+            {!isOwnPost && <View style={styles.menuDivider} />}
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setDropdownMenuVisible(false);
+                handleReportPress();
+              }}
+            >
+              <Flag size={16} color="#EF4444" />
+              <Text style={[styles.menuText, { color: '#EF4444' }]}>Report post</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
       </Modal>
     </FadeInView>
   );
@@ -806,10 +917,12 @@ const styles = StyleSheet.create({
     color: '#0F1419',
   },
   // Removed loadingIndicator and loadingText styles - no longer needed
-  moreMenu: {
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  dropdownMenu: {
     position: 'absolute',
-    top: 40,
-    right: 16,
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
     borderWidth: 1,
@@ -819,8 +932,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    zIndex: 1000,
     minWidth: 160,
+    maxWidth: 200,
   },
   menuItem: {
     flexDirection: 'row',
