@@ -579,7 +579,7 @@ router.patch("/:id", authenticateAdmin, async (req, res) => {
           const { error: userError } = await supabaseAdmin
             .from("users")
             .update({
-              pending_lawyer: false,
+              pending_lawyer: true, // Keep true so frontend can show rejected status screen
               reject_count: newRejectCount,
               last_rejected_at: new Date().toISOString(),
               is_blocked_from_applying: isBlocked,
@@ -836,7 +836,7 @@ router.patch("/:id/status", authenticateAdmin, async (req, res) => {
         const { error: userError } = await supabaseAdmin
           .from("users")
           .update({
-            pending_lawyer: false,
+            pending_lawyer: true, // Keep true so frontend can show rejected status screen
             reject_count: newRejectCount,
             last_rejected_at: new Date().toISOString(),
             is_blocked_from_applying: isBlocked,
