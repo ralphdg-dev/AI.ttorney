@@ -1,0 +1,2 @@
+timeStamp,elapsed,label,responseCode,responseMessage,threadName,dataType,success,failureMessage,bytes,sentBytes,grpThreads,allThreads,URL,Latency,IdleTime,Connect
+1765132006194,1681,Login Request,200,OK,Setup - Authentication 1-1,text,true,,3591,254,1,1,https://aittorney-production.up.railway.app/api/auth/signin,1666,0,358

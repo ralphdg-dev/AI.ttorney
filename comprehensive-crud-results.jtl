@@ -1,0 +1,3 @@
+timeStamp,elapsed,label,responseCode,responseMessage,threadName,dataType,success,failureMessage,bytes,sentBytes,grpThreads,allThreads,URL,Latency,IdleTime,Connect
+1765126159195,1582,Login Request,200,OK,Setup - Authentication 1-1,text,true,,3560,259,1,1,https://aittorney-production.up.railway.app/api/auth/signin,1579,0,573
+1765126161321,187,Health Check,200,OK,Health Check - 300 Users 1-8,text,true,,649,144,11,11,https://aittorney-production.up.railway.app/health,187,0,129
