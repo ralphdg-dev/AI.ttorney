@@ -1,24 +1,30 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
-import { useAuth } from './contexts/AuthContext';
-import ProtectedRoute from './components/ProtectedRoute';
-import PublicRoute from './components/PublicRoute';
-import Sidebar from './components/Sidebar';
-import Header from './components/Header';
-import Login from './pages/auth/Login';
-import VerifyOTP from './pages/auth/VerifyOTP';
-import ForgotPassword from './pages/auth/ForgotPassword';
+import React from "react";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  useLocation,
+  Navigate,
+} from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
+import { useAuth } from "./contexts/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
+import PublicRoute from "./components/PublicRoute";
+import Sidebar from "./components/Sidebar";
+import Header from "./components/Header";
+import Login from "./pages/auth/Login";
+import VerifyOTP from "./pages/auth/VerifyOTP";
+import ForgotPassword from "./pages/auth/ForgotPassword";
 
 // Import all page components
-import Dashboard from './pages/Dashboard';
-import ManageLegalSeekers from './pages/users/ManageLegalSeekers';
-import ManageLawyers from './pages/users/ManageLawyers';
-import ManageLawyerApplications from './pages/users/ManageLawyerApplications';
-import ManageAdminsPage from './pages/admin/ManageAdmins';
-import ManageGlossaryTerms from './pages/legal-resources/ManageGlossaryTerms';
-import ManageAppeals from './pages/moderation/ManageAppeals';
-import ManageLegalArticles from './pages/legal-resources/ManageLegalArticles';
+import Dashboard from "./pages/Dashboard";
+import ManageLegalSeekers from "./pages/users/ManageLegalSeekers";
+import ManageLawyers from "./pages/users/ManageLawyers";
+import ManageLawyerApplications from "./pages/users/ManageLawyerApplications";
+import ManageAdminsPage from "./pages/admin/ManageAdmins";
+import ManageGlossaryTerms from "./pages/legal-resources/ManageGlossaryTerms";
+import ManageAppeals from "./pages/moderation/ManageAppeals";
+import ManageLegalArticles from "./pages/legal-resources/ManageLegalArticles";
 
 // Forum Management Pages
 import ManageTopicsThreadsPage from "./pages/forum/ManageTopicsThreadsPage";
@@ -26,16 +32,14 @@ import ReportedPostsPage from "./pages/forum/ReportedPostsPage";
 import ReportedRepliesPage from "./pages/forum/ReportedRepliesPage";
 import BanRestrictUsersPage from "./pages/forum/BanRestrictUsersPage";
 
-import ManageAppealsPage from "./pages/appeals/ManageAppeals"
+import ManageAppealsPage from "./pages/appeals/ManageAppeals";
 
 // Settings Page
 import Settings from "./pages/Settings";
 
 // Placeholder components for missing pages
-import Help from './pages/help/Help';
-import NotFound from './pages/NotFound';
-
-
+import Help from "./pages/help/Help";
+import NotFound from "./pages/NotFound";
 
 const LegalArticles = () => (
   <div className="p-6">
@@ -45,7 +49,6 @@ const LegalArticles = () => (
     <p className="text-gray-600">Legal articles management coming soon...</p>
   </div>
 );
-
 
 const OpenTickets = () => (
   <div className="p-6">
@@ -94,29 +97,29 @@ const App = () => {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route 
-            path="/login" 
+          <Route
+            path="/login"
             element={
               <PublicRoute>
                 <Login />
               </PublicRoute>
-            } 
+            }
           />
-          <Route 
-            path="/forgot-password" 
+          <Route
+            path="/forgot-password"
             element={
               <PublicRoute>
                 <ForgotPassword />
               </PublicRoute>
-            } 
+            }
           />
-          <Route 
-            path="/verify-otp" 
+          <Route
+            path="/verify-otp"
             element={
               <PublicRoute>
                 <VerifyOTP />
               </PublicRoute>
-            } 
+            }
           />
           <Route
             path="/*"
@@ -135,6 +138,7 @@ const App = () => {
 const AdminDashboard = () => {
   const location = useLocation();
   const { hasRole } = useAuth();
+  const [isMobileNavOpen, setIsMobileNavOpen] = React.useState(false);
 
   // Get active item from current path
   const getActiveItemFromPath = (pathname) => {
@@ -160,77 +164,108 @@ const AdminDashboard = () => {
   const activeItem = getActiveItemFromPath(location.pathname);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="flex">
-        <Sidebar activeItem={activeItem} />
-        <div className="flex-1 flex flex-col">
-          <Header activeItem={activeItem} />
-          <main className="flex-1 p-6">
-            <Routes>
-              <Route
-                path="/"
-                element={hasRole('superadmin') ? <Dashboard /> : <Navigate to="/users/legal-seekers" replace />}
-              />
-              <Route
-                path="/dashboard"
-                element={hasRole('superadmin') ? <Dashboard /> : <Navigate to="/users/legal-seekers" replace />}
-              />
+    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+      <Sidebar
+        activeItem={activeItem}
+        mobileOpen={isMobileNavOpen}
+        onMobileClose={() => setIsMobileNavOpen(false)}
+      />
+      <div className="flex-1 flex flex-col">
+        <Header
+          activeItem={activeItem}
+          onToggleSidebar={() => setIsMobileNavOpen((open) => !open)}
+        />
+        <main className="flex-1 p-4 sm:p-6">
+          <Routes>
+            <Route
+              path="/"
+              element={
+                hasRole("superadmin") ? (
+                  <Dashboard />
+                ) : (
+                  <Navigate to="/users/legal-seekers" replace />
+                )
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                hasRole("superadmin") ? (
+                  <Dashboard />
+                ) : (
+                  <Navigate to="/users/legal-seekers" replace />
+                )
+              }
+            />
 
-              {/* Users Routes */}
-              <Route
-                path="/users/legal-seekers"
-                element={<ManageLegalSeekers />}
-              />
-              <Route path="/users/lawyers" element={<ManageLawyers />} />
-              <Route path="/users/lawyer-applications" element={<ManageLawyerApplications />} />
-              
-              {/* Moderation Routes */}
-              <Route path="/moderation/appeals" element={<ManageAppeals />} />
-              
-              {/* Admin Routes */}
-              <Route
-                path="/admin/manage-admins"
-                element={hasRole('superadmin') ? <ManageAdminsPage /> : <Navigate to="/users/legal-seekers" replace />}
-              />
+            {/* Users Routes */}
+            <Route
+              path="/users/legal-seekers"
+              element={<ManageLegalSeekers />}
+            />
+            <Route path="/users/lawyers" element={<ManageLawyers />} />
+            <Route
+              path="/users/lawyer-applications"
+              element={<ManageLawyerApplications />}
+            />
 
-              {/* Legal Resources Routes */}
-              <Route path="/legal-resources/glossary-terms" element={<ManageGlossaryTerms />} />
-              <Route path="/legal-resources/legal-articles" element={<ManageLegalArticles />} />
-              
-              {/* Forum Routes */}
-              <Route
-                path="/forum/topics-threads"
-                element={<ManageTopicsThreadsPage />}
-              />
-              <Route
-                path="/forum/reported-posts"
-                element={<ReportedPostsPage />}
-              />
-              <Route
-                path="/forum/reported-replies"
-                element={<ReportedRepliesPage />}
-              />
+            {/* Moderation Routes */}
+            <Route path="/moderation/appeals" element={<ManageAppeals />} />
 
-              {/* Appeals Routes */}
-              <Route
-                path="/appeals/ban-restrict-users"
-                element={<BanRestrictUsersPage />}
-              />
+            {/* Admin Routes */}
+            <Route
+              path="/admin/manage-admins"
+              element={
+                hasRole("superadmin") ? (
+                  <ManageAdminsPage />
+                ) : (
+                  <Navigate to="/users/legal-seekers" replace />
+                )
+              }
+            />
 
-              <Route
-                path="/appeals/manage-appeals"
-                element={<ManageAppealsPage />}
-              />
+            {/* Legal Resources Routes */}
+            <Route
+              path="/legal-resources/glossary-terms"
+              element={<ManageGlossaryTerms />}
+            />
+            <Route
+              path="/legal-resources/legal-articles"
+              element={<ManageLegalArticles />}
+            />
 
-              {/* Other Routes */}
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/help" element={<Help />} />
-              
-              {/* 404 Catch-all Route */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </main>
-        </div>
+            {/* Forum Routes */}
+            <Route
+              path="/forum/topics-threads"
+              element={<ManageTopicsThreadsPage />}
+            />
+            <Route
+              path="/forum/reported-posts"
+              element={<ReportedPostsPage />}
+            />
+            <Route
+              path="/forum/reported-replies"
+              element={<ReportedRepliesPage />}
+            />
+
+            {/* Appeals Routes */}
+            <Route
+              path="/appeals/ban-restrict-users"
+              element={<BanRestrictUsersPage />}
+            />
+            <Route
+              path="/appeals/manage-appeals"
+              element={<ManageAppealsPage />}
+            />
+
+            {/* Other Routes */}
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/help" element={<Help />} />
+
+            {/* 404 Catch-all Route */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </main>
       </div>
     </div>
   );

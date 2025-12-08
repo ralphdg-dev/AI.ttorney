@@ -1,13 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { appealAdminService } from '../../services/appealAdminService';
-import { Clock, CheckCircle, XCircle, Eye, Loader2, AlertCircle, MessageSquare } from 'lucide-react';
-import ReviewAppealModal from '../../components/moderation/ReviewAppealModal';
+import React, { useState, useEffect } from "react";
+import { appealAdminService } from "../../services/appealAdminService";
+import {
+  Clock,
+  CheckCircle,
+  XCircle,
+  Eye,
+  Loader2,
+  AlertCircle,
+  MessageSquare,
+} from "lucide-react";
+import ReviewAppealModal from "../../components/moderation/ReviewAppealModal";
 
 export default function ManageAppeals() {
   const [appeals, setAppeals] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('pending');
+  const [statusFilter, setStatusFilter] = useState("pending");
   const [selectedAppeal, setSelectedAppeal] = useState(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
 
@@ -22,8 +30,11 @@ export default function ManageAppeals() {
       const response = await appealAdminService.getAppeals(statusFilter);
       setAppeals(response.data || []);
     } catch (error) {
-      console.error('Failed to load appeals:', error);
-      alert('Failed to load appeals: ' + (error.response?.data?.detail || error.message));
+      console.error("Failed to load appeals:", error);
+      alert(
+        "Failed to load appeals: " +
+          (error.response?.data?.detail || error.message)
+      );
     } finally {
       setLoading(false);
     }
@@ -34,7 +45,7 @@ export default function ManageAppeals() {
       const response = await appealAdminService.getStats();
       setStats(response.data || {});
     } catch (error) {
-      console.error('Failed to load stats:', error);
+      console.error("Failed to load stats:", error);
     }
   };
 
@@ -52,17 +63,35 @@ export default function ManageAppeals() {
 
   const getStatusBadge = (status) => {
     const badges = {
-      pending: { icon: Clock, color: 'bg-yellow-100 text-yellow-800', text: 'Pending' },
-      under_review: { icon: Clock, color: 'bg-blue-100 text-blue-800', text: 'Under Review' },
-      approved: { icon: CheckCircle, color: 'bg-green-100 text-green-800', text: 'Approved' },
-      rejected: { icon: XCircle, color: 'bg-red-100 text-red-800', text: 'Rejected' }
+      pending: {
+        icon: Clock,
+        color: "bg-yellow-100 text-yellow-800",
+        text: "Pending",
+      },
+      under_review: {
+        icon: Clock,
+        color: "bg-blue-100 text-blue-800",
+        text: "Under Review",
+      },
+      approved: {
+        icon: CheckCircle,
+        color: "bg-green-100 text-green-800",
+        text: "Approved",
+      },
+      rejected: {
+        icon: XCircle,
+        color: "bg-red-100 text-red-800",
+        text: "Rejected",
+      },
     };
 
     const badge = badges[status] || badges.pending;
     const Icon = badge.icon;
 
     return (
-      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${badge.color}`}>
+      <span
+        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${badge.color}`}
+      >
         <Icon size={12} />
         {badge.text}
       </span>
@@ -70,7 +99,7 @@ export default function ManageAppeals() {
   };
 
   const getSuspensionTypeBadge = (type) => {
-    return type === 'permanent' ? (
+    return type === "permanent" ? (
       <span className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-medium">
         Permanent
       </span>
@@ -82,7 +111,7 @@ export default function ManageAppeals() {
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return "N/A";
     return new Date(dateString).toLocaleString();
   };
 
@@ -90,8 +119,12 @@ export default function ManageAppeals() {
     <div className="p-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Suspension Appeals</h1>
-        <p className="text-sm text-gray-600">Review and manage user appeals for suspensions</p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          Suspension Appeals
+        </h1>
+        <p className="text-sm text-gray-600">
+          Review and manage user appeals for suspensions
+        </p>
       </div>
 
       {/* Stats Cards */}
@@ -101,7 +134,9 @@ export default function ManageAppeals() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-gray-600 mb-1">Pending</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.pending || 0}</p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {stats.pending || 0}
+                </p>
               </div>
               <Clock className="text-yellow-600" size={24} />
             </div>
@@ -111,7 +146,9 @@ export default function ManageAppeals() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-gray-600 mb-1">Under Review</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.under_review || 0}</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {stats.under_review || 0}
+                </p>
               </div>
               <Clock className="text-blue-600" size={24} />
             </div>
@@ -121,7 +158,9 @@ export default function ManageAppeals() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-gray-600 mb-1">Approved</p>
-                <p className="text-2xl font-bold text-green-600">{stats.approved || 0}</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {stats.approved || 0}
+                </p>
               </div>
               <CheckCircle className="text-green-600" size={24} />
             </div>
@@ -131,7 +170,9 @@ export default function ManageAppeals() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-gray-600 mb-1">Rejected</p>
-                <p className="text-2xl font-bold text-red-600">{stats.rejected || 0}</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {stats.rejected || 0}
+                </p>
               </div>
               <XCircle className="text-red-600" size={24} />
             </div>
@@ -141,7 +182,9 @@ export default function ManageAppeals() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-gray-600 mb-1">Total</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.total || 0}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.total || 0}
+                </p>
               </div>
               <MessageSquare className="text-gray-600" size={24} />
             </div>
@@ -151,43 +194,43 @@ export default function ManageAppeals() {
 
       {/* Filter Tabs */}
       <div className="bg-white border border-gray-200 rounded-lg mb-6">
-        <div className="flex border-b border-gray-200">
+        <div className="flex overflow-x-auto border-b border-gray-200">
           <button
-            onClick={() => setStatusFilter('pending')}
+            onClick={() => setStatusFilter("pending")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              statusFilter === 'pending'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
+              statusFilter === "pending"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-600 hover:text-gray-900"
             }`}
           >
             Pending ({stats?.pending || 0})
           </button>
           <button
-            onClick={() => setStatusFilter('under_review')}
+            onClick={() => setStatusFilter("under_review")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              statusFilter === 'under_review'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
+              statusFilter === "under_review"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-600 hover:text-gray-900"
             }`}
           >
             Under Review ({stats?.under_review || 0})
           </button>
           <button
-            onClick={() => setStatusFilter('approved')}
+            onClick={() => setStatusFilter("approved")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              statusFilter === 'approved'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
+              statusFilter === "approved"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-600 hover:text-gray-900"
             }`}
           >
             Approved ({stats?.approved || 0})
           </button>
           <button
-            onClick={() => setStatusFilter('rejected')}
+            onClick={() => setStatusFilter("rejected")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              statusFilter === 'rejected'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
+              statusFilter === "rejected"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-600 hover:text-gray-900"
             }`}
           >
             Rejected ({stats?.rejected || 0})
@@ -196,8 +239,8 @@ export default function ManageAppeals() {
             onClick={() => setStatusFilter(null)}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               statusFilter === null
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-600 hover:text-gray-900"
             }`}
           >
             All ({stats?.total || 0})
@@ -247,9 +290,11 @@ export default function ManageAppeals() {
                     <td className="px-4 py-3">
                       <div>
                         <p className="text-sm font-medium text-gray-900">
-                          {appeal.user_username || 'Unknown'}
+                          {appeal.user_username || "Unknown"}
                         </p>
-                        <p className="text-xs text-gray-500">{appeal.user_email}</p>
+                        <p className="text-xs text-gray-500">
+                          {appeal.user_email}
+                        </p>
                       </div>
                     </td>
                     <td className="px-4 py-3">

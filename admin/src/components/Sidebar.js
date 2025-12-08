@@ -23,17 +23,18 @@ const Avatar = () => {
         {admin && (admin.photo_url || admin.profile_photo) ? (
           <img
             src={admin.photo_url || admin.profile_photo}
-            alt={admin?.full_name || 'avatar'}
+            alt={admin?.full_name || "avatar"}
             className="h-10 w-10 rounded-full object-cover"
           />
         ) : (
           <span className="text-xs font-semibold text-gray-600">
-            {((admin?.full_name || admin?.email || 'A')
-              .split(' ')
-              .map((p) => p[0])
-              .slice(0, 2)
-              .join('') || 'A')
-              .toUpperCase()}
+            {(
+              (admin?.full_name || admin?.email || "A")
+                .split(" ")
+                .map((p) => p[0])
+                .slice(0, 2)
+                .join("") || "A"
+            ).toUpperCase()}
           </span>
         )}
       </div>
@@ -49,7 +50,7 @@ const Avatar = () => {
   );
 };
 
-const Sidebar = ({ activeItem }) => {
+const Sidebar = ({ activeItem, mobileOpen = false, onMobileClose }) => {
   const { showSuccess, showError, ToastContainer } = useToast();
   const [collapsed, setCollapsed] = React.useState(false);
   const [openGroups, setOpenGroups] = React.useState({});
@@ -178,149 +179,168 @@ const Sidebar = ({ activeItem }) => {
     );
   };
 
+  const renderContent = () => (
+    <>
+      {/* Floating collapse/expand toggle */}
+      <button
+        className="hidden md:flex absolute -right-3 top-10 z-20 h-9 w-9 items-center justify-center rounded-2xl bg-white border border-gray-200 shadow-md hover:shadow-lg text-gray-800"
+        onClick={() => setCollapsed((c) => !c)}
+        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      >
+        {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+      </button>
+      {/* Header */}
+      <div className="p-3 flex items-center justify-between">
+        {collapsed ? (
+          <div className="h-10 w-10 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+            {admin && (admin.photo_url || admin.profile_photo) ? (
+              <img
+                src={admin.photo_url || admin.profile_photo}
+                alt="avatar"
+                className="h-10 w-10 object-cover"
+              />
+            ) : (
+              <span className="text-xs font-semibold text-gray-600">
+                {(
+                  (admin?.full_name || admin?.email || "A")
+                    .split(" ")
+                    .map((p) => p[0])
+                    .slice(0, 2)
+                    .join("") || "A"
+                ).toUpperCase()}
+              </span>
+            )}
+          </div>
+        ) : (
+          <Avatar />
+        )}
+        {/* toggle moved to floating button */}
+      </div>
+      {/* Header divider */}
+      <div className="mx-3 border-t border-gray-200" />
+
+      <div className="px-3 mt-2 overflow-y-auto">
+        {sections.map((section) => (
+          <div key={section.id} className="mb-4">
+            <p
+              className={`px-2 text-[8px] tracking-widest text-gray-400 ${
+                collapsed ? "text-center" : ""
+              }`}
+            >
+              {section.title}
+            </p>
+            {/* Dashboard button under MAIN (superadmin only) */}
+            {section.id === "main" && hasRole("superadmin") && (
+              <div className="mt-2">
+                <button
+                  onClick={() => handleItemClick("dashboard")}
+                  className={`w-full flex items-center ${
+                    collapsed ? "justify-center" : "justify-start space-x-2"
+                  } px-3 py-1.5 rounded-lg text-[11px] ${
+                    activeItem === "dashboard"
+                      ? "bg-gray-50 text-gray-900"
+                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                  }`}
+                  title={collapsed ? "Dashboard" : undefined}
+                >
+                  <Home size={16} className="text-gray-600" />
+                  {!collapsed && (
+                    <span className="text-[11px] font-medium">Dashboard</span>
+                  )}
+                </button>
+              </div>
+            )}
+            {/* Section content */}
+            {section.id === "account" ? (
+              <div className="mt-2">
+                <button
+                  onClick={() => handleItemClick("settings")}
+                  className={`w-full flex items-center ${
+                    collapsed ? "justify-center" : "justify-start space-x-2"
+                  } px-3 py-1.5 rounded-lg text-[11px] ${
+                    activeItem === "settings"
+                      ? "bg-gray-50 text-gray-900"
+                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                  }`}
+                  title={collapsed ? "Settings" : undefined}
+                >
+                  <Settings size={16} className="text-gray-600" />
+                  {!collapsed && (
+                    <span className="text-[11px] font-medium">Settings</span>
+                  )}
+                </button>
+              </div>
+            ) : (
+              <div className={`mt-2 ${collapsed ? "space-y-3" : ""}`}>
+                {section.groups
+                  .filter((g) => {
+                    // Hide entire Admin section for non-superadmin users
+                    if (g.label === "Admin") {
+                      return hasRole("superadmin");
+                    }
+                    return true;
+                  })
+                  .map((g) => renderGroup(g))}
+              </div>
+            )}
+            {/* Divider between MAIN and ACCOUNT */}
+            {section.id === "main" && (
+              <div className="my-3 border-t border-gray-200" />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Footer actions when expanded/collapsed */}
+      <div className="mt-auto p-3">
+        <button
+          onClick={() => handleItemClick("help")}
+          className={`w-full flex items-center ${
+            collapsed ? "justify-center" : "justify-start space-x-3"
+          } px-3 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50`}
+          title={collapsed ? "Help" : undefined}
+        >
+          <AlertTriangle size={18} />
+          {!collapsed && <span className="text-[10px]">Help</span>}
+        </button>
+        <button
+          onClick={() => handleItemClick("logout")}
+          className={`w-full flex items-center ${
+            collapsed ? "justify-center" : "justify-start space-x-3"
+          } px-3 py-1.5 mt-2 rounded-lg text-red-600 hover:bg-red-50`}
+          title={collapsed ? "Logout" : undefined}
+        >
+          <LogOut size={18} />
+          {!collapsed && (
+            <span className="text-[10px] font-medium">Logout</span>
+          )}
+        </button>
+      </div>
+    </>
+  );
+
   return (
     <>
       <ToastContainer />
+
+      {/* Desktop sidebar */}
       <aside
-        className={`h-screen sticky top-0 bg-white shadow-sm border-r border-gray-200 flex flex-col relative ${
-          collapsed ? "w-16" : "w-56"
+        className={`hidden md:flex bg-white shadow-sm border-gray-200 flex-col relative md:border-r md:h-screen md:sticky md:top-0 ${
+          collapsed ? "md:w-16" : "md:w-56"
         } transition-all duration-200`}
       >
-        {/* Floating collapse/expand toggle */}
-        <button
-          className="absolute -right-3 top-10 z-20 h-9 w-9 flex items-center justify-center rounded-2xl bg-white border border-gray-200 shadow-md hover:shadow-lg text-gray-800"
-          onClick={() => setCollapsed((c) => !c)}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-        </button>
-        {/* Header */}
-        <div className="p-3 flex items-center justify-between">
-          {collapsed ? (
-            <div className="h-10 w-10 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
-              {admin && (admin.photo_url || admin.profile_photo) ? (
-                <img
-                  src={admin.photo_url || admin.profile_photo}
-                  alt="avatar"
-                  className="h-10 w-10 object-cover"
-                />
-              ) : (
-                <span className="text-xs font-semibold text-gray-600">
-                  {((admin?.full_name || admin?.email || 'A')
-                    .split(' ')
-                    .map((p) => p[0])
-                    .slice(0, 2)
-                    .join('') || 'A')
-                    .toUpperCase()}
-                </span>
-              )}
-            </div>
-          ) : (
-            <Avatar />
-          )}
-          {/* toggle moved to floating button */}
-        </div>
-        {/* Header divider */}
-        <div className="mx-3 border-t border-gray-200" />
-
-        <div className="px-3 mt-2 overflow-y-auto">
-          {sections.map((section) => (
-            <div key={section.id} className="mb-4">
-              <p
-                className={`px-2 text-[8px] tracking-widest text-gray-400 ${
-                  collapsed ? "text-center" : ""
-                }`}
-              >
-                {section.title}
-              </p>
-              {/* Dashboard button under MAIN (superadmin only) */}
-              {section.id === "main" && hasRole('superadmin') && (
-                <div className="mt-2">
-                  <button
-                    onClick={() => handleItemClick("dashboard")}
-                    className={`w-full flex items-center ${
-                      collapsed ? "justify-center" : "justify-start space-x-2"
-                    } px-3 py-1.5 rounded-lg text-[11px] ${
-                      activeItem === "dashboard"
-                        ? "bg-gray-50 text-gray-900"
-                        : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-                    }`}
-                    title={collapsed ? "Dashboard" : undefined}
-                  >
-                    <Home size={16} className="text-gray-600" />
-                    {!collapsed && (
-                      <span className="text-[11px] font-medium">Dashboard</span>
-                    )}
-                  </button>
-                </div>
-              )}
-              {/* Section content */}
-              {section.id === "account" ? (
-                <div className="mt-2">
-                  <button
-                    onClick={() => handleItemClick("settings")}
-                    className={`w-full flex items-center ${
-                      collapsed ? "justify-center" : "justify-start space-x-2"
-                    } px-3 py-1.5 rounded-lg text-[11px] ${
-                      activeItem === "settings"
-                        ? "bg-gray-50 text-gray-900"
-                        : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-                    }`}
-                    title={collapsed ? "Settings" : undefined}
-                  >
-                    <Settings size={16} className="text-gray-600" />
-                    {!collapsed && (
-                      <span className="text-[11px] font-medium">Settings</span>
-                    )}
-                  </button>
-                </div>
-              ) : (
-                <div className={`mt-2 ${collapsed ? "space-y-3" : ""}`}>
-                  {section.groups
-                    .filter((g) => {
-                      // Hide entire Admin section for non-superadmin users
-                      if (g.label === 'Admin') {
-                        return hasRole('superadmin');
-                      }
-                      return true;
-                    })
-                    .map((g) => renderGroup(g))}
-                </div>
-              )}
-              {/* Divider between MAIN and ACCOUNT */}
-              {section.id === "main" && (
-                <div className="my-3 border-t border-gray-200" />
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Footer actions when expanded/collapsed */}
-        <div className="mt-auto p-3">
-          <button
-            onClick={() => handleItemClick("help")}
-            className={`w-full flex items-center ${
-              collapsed ? "justify-center" : "justify-start space-x-3"
-            } px-3 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50`}
-            title={collapsed ? "Help" : undefined}
-          >
-            <AlertTriangle size={18} />
-            {!collapsed && <span className="text-[10px]">Help</span>}
-          </button>
-          <button
-            onClick={() => handleItemClick("logout")}
-            className={`w-full flex items-center ${
-              collapsed ? "justify-center" : "justify-start space-x-3"
-            } px-3 py-1.5 mt-2 rounded-lg text-red-600 hover:bg-red-50`}
-            title={collapsed ? "Logout" : undefined}
-          >
-            <LogOut size={18} />
-            {!collapsed && (
-              <span className="text-[10px] font-medium">Logout</span>
-            )}
-          </button>
-        </div>
+        {renderContent()}
       </aside>
+
+      {/* Mobile overlay sidebar */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 flex md:hidden">
+          <div className="flex-1 bg-black/30" onClick={onMobileClose} />
+          <aside className="w-72 max-w-full bg-white shadow-lg border-r border-gray-200 flex flex-col relative">
+            {renderContent()}
+          </aside>
+        </div>
+      )}
     </>
   );
 };
