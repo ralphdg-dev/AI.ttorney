@@ -12,18 +12,20 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     userInterfaceStyle: 'automatic',
     newArchEnabled: true,
     owner: 'j24a',
-    ios: {
-      bundleIdentifier: 'com.j24a.aittorney',
-      config: {
-        googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || 'AIzaSyD0OPK0U7WdEwlzNh7XKsYpYVMyHea-G80',
-      },
-    },
     android: {
       package: 'com.j24a.aittorney',
       adaptiveIcon: {
         foregroundImage: './assets/images/adaptive-icon.png',
         backgroundColor: '#ffffff',
       },
+      permissions: [
+        'android.permission.CAMERA',
+        'android.permission.READ_EXTERNAL_STORAGE',
+        'android.permission.WRITE_EXTERNAL_STORAGE',
+        'android.permission.ACCESS_FINE_LOCATION',
+        'android.permission.ACCESS_COARSE_LOCATION',
+        'android.permission.ACCESS_BACKGROUND_LOCATION'
+      ],
       config: {
         googleMaps: {
           apiKey: process.env.GOOGLE_MAPS_API_KEY || 'AIzaSyD0OPK0U7WdEwlzNh7XKsYpYVMyHea-G80',
@@ -54,6 +56,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         },
       ],
       'expo-font',
+      'expo-secure-store',
+      'expo-web-browser',
+      'expo-camera',
+      'expo-image-picker',
+      'expo-location'
     ],
     experiments: {
       typedRoutes: true,
