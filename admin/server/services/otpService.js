@@ -1,5 +1,4 @@
 const crypto = require("crypto");
-const fetch = require("node-fetch");
 const nodemailer = require("nodemailer");
 
 // In-memory OTP storage (consider Redis for production)

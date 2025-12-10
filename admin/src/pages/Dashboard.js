@@ -1,74 +1,341 @@
-import React from "react";
-import CountCards from "../components/dashboard/CountCards";
-import LineChartCard from "../components/dashboard/LineChartCard";
-import ReportsListCard from "../components/dashboard/ReportsListCard";
-import RecentLawyerApplicationsCard from "../components/dashboard/RecentLawyerApplicationsCard";
-import ForumPostsByCategoryCard from "../components/dashboard/ForumPostsByCategoryCard";
-import TermsByCategoryCard from "../components/dashboard/TermsByCategoryCard";
-import ArticlesByCategoryCard from "../components/dashboard/ArticlesByCategoryCard";
-import ManageAuditLogs from "../pages/system/ManageAuditLogs";
+import React, { useState, useEffect } from 'react';
+import { 
+  LineChart, 
+  Line, 
+  BarChart, 
+  Bar, 
+  PieChart, 
+  Pie, 
+  Cell, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer 
+} from 'recharts';
 
-const Dashboard = () => (
-  <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-50">
-    {/* Header Section */}
-    <div className="mb-8">
-      <h1 className="text-3xl font-bold text-gray-800 mb-2">Dashboard Overview</h1>
-      <p className="text-gray-600">Monitor your platform's key metrics and insights</p>
-    </div>
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://ai-ttorney-admin-server.onrender.com/api';
 
-    {/* TOP GRID */}
-    <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 mb-6">
-      {/* Count cards */}
-      <div className="xl:col-span-9">
-        <CountCards />
-      </div>
+const Dashboard = () => {
+  const [loading, setLoading] = useState(true);
+  const [metrics, setMetrics] = useState([
+    { title: 'Total Users', value: 0, color: 'bg-blue-500' },
+    { title: 'Lawyers', value: 0, color: 'bg-green-500' },
+    { title: 'Legal Seekers', value: 0, color: 'bg-blue-600' },
+    { title: 'Forum Posts', value: 0, color: 'bg-purple-500' },
+  ]);
+  const [lineChartData, setLineChartData] = useState([]);
+  const [categoryData, setCategoryData] = useState([]);
+  const [barChartData, setBarChartData] = useState([]);
+  const [pieChartData, setPieChartData] = useState([]);
 
-      {/* Lawyer applications */}
-      <div className="xl:col-span-3 xl:row-span-2">
-        <div className="h-full min-h-[280px] sm:min-h-[320px] md:min-h-[380px]">
-          <RecentLawyerApplicationsCard />
+  const getAuthHeader = () => {
+    const token = localStorage.getItem('admin_token');
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      console.log('🔄 Starting dashboard data fetch...');
+
+      // Fetch dashboard summary
+      console.log('📊 Fetching dashboard summary...');
+      const summaryResponse = await fetch(`${API_BASE_URL}/stats/dashboard-summary`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader()
+        }
+      });
+      
+      console.log('📋 Summary response status:', summaryResponse.status);
+      const summaryData = await summaryResponse.json();
+      console.log('📈 Summary data received:', summaryData);
+
+      if (!summaryResponse.ok) {
+        console.error('❌ Summary API error:', summaryData);
+        throw new Error(summaryData.error || 'Failed to fetch dashboard summary');
+      }
+
+      // Update metrics
+      setMetrics([
+        { title: 'Total Users', value: summaryData.totalUsers || 0, color: 'bg-blue-500' },
+        { title: 'Lawyers', value: summaryData.lawyersCount || 0, color: 'bg-green-500' },
+        { title: 'Legal Seekers', value: summaryData.seekersCount || 0, color: 'bg-blue-600' },
+        { title: 'Forum Posts', value: summaryData.forumPosts || 0, color: 'bg-purple-500' },
+      ]);
+
+      // Fetch forum posts by category for the line chart and category list
+      console.log('📝 Fetching category data...');
+      const categoryResponse = await fetch(`${API_BASE_URL}/stats/forum-posts-by-category`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader()
+        }
+      });
+      
+      console.log('📂 Category response status:', categoryResponse.status);
+      const categoryDataRaw = await categoryResponse.json();
+      console.log('📊 Category data received:', categoryDataRaw);
+      
+      if (!categoryResponse.ok) {
+        console.error('❌ Category API error:', categoryDataRaw);
+        // Set empty data instead of throwing error to prevent crashes
+        setCategoryData([]);
+      } else {
+        // Transform for category list (top 5)
+        const sortedCategories = (categoryDataRaw || [])
+          .sort((a, b) => (b.count || 0) - (a.count || 0))
+          .slice(0, 5)
+          .map(item => ({
+            name: item.category ? item.category.charAt(0).toUpperCase() + item.category.slice(1) : 'Unknown',
+            count: item.count || 0
+          }));
+        setCategoryData(sortedCategories);
+      }
+
+      // Mock line chart data for now (you can create a new endpoint for this)
+      setLineChartData([
+        { month: 'Jan', value: 120 },
+        { month: 'Feb', value: 150 },
+        { month: 'Mar', value: 180 },
+        { month: 'Apr', value: 220 },
+        { month: 'May', value: 280 },
+        { month: 'Jun', value: 320 },
+        { month: 'Jul', value: 380 },
+      ]);
+
+      // Fetch guides and terms by category for bar chart
+      console.log('📚 Fetching guides and terms data...');
+      const guidesResponse = await fetch(`${API_BASE_URL}/stats/guides-and-terms-by-category`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader()
+        }
+      });
+      
+      console.log('📖 Guides response status:', guidesResponse.status);
+      const guidesData = await guidesResponse.json();
+      console.log('📚 Guides data received:', guidesData);
+      
+      if (!guidesResponse.ok) {
+        console.error('❌ Guides API error:', guidesData);
+        // Set empty data instead of throwing error to prevent crashes
+        setBarChartData([]);
+      } else {
+        // Transform and assign colors
+        const colors = ['#3B82F6', '#60A5FA', '#93C5FD', '#2563EB', '#1D4ED8'];
+        const transformedBarData = (guidesData || [])
+          .filter(item => item && item.category && item.category !== 'others')
+          .map((item, index) => ({
+            category: item.category.charAt(0).toUpperCase() + item.category.slice(1) + ' Law',
+            count: item.count || 0,
+            color: colors[index % colors.length]
+          }));
+        setBarChartData(transformedBarData);
+      }
+
+      // Calculate pie chart data for user distribution
+      const totalUsers = summaryData.seekersCount + summaryData.lawyersCount;
+      const seekersPercentage = totalUsers > 0 
+        ? Math.round((summaryData.seekersCount / totalUsers) * 100) 
+        : 0;
+      const lawyersPercentage = totalUsers > 0 
+        ? Math.round((summaryData.lawyersCount / totalUsers) * 100) 
+        : 0;
+
+      setPieChartData([
+        { 
+          name: 'Legal Seekers', 
+          value: seekersPercentage, 
+          count: summaryData.seekersCount, 
+          color: '#3B82F6' 
+        },
+        { 
+          name: 'Verified Lawyers', 
+          value: lawyersPercentage, 
+          count: summaryData.lawyersCount, 
+          color: '#60A5FA' 
+        },
+      ]);
+
+      console.log('✅ Dashboard data fetch completed successfully!');
+      setLoading(false);
+    } catch (error) {
+      console.error('❌ Error fetching dashboard data:', error);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="p-6">
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-lg text-gray-600">Loading dashboard data...</div>
         </div>
-      </div>
+      ) : (
+        <>
+          {/* Top Row - Metrics Cards */}
+          <div className="grid grid-cols-1 gap-4 mb-6 md:grid-cols-2 lg:grid-cols-4">
+            {metrics.map((metric, index) => (
+              <div key={index} className="p-4 bg-blue-100 border border-blue-300 rounded-xl">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-medium text-black">{metric.title}</h3>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold text-black">{metric.value.toLocaleString()}</div>
+                </div>
+              </div>
+            ))}
+          </div>
 
-      {/* Charts section */}
-      <div className="xl:col-span-9">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <LineChartCard />
-          <ReportsListCard />
-        </div>
-      </div>
-    </div>
-
-    {/* BOTTOM GRID */}
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 pb-8">
-      <ForumPostsByCategoryCard />
-      <TermsByCategoryCard />
-      <ArticlesByCategoryCard />
-    </div>
-
-    {/* AUDIT LOGS SECTION */}
-    <div className="mb-8 px-2 sm:px-0">
-      <div className="bg-white rounded-xl border border-blue-100 shadow-sm p-4 sm:p-6">
-        <div className="mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-3">
-            <div className="flex items-center space-x-3">
-              <div className="w-1 h-6 bg-gradient-to-b from-[#023D7B] to-[#0E5E9C] rounded-full" />
-              <h2 className="text-lg font-bold text-gray-800">Recent Audit Logs</h2>
+          {/* Middle Section */}
+          <div className="grid grid-cols-1 gap-4 mb-6 lg:grid-cols-3">
+            {/* Line Chart - Legal Consultations */}
+            <div className="p-6 border border-gray-300 lg:col-span-2 bg-gray-50 rounded-xl">
+              <h3 className="mb-8 text-base font-semibold text-gray-900">Forum Posts Trend</h3>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={lineChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis 
+                    dataKey="month" 
+                    tick={{ fontSize: 12 }}
+                    stroke="#6b7280"
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 12 }}
+                    stroke="#6b7280"
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#fff',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="value" 
+                    stroke="#3B82F6" 
+                    strokeWidth={2}
+                    dot={{ fill: '#3B82F6', r: 4 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
-            <div className="sm:ml-auto text-xs text-gray-500">
-              View detailed system activity and admin actions
+
+            {/* Category List */}
+            <div className="p-6 border border-gray-300 bg-gray-50 rounded-xl">
+              <h3 className="mb-3 text-base font-semibold text-gray-900">Category with Highest Post Count</h3>
+              <div className="space-y-2">
+                {categoryData.map((category, index) => (
+                  <div key={index} className="flex items-center justify-between py-2 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <div className="flex items-center justify-center w-6 h-6 bg-blue-100 rounded-full">
+                        <span className="text-xs font-semibold text-blue-600">{index + 1}</span>
+                      </div>
+                      <span className="text-xs font-medium text-gray-900">{category.name}</span>
+                    </div>
+                    <div className="flex items-center space-x-1 text-right">
+                      <span className="text-xs font-semibold text-gray-900">
+                        {category.count}
+                      </span>
+                      <span className="text-xs text-gray-500">posts</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-        {/* Add horizontal scroll container for mobile */}
-        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-          <div className="min-w-[600px] sm:min-w-0">
-            <ManageAuditLogs />
+
+          {/* Bottom Section */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {/* Bar Chart - Category Distribution */}
+            <div className="p-6 border border-gray-300 bg-gray-50 rounded-xl">
+              <h3 className="mb-8 text-base font-semibold text-gray-900">Category Distribution (Guides & Terms)</h3>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={barChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis 
+                    dataKey="category" 
+                    tick={{ fontSize: 12 }}
+                    stroke="#6b7280"
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 12 }}
+                    stroke="#6b7280"
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#fff',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Bar 
+                    dataKey="count" 
+                    radius={[8, 8, 0, 0]}
+                  >
+                    {barChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Pie Chart - User Distribution */}
+            <div className="p-6 border border-gray-300 bg-gray-50 rounded-xl">
+              <h3 className="mb-4 text-base font-semibold text-gray-900">User Distribution</h3>
+              <div className="flex items-center space-x-6">
+                <ResponsiveContainer width="50%" height={180}>
+                  <PieChart>
+                    <Pie
+                      data={pieChartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={60}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {pieChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value, name, props) => {
+                        const entry = props.payload;
+                        return [`${entry.count} users`, entry.name];
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex-1 space-y-3">
+                  {pieChartData.map((item, index) => (
+                    <div key={index} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: item.color }}
+                        ></div>
+                        <span className="text-sm text-gray-700">{item.name}</span>
+                      </div>
+                      <span className="text-sm font-semibold text-gray-900">{item.value}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 export default Dashboard;

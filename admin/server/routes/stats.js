@@ -382,4 +382,121 @@ router.get("/articles-by-category", async (req, res) => {
   }
 });
 
+// Combined terms and articles by category
+router.get("/guides-and-terms-by-category", async (req, res) => {
+  try {
+    // Fetch terms
+    const { data: termsData, error: termsError } = await supabaseAdmin
+      .from("glossary_terms")
+      .select("category");
+
+    if (termsError) throw termsError;
+
+    // Fetch articles
+    const { data: articlesData, error: articlesError } = await supabaseAdmin
+      .from("legal_articles")
+      .select("category");
+
+    if (articlesError) throw articlesError;
+
+    const categories = [
+      "civil",
+      "consumer",
+      "criminal",
+      "family",
+      "labor",
+    ];
+    
+    const counts = categories.reduce((acc, cat) => {
+      acc[cat] = 0;
+      return acc;
+    }, {});
+
+    // Count terms
+    termsData.forEach((term) => {
+      const category = term.category?.toLowerCase();
+      if (counts.hasOwnProperty(category)) {
+        counts[category] += 1;
+      }
+    });
+
+    // Count articles
+    articlesData.forEach((article) => {
+      const category = article.category?.toLowerCase();
+      if (counts.hasOwnProperty(category)) {
+        counts[category] += 1;
+      }
+    });
+
+    const chartData = Object.entries(counts).map(([category, count]) => ({
+      category,
+      count,
+    }));
+
+    res.json(chartData);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Dashboard summary stats
+router.get("/dashboard-summary", async (req, res) => {
+  try {
+    console.log('🔍 Dashboard summary API called');
+    
+    // Total users (from users table only, excluding admins and superadmins)
+    console.log('📊 Fetching total users...');
+    const { count: totalUsers, error: usersError } = await supabaseAdmin
+      .from("users")
+      .select("*", { count: "exact", head: true })
+      .neq("role", "admin")
+      .neq("role", "superadmin");
+
+    console.log('👥 Total users result:', { count: totalUsers, error: usersError });
+    if (usersError) throw usersError;
+
+    // Lawyers count (verified_lawyer role only)
+    console.log('⚖️ Fetching lawyers...');
+    const { count: lawyersCount, error: lawyersError } = await supabaseAdmin
+      .from("users")
+      .select("*", { count: "exact", head: true })
+      .eq("role", "verified_lawyer");
+
+    console.log('👨‍⚖️ Lawyers result:', { count: lawyersCount, error: lawyersError });
+    if (lawyersError) throw lawyersError;
+
+    // Legal seekers count (registered_user + guest roles)
+    console.log('🔍 Fetching legal seekers...');
+    const { count: seekersCount, error: seekersError } = await supabaseAdmin
+      .from("users")
+      .select("*", { count: "exact", head: true })
+      .in("role", ["registered_user", "guest"]);
+
+    console.log('👤 Legal seekers result:', { count: seekersCount, error: seekersError });
+    if (seekersError) throw seekersError;
+
+    // Forum posts count
+    console.log('💬 Fetching forum posts...');
+    const { count: forumPosts, error: forumError } = await supabaseAdmin
+      .from("forum_posts")
+      .select("*", { count: "exact", head: true });
+
+    console.log('📝 Forum posts result:', { count: forumPosts, error: forumError });
+    if (forumError) throw forumError;
+
+    const result = {
+      totalUsers,
+      lawyersCount,
+      seekersCount,
+      forumPosts,
+    };
+    
+    console.log('✅ Final result to send:', result);
+    res.json(result);
+  } catch (error) {
+    console.error('❌ Dashboard summary error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
