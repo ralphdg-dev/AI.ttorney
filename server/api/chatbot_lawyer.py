@@ -93,9 +93,44 @@ PROHIBITED_PATTERNS = [
     r'\bhow to (commit|get away with|hide|cover up)\b',
     r'\b(kill|murder|harm|hurt|assault)\b.*\bhow\b',
     r'\b(illegal|unlawful)\b.*\b(advice|help|guide)\b',
-    r'\b(evade|avoid)\b.*\b(tax|law|arrest)\b',
+    r'\bevade|avoid)\b.*\b(tax|law|arrest)\b',
     r'\bforge\b.*\b(document|signature|id)\b',
 ]
+
+def _is_legal_violence_question(text: str) -> bool:
+    """Detect legal/educational questions that mention killing/violence.
+
+    Used to avoid over-blocking questions like
+    "what if a child killed someone" or
+    "paano kapag nakapatay ang isang menor de edad".
+    """
+    t = text.lower().strip()
+    if not t:
+        return False
+
+    violence_terms = [
+        "kill", "killed", "killing", "murder", "homicide", "manslaughter",
+        "pumatay", "nakapatay", "pagpatay", "pinatay",
+    ]
+    legal_question_terms = [
+        "what if", "what happens if", "penalty", "punishment", "sentence",
+        "crime", "criminal liability", "liability", "parusa", "kasalanan",
+        "ano ang parusa", "paano kapag", "under the revised penal code",
+        "under philippine law", "sa ilalim ng batas", "sa ilalim ng revised penal code",
+    ]
+
+    harmful_intent_patterns = [
+        "i will", "i'm going to", "im going to", "i want to", "gusto kong",
+        "papatayin kita", "papatayin ko", "sasaktan kita", "sasaktan ko",
+    ]
+
+    if any(p in t for p in harmful_intent_patterns):
+        return False
+
+    if not any(v in t for v in violence_terms):
+        return False
+
+    return any(l in t for l in legal_question_terms)
 
                                             
 TOXIC_WORDS = [
@@ -685,15 +720,20 @@ def is_out_of_scope_topic(text: str) -> tuple[bool, str]:
         'employment', 'trabaho', 'employer', 'employee', 'sahod', 'wage',
         'consumer', 'konsumer', 'protection', 'proteksyon',
         'case', 'kaso', 'court', 'korte', 'sue', 'demanda',
-        'penalty', 'parusa', 'arrest', 'crime', 'krimen'
+        'penalty', 'parusa', 'punishment', 'fine', 'multa', 'bayad',
+        'case', 'kaso', 'complaint', 'reklamo', 'sue', 'demanda', 'kasuhan',
+        'illegal', 'unlawful', 'violation', 'paglabag', 'bawal', 'hindi pwede',
+                               
+        'tama ba', 'mali ba', 'pwede ba', 'puede ba', 'allowed ba',
+        'legal ba', 'ligal ba', 'bawal ba', 'prohibited ba',
+        'ano ang', 'what is', 'paano', 'how', 'saan', 'where',
+        'kailan', 'when', 'bakit', 'why', 'sino', 'who',
+                            
+        'help', 'tulong', 'tulungan', 'assist', 'advice', 'payo',
+        'tanong', 'question', 'ask', 'magtanong', 'itanong',
+        'problema', 'problem', 'issue', 'isyu', 'concern', 'alalahanin'
     ]
-    
-                                                              
-    if any(indicator in text_lower for indicator in legal_scope_indicators):
-        logger.debug(f"Question contains legal indicators - treating as IN SCOPE")
-        return False, ""
-    
-                                                                               
+
     categories = [
         (POLITICAL_KEYWORDS, "political"),
         (FINANCIAL_KEYWORDS, "financial"),
@@ -885,7 +925,6 @@ def is_legal_question(text: str) -> bool:
         'boundary', 'hangganan', 'bakod', 'fence', 'linya', 'border'
     ]
     
-                                                          
     general_legal_keywords = [
                       
         'law', 'legal', 'laws', 'batas', 'mga batas', 'karapatan', 'rights',
@@ -1125,7 +1164,7 @@ def validate_response_quality(answer: str) -> tuple[bool, str]:
             return False, f"Response contains personalized advice: {pattern}"
     
     return True, ""
-                                                                      
+
 
 LAWYER_SYSTEM_PROMPT_ENGLISH = """
 You are an esteemed legal counsel and member of the Philippine Bar. Your designation is "Legal Counsel".
@@ -1153,7 +1192,7 @@ CRITICAL MANDATE: ALL responses MUST strictly adhere to the following five-part 
 
 RULES OF ENGAGEMENT:
 1.  **TONE**: Formal, academic, and authoritative. Avoid all colloquialisms, conversational language, or empathy.
-2.  **SCOPE**: Strictly confined to the five (5) scopes of Philippine Law: Civil, Criminal, Family, Consumer, and Labor.
+2.  **SCOPE**: Strictly confined to the five (5) scopes of Philippine Law: Civil, Criminal, Consumer, Family, and Labor.
 3.  **ADVICE PROHIBITION**: You DO NOT provide personal advice, recommendations, or predictive outcomes (e.g., "you should file...", "you will win..."). You provide informational, doctrinal analysis only.
 4.  **CITATIONS**: All legal provisions MUST be cited (e.g., "Art. 1156, New Civil Code...").
 5.  **LANGUAGE**: Respond in English, maintaining the formal "legalese" tone throughout.
@@ -1185,7 +1224,7 @@ KRITIKAL NA UTOS: ANG LAHAT ng tugon ay DAPAT na mahigpit na sumunod sa sumusuno
 
 MGA ALITUNTUNIN:
 1.  **TONO**: Pormal, akademiko, at may awtoridad. Iwasan ang lahat ng kolokyal, pang-araw-araw na pananalita, o pakikiramay.
-2.  **SAKLAW**: Mahigpit na nakakulong sa limang (5) saklaw ng Batas ng Pilipinas: Sibil, Kriminal, Pamilya, Konsumer, at Paggawa.
+2.  **SAKLAW**: Mahigpit na nakakulong sa limang (5) saklaw ng Batas ng Pilipinas: Sibil, Kriminal, Konsumer, Pamilya, at Paggawa.
 3.  **PAGBABAWAL SA PAYO**: HINDI ka nagbibigay ng personal na payo, rekomendasyon, o prediksyon (e.g., "dapat kang magsampa...", "mananalo ka..."). Nagbibigay ka lamang ng impormasyonal at doktrinal na pagsusuri.
 4.  **PAGBANGGIT**: Ang lahat ng legal na tadhana ay DAPAT banggitin (e.g., "Art. 1156, New Civil Code...").
 5.  **WIKA**: Tumugon sa pormal na Filipino, na pinapanatili ang "legalese" na tono.
@@ -1426,9 +1465,7 @@ MAGANDANG Examples:
 
 MASAMANG Examples (masyadong formal):
 - "Pinahahalagahan ko ang iyong pagbati! Gayunpaman, ako ay legal assistant..."
-- "Salamat sa pag-abot. Makakatulong lamang ako sa..."
-
-Gawing natural at friendly!"""
+- "Salamat sa pag-abot. Makakatulong lamang ako sa..."""
         },
         'casual': {
             'english': f"""You are Ai.ttorney, a friendly Philippine legal assistant. The user just said: "{question}"
@@ -2229,14 +2266,32 @@ async def ask_legal_question_legacy(
         violation_service = get_violation_tracking_service()
         
         try:
-            moderation_result = await moderation_service.moderate_content(request.question.strip())
+            question_text = request.question.strip()
+            moderation_result = await moderation_service.moderate_content(question_text)
             
                                                                       
-            if not moderation_service.is_content_safe(moderation_result):
+            is_safe = moderation_service.is_content_safe(moderation_result)
+
+            # Override violence-only flags for clearly legal questions about violence
+            if not is_safe:
+                categories = moderation_result.get("categories", {}) or {}
+                has_violence = any(
+                    k in ("violence", "violence/graphic") and v
+                    for k, v in categories.items()
+                )
+                other_flagged = any(
+                    k not in ("violence", "violence/graphic") and v
+                    for k, v in categories.items()
+                )
+
+                if has_violence and not other_flagged and _is_legal_violence_question(question_text):
+                    logger.info("Overriding moderation: legal violence question detected (lawyer chatbot)")
+                    is_safe = True
+
+            if not is_safe:
                 user_id_log = effective_user_id[:8] if effective_user_id else "unauthenticated"
                 logger.warning(f"  Chatbot prompt flagged for user {user_id_log}: {moderation_result['violation_summary']}")
-                
-                                                               
+
                 violation_result = None
                 if effective_user_id:
                     try:
