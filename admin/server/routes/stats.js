@@ -499,4 +499,42 @@ router.get("/dashboard-summary", async (req, res) => {
   }
 });
 
+// Forum posts trend by month (last 7 months)
+router.get("/forum-posts-trend", async (req, res) => {
+  try {
+    console.log('📈 Fetching forum posts trend...');
+    
+    const monthsData = [];
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    // Get last 7 months of data
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      
+      const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+      const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59);
+      
+      const { count, error } = await supabaseAdmin
+        .from("forum_posts")
+        .select("*", { count: "exact", head: true })
+        .gte("created_at", startOfMonth.toISOString())
+        .lte("created_at", endOfMonth.toISOString());
+      
+      if (error) throw error;
+      
+      monthsData.push({
+        month: monthNames[date.getMonth()],
+        value: count || 0
+      });
+    }
+    
+    console.log('📊 Forum posts trend data:', monthsData);
+    res.json(monthsData);
+  } catch (error) {
+    console.error('❌ Forum posts trend error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

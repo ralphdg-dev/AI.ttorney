@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   LineChart, 
   Line, 
@@ -34,11 +34,7 @@ const Dashboard = () => {
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   };
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       console.log('🔄 Starting dashboard data fetch...');
@@ -98,16 +94,26 @@ const Dashboard = () => {
         setCategoryData(sortedCategories);
       }
 
-      // Mock line chart data for now (you can create a new endpoint for this)
-      setLineChartData([
-        { month: 'Jan', value: 120 },
-        { month: 'Feb', value: 150 },
-        { month: 'Mar', value: 180 },
-        { month: 'Apr', value: 220 },
-        { month: 'May', value: 280 },
-        { month: 'Jun', value: 320 },
-        { month: 'Jul', value: 380 },
-      ]);
+      // Fetch forum posts trend for line chart
+      console.log('📈 Fetching forum posts trend...');
+      const trendResponse = await fetch(`${API_BASE_URL}/stats/forum-posts-trend`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader()
+        }
+      });
+      
+      console.log('📊 Trend response status:', trendResponse.status);
+      const trendData = await trendResponse.json();
+      console.log('📉 Trend data received:', trendData);
+      
+      if (!trendResponse.ok) {
+        console.error('❌ Trend API error:', trendData);
+        // Set empty data instead of throwing error
+        setLineChartData([]);
+      } else {
+        setLineChartData(trendData);
+      }
 
       // Fetch guides and terms by category for bar chart
       console.log('📚 Fetching guides and terms data...');
@@ -169,7 +175,11 @@ const Dashboard = () => {
       console.error('❌ Error fetching dashboard data:', error);
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   return (
     <div className="p-6">
