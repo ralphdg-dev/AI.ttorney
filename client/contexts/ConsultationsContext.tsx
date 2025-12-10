@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '../config/supabase';
+import { AppState, AppStateStatus } from 'react-native';
 
 interface ConsultationsContextType {
   consultationsCount: number;
@@ -76,6 +77,9 @@ export const ConsultationsProvider: React.FC<ConsultationsProviderProps> = ({ ch
       console.log("✅ ConsultationsContext: Loaded count:", count);
       console.log("📊 ConsultationsContext: Setting consultationsCount to:", count || 0);
       setConsultationsCount(count || 0);
+      
+      // Debug: Log the current state after setting
+      console.log("🔍 ConsultationsContext: consultationsCount is now:", count || 0);
     } catch (error) {
       console.error("❌ ConsultationsContext: Exception in loadConsultations:", error);
       // Fail gracefully
@@ -101,22 +105,27 @@ export const ConsultationsProvider: React.FC<ConsultationsProviderProps> = ({ ch
 
     loadConsultations();
 
-    // Real-time subscription
-    // Lawyers: listen on lawyer_id; regular users: listen on user_id
-    const filterField = user.role === 'verified_lawyer' ? 'lawyer_id' : 'user_id';
-
+    // Real-time subscription - listen to ALL changes on consultation_requests table
+    // This catches bulk operations, manual cleanup, and individual row changes
     const channel = supabase
-      .channel(`consultations:${user.id}`)
+      .channel(`consultations-all:${user.id}`)
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: '*', // Listen to INSERT, UPDATE, DELETE
           schema: 'public',
           table: 'consultation_requests',
-          filter: `${filterField}=eq.${user.id}`,
+          // No filter - catch ALL table changes including bulk operations
         },
-        () => {
-          // Refresh count on any change
+        (payload: any) => {
+          console.log('📡 ConsultationsContext: Database change detected (sidebar update)', {
+            event: payload.eventType,
+            table: payload.table,
+            userId: user.id,
+            role: user.role
+          });
+          
+          // Only refresh sidebar count on table changes - more efficient
           loadConsultations();
         }
       )
@@ -124,12 +133,30 @@ export const ConsultationsProvider: React.FC<ConsultationsProviderProps> = ({ ch
 
     subscriptionRef.current = channel;
 
+    // App state listener - refresh when app comes to foreground
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        console.log('📱 ConsultationsContext: App came to foreground, refreshing counts');
+        loadConsultations();
+      }
+    };
+
+    const appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
+
+    // Periodic refresh to prevent stale counts (every 2 minutes - more frequent)
+    const periodicRefresh = setInterval(() => {
+      console.log("⏰ ConsultationsContext: Periodic refresh to prevent stale counts");
+      loadConsultations();
+    }, 2 * 60 * 1000); // 2 minutes
+
     return () => {
       if (subscriptionRef.current) {
         supabase.removeChannel(subscriptionRef.current);
       }
+      appStateSubscription?.remove();
+      clearInterval(periodicRefresh);
     };
-  }, [isAuthenticated, user?.id, loadConsultations]);
+  }, [isAuthenticated, user?.id, user?.role, loadConsultations]);
 
   const value: ConsultationsContextType = React.useMemo(() => ({
     consultationsCount,

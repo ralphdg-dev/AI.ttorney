@@ -35,7 +35,6 @@ import tw from "tailwind-react-native-classnames";
 import { TimeSlot, lawyerProfileService } from "../../services/lawyerProfileServices";
 import { supabase } from "../../config/supabase";
 import { useRouter } from "expo-router";
-import { NetworkConfig } from "../../utils/networkConfig";
 
 interface ProfileData {
   name: string;
@@ -186,7 +185,6 @@ const LawyerProfilePage: React.FC = () => {
   ]);
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [showAllSpecializations, setShowAllSpecializations] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isAcceptingConsultations, setIsAcceptingConsultations] =
@@ -475,8 +473,6 @@ const LawyerProfilePage: React.FC = () => {
     if (!user?.id) return;
 
     try {
-      setIsProfileLoading(true);
-      
       // Direct Supabase queries - faster than going through backend API
       // Fetch both queries in parallel for maximum speed
       const [lawyerResult, professionalResult] = await Promise.all([
@@ -542,8 +538,6 @@ const LawyerProfilePage: React.FC = () => {
         days: "",
         hours_available: "",
       });
-    } finally {
-      setIsProfileLoading(false);
     }
   }, [user?.id]);
 
@@ -598,19 +592,16 @@ const LawyerProfilePage: React.FC = () => {
         email: user.email || prev.email,
       }));
     }
-  }, [user?.profile_photo, user?.full_name, user?.email, (user as any)?.photo_url]);
+  }, [user]);
 
   const refreshProfileData = useCallback(async () => {
     if (!user) return;
 
-    setIsProfileLoading(true);
     try {
       await Promise.all([fetchLawyerContactInfo(), fetchProfessionalInfo()]);
       await refreshUserData();
     } catch (error) {
       console.error("Error refreshing profile data:", error);
-    } finally {
-      setIsProfileLoading(false);
     }
   }, [user, fetchLawyerContactInfo, fetchProfessionalInfo, refreshUserData]);
 
@@ -849,7 +840,7 @@ const LawyerProfilePage: React.FC = () => {
                       {lawyerContactInfo.specializations.split(",")[0].replace(/[\[\]"]/g, '').trim()}
                     </Text>
                   ) : (
-                    <Text style={tw`text-sm text-gray-400 italic`}>
+                    <Text style={tw`text-sm italic text-gray-400`}>
                       No specializations set yet
                     </Text>
                   )}

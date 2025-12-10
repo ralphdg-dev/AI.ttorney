@@ -28,7 +28,110 @@ class SafetyFilter:
         "plaintiff", "defendant", "accused", "complainant",
         "evidence", "testimony", "witness", "case", "lawsuit",
         "legal advice", "legal rights", "legal remedies",
-        "demanda", "kaso", "batas", "korte", "abogado"
+        "demanda", "kaso", "batas", "korte", "abogado",
+        
+        # Educational/Legal Inquiry Patterns
+        "what is", "what are", "what's the", "what's a", 
+        "how is", "how does", "how can", "how do",
+        "is it", "is there", "is that", "is this",
+        "are there", "are these", "are those",
+        "can someone", "can you", "can one",
+        "could someone", "could you", "could one",
+        "would someone", "would you", "would one",
+        "should someone", "should you", "should one",
+        "does the", "do the", "is the", "are the",
+        
+        # Legal Process Questions
+        "penalty for", "punishment for", "sentence for", "jail time",
+        "prison", "imprisonment", "fine", "conviction", "acquittal",
+        "guilty", "innocent", "not guilty", "plea", "bail",
+        "arrest", "detention", "custody", "investigation",
+        "prosecute", "prosecution", "defend", "defense",
+        "charge", "charged with", "accused of", "suspected of",
+        "victim", "perpetrator", "offender", "crime", "criminal",
+        
+        # Specific Crimes & Legal Topics
+        "rape case", "rape charge", "rape accusation", "rape law",
+        "assault case", "assault charge", "physical assault", "simple assault",
+        "abuse case", "abuse charge", "child abuse", "domestic abuse",
+        "molestation case", "molestation charge", "child molestation",
+        "harassment case", "harassment charge", "sexual harassment",
+        "physical violence", "domestic violence", "violence against",
+        "bodily harm", "grievous harm", "physical injury", "causing injury",
+        "battery", "physical battery", "simple battery",
+        "homicide", "manslaughter", "killing", "unlawful killing",
+        "suicide case", "assisted suicide", "euthanasia",
+        
+        # Violence-Related Legal Context
+        "hit someone", "punch someone", "slap someone", "kick someone",
+        "physical fight", "altercation", "confrontation", "quarrel",
+        "self defense", "self-defense", "defense of self", "defense of others",
+        "provocation", "provoked", "self-preservation", "protecting oneself",
+        "use of force", "excessive force", "reasonable force", "necessary force",
+        
+        # Legal Procedures for Violent Crimes
+        "violent crime", "crime of violence", "offense involving violence",
+        "aggravated assault", "simple assault", "assault with weapon",
+        "sexual assault", "indecent assault", "carnal assault",
+        "physical abuse", "emotional abuse", "psychological abuse",
+        "verbal abuse", "abusive behavior", "pattern of abuse",
+        
+        # Filipino Legal Terms for Crimes
+        "kasong panggagahasa", "kasong pang-aabuso", "kasong pang-aapi",
+        "batas sa rape", "batas sa pang-aabuso", "batas sa pang-aapi",
+        "parusa sa rape", "parusa sa pang-aabuso", "parusa sa pang-aapi",
+        "kulong sa rape", "kulong sa pang-aabuso", "kulong sa pang-aapi",
+        
+        # Tagalog Legal Inquiry Patterns
+        "ano ang parusa", "ano ang batas", "ano ang kasong", "paano ang",
+        "kung ano ang", "kung paano ang", "kung saan ang", "kung kailan ang",
+        "legal na tanong", "batas na tanong", "konsulta sa batas",
+        
+        # Tagalog Crime-Specific Legal Terms
+        "kasong pumatay", "kasong saksak", "kasong bugbug", "kasong gahasa",
+        "parusa sa pumatay", "parusa sa saksak", "parusa sa bugbug", "parusa sa gahasa",
+        "batas sa pumatay", "batas sa saksak", "batas sa bugbug", "batas sa gahasa",
+        "kulong sa pumatay", "kulong sa saksak", "kulong sa bugbug", "kulong sa gahasa",
+        
+        # Tagalog Legal Process Terms
+        "akusasyon", "kaso", "demanda", "hukom", "korte", "abogado",
+        "fiskal", "prosekutor", "testigo", "ebidensya", "bilangguan",
+        "preso", "suspeta", "biktima", "sasakyan", "parusa",
+        
+        # Tagalog Educational Patterns
+        "ano ang", "ano ba", "paano ang", "paano ba", "kung ano ang",
+        "kung paano ang", "ito ba ay", "ito ba ay legal", "legal ba ito",
+        "batas ba ito", "krimen ba ito", "kasong", "parusa", "kulong"
+        
+        # Specific Legal Areas
+        "self-defense", "defense of others", "defense of property",
+        "justifying circumstance", "exempting circumstance", "mitigating",
+        "aggravating", "circumstance", "elements of", "requirements",
+        "legal definition", "defined as", "classified as", "constitutes",
+        
+        # Philippine Law Terms
+        "revised penal code", "rpc", "civil code", "family code",
+        "labor code", "tax code", "building code", "sanitation code",
+        "batas pambansa", "presidential decree", "executive order",
+        "department order", "administrative order", "circular",
+        "memorandum", "rule", "regulation", "guideline",
+        
+        # Legal Proceedings
+        "hearing", "trial", "appeal", "appellate", "supreme court",
+        "court of appeals", "regional trial court", "municipal trial court",
+        "barangay", "mediation", "conciliation", "arbitration",
+        "settlement", "compromise", "agreement", "contract",
+        
+        # Legal Rights
+        "rights of", "constitutional rights", "human rights",
+        "due process", "equal protection", "freedom of",
+        "right to", "privilege", "immunity", "exemption",
+        
+        # Filipino Legal Terms
+        "parusa", "kulong", "bilangguan", "preso", "akusado",
+        "biktima", "sasakyan", "ebidensya", "testigo", "hukom",
+        "fiskal", "prosekutor", "tagapagtanggol", "abogado",
+        "korte", "kasong", "kriminal", "sedisyon", "parisyon"
     ]
     
                                    
@@ -79,7 +182,24 @@ class SafetyFilter:
         "shut up", "stupid", "worthless", "useless",
         "kill", "die", "death", "murder", "suicide",
         "rape", "assault", "abuse", "molest", "harass",
-        "saktan", "suntukin", "sampalin", "patayin"
+        
+        # Tagalog Violence Terms
+        "saktan", "suntukin", "sampalin", "patayin", "sakalin",
+        "bugbugin", "saksakin", "habulin", "manakit", "sumakit",
+        "babarain", "lalaitin", "mura", "mumura", "tarantado",
+        
+        # Tagalog Sexual Abuse Terms
+        "gahasa", "gahasahin", "manggahasa", "panggagahasa",
+        "molestahin", "pangmomoles", "hipuin", "panghihipo",
+        "abuso", "mag-abuso", "pang-aabuso", "mag-aapi", "pangaapi",
+        
+        # Tagalog General Abuse Terms
+        "panloloko", "manloloko", "paninindak", "manindak", "pananakit",
+        "pang-aapi", "mag-aapi", "mamumuhat", "pangmuha", "mamumura",
+        
+        # Tagalog Death/Killing Terms
+        "pumatay", "patayan", "mamamatay-tao", "kriminal", "krimen",
+        "sirain", "wasakin", "ubusin", "puksain", "ligpitin"
     ]
     
                     
@@ -103,12 +223,91 @@ class SafetyFilter:
         """
         Check if text appears to be a legitimate legal question.
         Returns True if legal context indicators are present.
+        
+        Enhanced with intent detection to distinguish educational inquiries
+        from actual threats or harmful intent.
         """
         text_lower = text.lower()
-        return any(
+        
+        # Check for legal context indicators
+        has_legal_context = any(
             indicator in text_lower
             for indicator in self.LEGAL_CONTEXT_INDICATORS
         )
+        
+        if not has_legal_context:
+            return False
+        
+        # Intent detection: Check if this is an educational inquiry vs harmful intent
+        # Educational patterns (questions, definitions, explanations)
+        educational_patterns = [
+            r'\b(what|how|when|where|why|which|who)\b',
+            r'\b(is|are|am|was|were)\b',
+            r'\b(can|could|would|should|may|might)\b',
+            r'\b(define|explain|describe|tell me|show me)\b',
+            r'\b(penalty|punishment|sentence|charge|law|legal)\b.*\b(for|of)\b',
+            r'\?$',  # Ends with question mark
+        ]
+        
+        # Harmful intent patterns (first-person statements of intent)
+        harmful_patterns = [
+            r'\b(i\s+will|i\'m\s+going\s+to|i\s+want\s+to|i\s+plan\s+to)\b',
+            r'\b(let\s+me|let\'s|we\s+will|we\'re\s+going\s+to)\b',
+            r'\b(going\s+to\s+kill|will\s+kill|want\s+to\s+kill)\b',
+            r'\b(going\s+to\s+hurt|will\s+hurt|want\s+to\s+hurt)\b',
+            r'\b(going\s+to\s+rape|will\s+rape|want\s+to\s+rape)\b',
+            r'\b(going\s+to\s+murder|will\s+murder|want\s+to\s+murder)\b',
+            r'\b(going\s+to\s+assault|will\s+assault|want\s+to\s+assault)\b',
+            r'\b(going\s+to\s+abuse|will\s+abuse|want\s+to\s+abuse)\b',
+            r'\b(going\s+to\s+molest|will\s+molest|want\s+to\s+molest)\b',
+            r'\b(going\s+to\s+harass|will\s+harass|want\s+to\s+harass)\b',
+            r'\b(going\s+to\s+hit|will\s+hit|want\s+to\s+hit)\b',
+            r'\b(going\s+to\s+beat|will\s+beat|want\s+to\s+beat)\b',
+            r'\b(going\s+to\s+punch|will\s+punch|want\s+to\s+punch)\b',
+            r'\b(going\s+to\s+slap|will\s+slap|want\s+to\s+slap)\b',
+            r'\b(going\s+to\s+kick|will\s+kick|want\s+to\s+kick)\b',
+            r'\b(i\s+will\s+kill|i\'m\s+going\s+to\s+kill|i\s+want\s+to\s+kill)\b',
+            r'\b(i\s+will\s+hurt|i\'m\s+going\s+to\s+hurt|i\s+want\s+to\s+hurt)\b',
+            r'\b(i\s+will\s+rape|i\'m\s+going\s+to\s+rape|i\s+want\s+to\s+rape)\b',
+            r'\b(i\s+will\s+murder|i\'m\s+going\s+to\s+murder|i\s+want\s+to\s+murder)\b',
+            r'\b(i\s+will\s+assault|i\'m\s+going\s+to\s+assault|i\s+want\s+to\s+assault)\b',
+            r'\b(i\s+will\s+abuse|i\'m\s+going\s+to\s+abuse|i\s+want\s+to\s+abuse)\b',
+            r'\b(i\s+will\s+molest|i\'m\s+going\s+to\s+molest|i\s+want\s+to\s+molest)\b',
+            r'\b(i\s+will\s+harass|i\'m\s+going\s+to\s+harass|i\s+want\s+to\s+harass)\b',
+            r'\b(i\s+will\s+hit|i\'m\s+going\s+to\s+hit|i\s+want\s+to\s+hit)\b',
+            r'\b(i\s+will\s+beat|i\'m\s+going\s+to\s+beat|i\s+want\s+to\s+beat)\b',
+            r'\b(i\s+will\s+punch|i\'m\s+going\s+to\s+punch|i\s+want\s+to\s+punch)\b',
+            r'\b(i\s+will\s+slap|i\'m\s+going\s+to\s+slap|i\s+want\s+to\s+slap)\b',
+            r'\b(i\s+will\s+kick|i\'m\s+going\s+to\s+kick|i\s+want\s+to\s+kick)\b',
+            
+            # Tagalog Harmful Intent Patterns
+            r'\b(gusto\s+kong|kailangan\s+kong|papatayin\s+kong|sasaktan\s+kong)\b',
+            r'\b(papatusin\s+kong|pupuksain\s+kong|sisirain\s+kong)\b',
+            r'\b(gagahasan\s+kong|momoles\s+kong|aapakan\s+kong)\b',
+            r'\b(sasampalin\s+kong|sisuntukin\s+kong|kikickin\s+kong)\b',
+            r'\b(papatayin\s+ko|sasaktan\s+ko|gagahasan\s+ko)\b',
+            r'\b(momoles\s+ko|aapakan\s+ko|sasampalin\s+ko)\b',
+            r'\b(sisuntukin\s+ko|kikickin\s+ko|pupuksain\s+ko)\b',
+            r'\b(papatayin\s+natin|sasaktan\s+natin|gagahasan\s+natin)\b',
+            r'\b(tulungan\s+mo\s+akong|mamaya\s+kong|sakaling\s+kong)\b',
+            r'\b(akala\s+mo|pag\s+ako|magsisimula\s+ako)\b'
+        ]
+        
+        # Check for educational patterns
+        is_educational = any(
+            re.search(pattern, text_lower)
+            for pattern in educational_patterns
+        )
+        
+        # Check for harmful intent patterns
+        is_harmful_intent = any(
+            re.search(pattern, text_lower)
+            for pattern in harmful_patterns
+        )
+        
+        # Allow if it has legal context AND is educational OR doesn't show harmful intent
+        # Block if it shows clear harmful intent even with legal terms
+        return has_legal_context and (is_educational or not is_harmful_intent)
     
     def check_child_safety(self, text: str) -> Tuple[bool, List[str]]:
         """
