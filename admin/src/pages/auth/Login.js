@@ -1,44 +1,47 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Lock, Eye, EyeOff, Loader2, AlertCircle, Mail, Send, X } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { useToast } from '../../components/ui/Toast';
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Lock,
+  Eye,
+  EyeOff,
+  Loader2,
+  AlertCircle,
+  Mail,
+  Send,
+  X,
+} from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+import { useToast } from "../../components/ui/Toast";
 
 const Login = () => {
   const navigate = useNavigate();
   const { showSuccess, showError, ToastContainer } = useToast();
-  const [email, setEmail] = React.useState('');
-  const [password, setPassword] = React.useState('');
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
   const [showContactModal, setShowContactModal] = React.useState(false);
   const [contactForm, setContactForm] = React.useState({
-    name: '',
-    email: '',
-    subject: '',
-    message: ''
+    name: "",
+    email: "",
+    subject: "",
+    message: "",
   });
   const [isSending, setIsSending] = React.useState(false);
+  const [loginError, setLoginError] = React.useState("");
   const { login, loading, error, clearError, isAuthenticated } = useAuth();
 
   // Redirect if already authenticated
   React.useEffect(() => {
     if (isAuthenticated) {
-      window.location.href = '/';
+      window.location.href = "/";
     }
   }, [isAuthenticated]);
 
-  // Clear error when user starts typing
-  React.useEffect(() => {
-    if (error) {
-      clearError();
-    }
-  }, [email, password, error, clearError]);
-
   const onSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!email || !password) {
-      showError('Please enter both email and password');
+      showError("Please enter both email and password");
       return;
     }
 
@@ -46,40 +49,48 @@ const Login = () => {
     if (result.success) {
       // Check if 2FA is required
       if (result.requires2FA) {
-        showSuccess('Verification code sent to your email!');
+        showSuccess("Verification code sent to your email!");
         // Navigate to OTP verification page
         setTimeout(() => {
-          navigate('/verify-otp', {
+          navigate("/verify-otp", {
             state: {
               email: result.email,
-              adminId: result.adminId
-            }
+              adminId: result.adminId,
+            },
           });
         }, 500);
       } else {
         // Direct login (legacy flow)
-        showSuccess('Login successful! Redirecting to dashboard...');
+        showSuccess("Login successful! Redirecting to dashboard...");
         setTimeout(() => {
-          window.location.href = '/';
+          window.location.href = "/";
         }, 1000);
       }
     } else {
-      showError(result.error || 'Login failed. Please check your credentials.');
+      const message =
+        result?.error || "Login failed. Please check your credentials.";
+      setLoginError(message);
+      showError(message);
     }
   };
 
   const handleContactSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!contactForm.name || !contactForm.email || !contactForm.subject || !contactForm.message) {
-      showError('Please fill in all fields');
+
+    if (
+      !contactForm.name ||
+      !contactForm.email ||
+      !contactForm.subject ||
+      !contactForm.message
+    ) {
+      showError("Please fill in all fields");
       return;
     }
 
     // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(contactForm.email)) {
-      showError('Please enter a valid email address');
+      showError("Please enter a valid email address");
       return;
     }
 
@@ -88,27 +99,29 @@ const Login = () => {
       // In production, this would call an API endpoint:
       // POST /api/contact-superadmin
       // with rate limiting and database storage
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://ai-ttorney-admin-server.onrender.com/api';
+      const API_BASE_URL =
+        process.env.REACT_APP_API_URL ||
+        "https://ai-ttorney-admin-server.onrender.com/api";
       const response = await fetch(`${API_BASE_URL}/contact-superadmin`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(contactForm)
+        body: JSON.stringify(contactForm),
       });
-      
+
       if (!response.ok) {
-        throw new Error('Failed to send message');
+        throw new Error("Failed to send message");
       }
-      
-      showSuccess('Message sent to superadmin successfully!');
-      setContactForm({ name: '', email: '', subject: '', message: '' });
+
+      showSuccess("Message sent to superadmin successfully!");
+      setContactForm({ name: "", email: "", subject: "", message: "" });
       setShowContactModal(false);
     } catch (err) {
       // Fallback to simulation for demo purposes
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      showSuccess('Message sent to superadmin successfully!');
-      setContactForm({ name: '', email: '', subject: '', message: '' });
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      showSuccess("Message sent to superadmin successfully!");
+      setContactForm({ name: "", email: "", subject: "", message: "" });
       setShowContactModal(false);
     } finally {
       setIsSending(false);
@@ -116,7 +129,7 @@ const Login = () => {
   };
 
   const handleContactInputChange = (field, value) => {
-    setContactForm(prev => ({ ...prev, [field]: value }));
+    setContactForm((prev) => ({ ...prev, [field]: value }));
   };
 
   return (
@@ -125,31 +138,46 @@ const Login = () => {
       <div className="w-full max-w-sm">
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-6">
           <div className="flex items-center gap-2 mb-4">
-            <div className="inline-flex items-center justify-center rounded-md bg-[#023D7B]/10 text-[#023D7B] w-8 h-8"><Lock size={16} /></div>
+            <div className="inline-flex items-center justify-center rounded-md bg-[#023D7B]/10 text-[#023D7B] w-8 h-8">
+              <Lock size={16} />
+            </div>
             <div>
               <h1 className="text-sm font-semibold text-gray-900">Sign in</h1>
-              <p className="text-[11px] text-gray-500">Access your admin dashboard</p>
+              <p className="text-[11px] text-gray-500">
+                Access your admin dashboard
+              </p>
             </div>
           </div>
 
           {/* Error Message */}
-          {error && (
+          {(loginError || error) && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
               <div className="flex items-center gap-2">
                 <AlertCircle size={16} className="text-red-600" />
-                <p className="text-[11px] text-red-700">{error}</p>
+                <p className="text-[11px] text-red-700">
+                  {loginError || error}
+                </p>
               </div>
             </div>
           )}
 
           <form onSubmit={onSubmit} className="space-y-3">
             <div>
-              <label className="block text-[11px] text-gray-700 mb-1" htmlFor="email">Email</label>
+              <label
+                className="block text-[11px] text-gray-700 mb-1"
+                htmlFor="email"
+              >
+                Email
+              </label>
               <input
                 id="email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  if (loginError) setLoginError("");
+                  if (error) clearError();
+                  setEmail(e.target.value);
+                }}
                 className="w-full rounded-md border border-gray-200 px-3 py-2 text-[12px] text-gray-900 placeholder:text-gray-400 placeholder:text-xs focus:outline-none focus:ring-1 focus:ring-gray-300 disabled:bg-gray-50 disabled:cursor-not-allowed"
                 placeholder="Enter your email address"
                 required
@@ -159,13 +187,22 @@ const Login = () => {
             </div>
 
             <div>
-              <label className="block text-[11px] text-gray-700 mb-1" htmlFor="password">Password</label>
+              <label
+                className="block text-[11px] text-gray-700 mb-1"
+                htmlFor="password"
+              >
+                Password
+              </label>
               <div className="relative">
                 <input
                   id="password"
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    if (loginError) setLoginError("");
+                    if (error) clearError();
+                    setPassword(e.target.value);
+                  }}
                   className="w-full rounded-md border border-gray-200 px-3 py-2 pr-10 text-[12px] text-gray-900 placeholder:text-gray-400 placeholder:text-xs focus:outline-none focus:ring-1 focus:ring-gray-300 disabled:bg-gray-50 disabled:cursor-not-allowed"
                   placeholder="••••••••"
                   required
@@ -176,7 +213,7 @@ const Login = () => {
                   type="button"
                   onClick={() => setShowPassword((s) => !s)}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 disabled:cursor-not-allowed"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                   disabled={loading}
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -187,7 +224,7 @@ const Login = () => {
             <div className="flex items-center justify-end">
               <button
                 type="button"
-                onClick={() => navigate('/forgot-password')}
+                onClick={() => navigate("/forgot-password")}
                 className="text-[11px] text-[#023D7B] hover:underline bg-transparent border-none cursor-pointer"
               >
                 Forgot password?
@@ -205,7 +242,7 @@ const Login = () => {
                   Signing in...
                 </>
               ) : (
-                'Sign in'
+                "Sign in"
               )}
             </button>
 
@@ -226,7 +263,7 @@ const Login = () => {
 
       {/* Contact Superadmin Modal */}
       {showContactModal && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
@@ -242,8 +279,12 @@ const Login = () => {
                   <Mail size={18} className="text-[#023D7B]" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900">Contact Superadmin</h2>
-                  <p className="text-sm text-gray-500">Send a message to the system administrator</p>
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    Contact Superadmin
+                  </h2>
+                  <p className="text-sm text-gray-500">
+                    Send a message to the system administrator
+                  </p>
                 </div>
               </div>
               <button
@@ -263,7 +304,9 @@ const Login = () => {
                 <input
                   type="text"
                   value={contactForm.name}
-                  onChange={(e) => handleContactInputChange('name', e.target.value)}
+                  onChange={(e) =>
+                    handleContactInputChange("name", e.target.value)
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#023D7B] focus:border-transparent"
                   placeholder="Enter your full name"
                   required
@@ -277,7 +320,9 @@ const Login = () => {
                 <input
                   type="email"
                   value={contactForm.email}
-                  onChange={(e) => handleContactInputChange('email', e.target.value)}
+                  onChange={(e) =>
+                    handleContactInputChange("email", e.target.value)
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#023D7B] focus:border-transparent"
                   placeholder="your.email@example.com"
                   required
@@ -291,7 +336,9 @@ const Login = () => {
                 <input
                   type="text"
                   value={contactForm.subject}
-                  onChange={(e) => handleContactInputChange('subject', e.target.value)}
+                  onChange={(e) =>
+                    handleContactInputChange("subject", e.target.value)
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#023D7B] focus:border-transparent"
                   placeholder="Brief description of your issue"
                   required
@@ -304,7 +351,9 @@ const Login = () => {
                 </label>
                 <textarea
                   value={contactForm.message}
-                  onChange={(e) => handleContactInputChange('message', e.target.value)}
+                  onChange={(e) =>
+                    handleContactInputChange("message", e.target.value)
+                  }
                   rows={4}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#023D7B] focus:border-transparent resize-none"
                   placeholder="Describe your issue or request in detail..."
