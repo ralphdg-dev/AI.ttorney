@@ -174,33 +174,8 @@ class SafetyFilter:
         r"(private|direct)\s+message\s+me",
         r"add\s+me\s+on\s+(snap|instagram|whatsapp|telegram)",
     ]
-    
-                      
-    ABUSE_KEYWORDS = [
-        "hit", "beat", "punch", "slap", "kick", "hurt",
-        "deserve", "punishment", "teach you a lesson",
-        "shut up", "stupid", "worthless", "useless",
-        "kill", "die", "death", "murder", "suicide",
-        "rape", "assault", "abuse", "molest", "harass",
-        
-        # Tagalog Violence Terms
-        "saktan", "suntukin", "sampalin", "patayin", "sakalin",
-        "bugbugin", "saksakin", "habulin", "manakit", "sumakit",
-        "babarain", "lalaitin", "mura", "mumura", "tarantado",
-        
-        # Tagalog Sexual Abuse Terms
-        "gahasa", "gahasahin", "manggahasa", "panggagahasa",
-        "molestahin", "pangmomoles", "hipuin", "panghihipo",
-        "abuso", "mag-abuso", "pang-aabuso", "mag-aapi", "pangaapi",
-        
-        # Tagalog General Abuse Terms
-        "panloloko", "manloloko", "paninindak", "manindak", "pananakit",
-        "pang-aapi", "mag-aapi", "mamumuhat", "pangmuha", "mamumura",
-        
-        # Tagalog Death/Killing Terms
-        "pumatay", "patayan", "mamamatay-tao", "kriminal", "krimen",
-        "sirain", "wasakin", "ubusin", "puksain", "ligpitin"
-    ]
+
+    ABUSE_KEYWORDS = []
     
                     
     THREAT_PATTERNS = [
