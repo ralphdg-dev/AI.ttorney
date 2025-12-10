@@ -109,6 +109,42 @@ PROHIBITED_PATTERNS = [
     r'\bforge\b.*\b(document|signature|id)\b',
 ]
 
+def _is_legal_violence_question(text: str) -> bool:
+    """Detect legal/educational questions that mention killing/violence.
+
+    Used to avoid over-blocking questions like
+    "what if a child killed someone" or
+    "paano kapag nakapatay ang isang menor de edad".
+    """
+    t = text.lower().strip()
+    if not t:
+        return False
+
+    violence_terms = [
+        "kill", "killed", "killing", "murder", "homicide", "manslaughter",
+        "pumatay", "nakapatay", "pagpatay", "pinatay",
+    ]
+    legal_question_terms = [
+        "what if", "what happens if", "penalty", "punishment", "sentence",
+        "crime", "criminal liability", "liability", "parusa", "kasalanan",
+        "ano ang parusa", "paano kapag", "under the revised penal code",
+        "under philippine law", "sa ilalim ng batas", "sa ilalim ng revised penal code",
+    ]
+
+    # Roughly exclude first-person intent / threats; those should still be blocked
+    harmful_intent_patterns = [
+        "i will", "i'm going to", "im going to", "i want to", "gusto kong",
+        "papatayin kita", "papatayin ko", "sasaktan kita", "sasaktan ko",
+    ]
+
+    if any(p in t for p in harmful_intent_patterns):
+        return False
+
+    if not any(v in t for v in violence_terms):
+        return False
+
+    return any(l in t for l in legal_question_terms)
+
                                             
 TOXIC_WORDS = [
                         
@@ -3030,12 +3066,31 @@ async def ask_legal_question(
             violation_service = get_violation_tracking_service()
             
             try:
-                moderation_result = await moderation_service.moderate_content(request.question.strip())
+                question_text = request.question.strip()
+                moderation_result = await moderation_service.moderate_content(question_text)
                 step_time = time.time() - step_start
                 logger.debug(f"Content moderation took: {step_time:.2f}s")
                 
-                                                                                 
-                if not moderation_service.is_content_safe(moderation_result):
+                                                                                
+                is_safe = moderation_service.is_content_safe(moderation_result)
+
+                # Override violence-only flags for clearly legal questions about violence
+                if not is_safe:
+                    categories = moderation_result.get("categories", {}) or {}
+                    has_violence = any(
+                        k in ("violence", "violence/graphic") and v
+                        for k, v in categories.items()
+                    )
+                    other_flagged = any(
+                        k not in ("violence", "violence/graphic") and v
+                        for k, v in categories.items()
+                    )
+
+                    if has_violence and not other_flagged and _is_legal_violence_question(question_text):
+                        logger.info("Overriding moderation: legal violence question detected (user chatbot)")
+                        is_safe = True
+
+                if not is_safe:
                     logger.warning(f"  Chatbot prompt flagged for user {effective_user_id[:8]}: {moderation_result['violation_summary']}")
                     violation_detected = True
                     
