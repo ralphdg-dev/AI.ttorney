@@ -16,7 +16,7 @@ import { ArticleCard, ArticleItem } from "@/components/guides/ArticleCard";
 import { useBookmarks } from "@/contexts/BookmarksContext";
 import { useAuth } from "../contexts/AuthContext";
 import { AuthGuard } from "../components/AuthGuard";
-import { NetworkConfig } from '@/utils/networkConfig';
+import { useLegalArticles } from "@/hooks/useLegalArticles";
 import Button from "@/components/ui/Button";
 import { ArticleCardSkeletonList } from "@/components/guides/ArticleCardSkeleton";
 import { Filter, SortAsc } from "lucide-react-native";
@@ -26,63 +26,39 @@ export default function BookmarkedGuidesScreen() {
   const router = useRouter();
   const { session } = useAuth();
   const { bookmarkedGuideIds } = useBookmarks();
+  const { articles: legalArticles, loading: articlesLoading } = useLegalArticles();
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [bookmarkedArticles, setBookmarkedArticles] = useState<ArticleItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const flatListRef = useRef<FlatList>(null);
   const { width } = useWindowDimensions();
+  const loading = articlesLoading;
 
   const horizontalPadding = 16;
   const minCardWidth = 320;
   const numColumns = Math.max(1, Math.min(3, Math.floor((width - horizontalPadding * 2) / minCardWidth)));
 
-  // Load bookmarked articles
+  // Load bookmarked articles using the shared legal articles list (with image URLs)
   useEffect(() => {
-    const loadBookmarkedArticles = async () => {
-      if (!session?.access_token) {
-        setBookmarkedArticles([]);
-        setLoading(false);
-        return;
-      }
+    if (!session?.access_token) {
+      setBookmarkedArticles([]);
+      return;
+    }
 
-      if (bookmarkedGuideIds.size === 0) {
-        setBookmarkedArticles([]);
-        setLoading(false);
-        return;
-      }
+    if (bookmarkedGuideIds.size === 0) {
+      setBookmarkedArticles([]);
+      return;
+    }
 
-      try {
-        setLoading(true);
-        const apiUrl = await NetworkConfig.getBestApiUrl();
-        
-        const response = await fetch(`${apiUrl}/api/legal/articles`);
+    const bookmarked: ArticleItem[] = legalArticles
+      .filter((article) => bookmarkedGuideIds.has(article.id))
+      .map((article) => ({
+        ...article,
+        isBookmarked: true,
+      }));
 
-        if (response.ok) {
-          const data = await response.json();
-          const articles = data.data || [];
-          
-          const bookmarked: ArticleItem[] = articles
-            .filter((article: any) => bookmarkedGuideIds.has(article.id))
-            .map((article: any) => ({
-              id: article.id,
-              title: article.title_en || article.title,
-              summary: article.description_en || article.description,
-              category: article.category,
-              isBookmarked: true,
-            }));
-          
-          setBookmarkedArticles(bookmarked);
-        }
-      } catch (error) {
-        console.error("Error loading bookmarked articles:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadBookmarkedArticles();
-  }, [bookmarkedGuideIds, session?.access_token]);
+    setBookmarkedArticles(bookmarked);
+  }, [legalArticles, bookmarkedGuideIds, session?.access_token]);
 
   // Filter bookmarked articles by category and search
   const filteredArticles = useMemo(() => {
