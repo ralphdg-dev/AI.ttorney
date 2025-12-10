@@ -23,11 +23,14 @@ class SafetyFilter:
     LEGAL_CONTEXT_INDICATORS = [
         "criminal complaint", "filed a case", "violation of", "republic act",
         "anti-vawc", "vawc", "criminal liability", "criminally liable",
-        "legal question", "law", "article", "code", "statute",
+        "legal question", "legal issue", "legal meaning", "legal definition",
+        "law", "article", "code", "statute", "revised penal code", "rpc",
         "trial", "court", "judge", "lawyer", "attorney",
         "plaintiff", "defendant", "accused", "complainant",
         "evidence", "testimony", "witness", "case", "lawsuit",
-        "legal advice", "legal rights", "legal remedies",
+        "legal advice", "legal rights", "legal remedies", "criminal law",
+        "penalty", "penalties", "parusa", "ano ang parusa", "what is the penalty",
+        "criminal case", "criminal charge", "criminal offense",
         "demanda", "kaso", "batas", "korte", "abogado"
     ]
     
@@ -109,6 +112,19 @@ class SafetyFilter:
             indicator in text_lower
             for indicator in self.LEGAL_CONTEXT_INDICATORS
         )
+
+    def _is_educational_or_hypothetical_context(self, text: str) -> bool:
+        """Check if text appears to be academic, historical, news, or fictional context."""
+        text_lower = text.lower()
+        indicators = [
+            "history", "historical", "in history", "case study", "case studies",
+            "academic", "crim law", "criminal law discussion", "class discussion",
+            "for example if", "for instance if", "hypothetical", "hypothetically",
+            "imagine if", "imagine that", "let's say", "lets say",
+            "story", "fictional", "fiction", "novel", "movie", "film", "character",
+            "news", "news report", "reported that", "article said", "headline"
+        ]
+        return any(indicator in text_lower for indicator in indicators)
     
     def check_child_safety(self, text: str) -> Tuple[bool, List[str]]:
         """
@@ -202,7 +218,7 @@ class SafetyFilter:
         violations = []
         
                                                       
-        if self._is_legal_context(text):
+        if self._is_legal_context(text) or self._is_educational_or_hypothetical_context(text):
                                                      
             return False, []
         
