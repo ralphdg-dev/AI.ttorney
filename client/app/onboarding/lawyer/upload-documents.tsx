@@ -64,6 +64,17 @@ export default function LawyerReg() {
           if (uploadResult.success && uploadResult.file_path) {
             setIbpCardPath(uploadResult.file_path);
             setShowUploadOptions(false);
+            
+            // Auto-fill form fields from OCR extraction
+            if (uploadResult.extracted_first_name) {
+              setFirstName(uploadResult.extracted_first_name);
+            }
+            if (uploadResult.extracted_last_name) {
+              setLastName(uploadResult.extracted_last_name);
+            }
+            if (uploadResult.extracted_roll_number) {
+              setRollNumber(uploadResult.extracted_roll_number);
+            }
           } else {
             // Keep the preview but show warning - don't remove the image
             console.warn('Upload failed but keeping preview:', uploadResult.message);
@@ -111,6 +122,17 @@ export default function LawyerReg() {
           if (uploadResult.success && uploadResult.file_path) {
             setIbpCardPath(uploadResult.file_path);
             setShowUploadOptions(false);
+            
+            // Auto-fill form fields from OCR extraction
+            if (uploadResult.extracted_first_name) {
+              setFirstName(uploadResult.extracted_first_name);
+            }
+            if (uploadResult.extracted_last_name) {
+              setLastName(uploadResult.extracted_last_name);
+            }
+            if (uploadResult.extracted_roll_number) {
+              setRollNumber(uploadResult.extracted_roll_number);
+            }
           } else {
             // Keep the preview but show warning - don't remove the image
             console.warn('Upload failed but keeping preview:', uploadResult.message);
@@ -164,6 +186,17 @@ export default function LawyerReg() {
           if (uploadResult.success && uploadResult.file_path) {
             setIbpCardPath(uploadResult.file_path);
             setShowUploadOptions(false);
+            
+            // Auto-fill form fields from OCR extraction
+            if (uploadResult.extracted_first_name) {
+              setFirstName(uploadResult.extracted_first_name);
+            }
+            if (uploadResult.extracted_last_name) {
+              setLastName(uploadResult.extracted_last_name);
+            }
+            if (uploadResult.extracted_roll_number) {
+              setRollNumber(uploadResult.extracted_roll_number);
+            }
           } else {
             // Keep the preview but show warning - don't remove the image
             console.warn('Upload failed but keeping preview:', uploadResult.message);
@@ -220,6 +253,17 @@ export default function LawyerReg() {
           if (uploadResult.success && uploadResult.file_path) {
             setIbpCardPath(uploadResult.file_path);
             setShowUploadOptions(false);
+            
+            // Auto-fill form fields from OCR extraction
+            if (uploadResult.extracted_first_name) {
+              setFirstName(uploadResult.extracted_first_name);
+            }
+            if (uploadResult.extracted_last_name) {
+              setLastName(uploadResult.extracted_last_name);
+            }
+            if (uploadResult.extracted_roll_number) {
+              setRollNumber(uploadResult.extracted_roll_number);
+            }
           } else {
             // Keep the preview but show warning - don't remove the image
             console.warn('Upload failed but keeping preview:', uploadResult.message);

@@ -9,6 +9,7 @@ from lawyer.models import (
 )
 from lawyer.service import LawyerApplicationService
 from services.storage_service import StorageService
+from services.ibp_ocr_service import extract_ibp_fields_from_bytes
 from middleware.auth import get_current_user, require_role
 from typing import Dict, Any, List
 from datetime import date
@@ -25,18 +26,23 @@ async def upload_ibp_id_card(
     file: UploadFile = File(...),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
-    """Upload IBP ID card image"""
+    """Upload IBP ID card image and extract fields via OCR"""
     try:
         user_id = current_user["user"]["id"]
         
-                       
         if not file.filename:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No file provided"
             )
         
-                           
+        # Read file content for OCR before uploading
+        file_content = await file.read()
+        
+        # Reset file position for upload
+        await file.seek(0)
+        
+        # Upload to storage
         result = await storage_service.upload_ibp_id_card(file, user_id)
         
         if not result["success"]:
@@ -45,11 +51,25 @@ async def upload_ibp_id_card(
                 detail=result["error"]
             )
         
-        return FileUploadResponse(
-            success=True,
-            file_path=result["file_path"],
-            message=result["message"]
-        )
+        # Perform OCR extraction in background (don't block on failure)
+        ocr_result = None
+        try:
+            ocr_result = await extract_ibp_fields_from_bytes(file_content)
+            logger.info(f"IBP OCR completed: {ocr_result.to_dict()}")
+        except Exception as ocr_error:
+            logger.warning(f"IBP OCR failed (non-blocking): {ocr_error}")
+        
+        # Build response with OCR data if available
+        response_data = {
+            "success": True,
+            "file_path": result["file_path"],
+            "message": result["message"]
+        }
+        
+        if ocr_result:
+            response_data.update(ocr_result.to_dict())
+        
+        return FileUploadResponse(**response_data)
         
     except HTTPException:
         raise
