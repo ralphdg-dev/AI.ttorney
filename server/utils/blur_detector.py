@@ -1,4 +1,9 @@
-import cv2
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except ImportError:
+    CV2_AVAILABLE = False
+
 import numpy as np
 from PIL import Image
 import io
@@ -30,6 +35,11 @@ class BlurDetector:
             - is_blurry: True if image is considered blurry
             - blur_score: Laplacian variance score (higher = sharper)
         """
+        # If cv2 is not available, return non-blurry (skip detection)
+        if not CV2_AVAILABLE:
+            logger.warning("OpenCV (cv2) not available - skipping blur detection")
+            return False, 0.0
+            
         try:
             # Convert bytes to PIL Image
             pil_image = Image.open(io.BytesIO(image_bytes))
