@@ -34,7 +34,8 @@ export default function LawyerReg() {
   const [ibpCardPath, setIbpCardPath] = useState<string>('');
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [blurInfo, setBlurInfo] = useState<{ is_blurry?: boolean; blur_score?: number } | null>(null);
-  const isComplete = Boolean(firstName.trim() && lastName.trim() && rollNumber.trim() && rollSignDate && ibpCard);
+  const isImageBlurry = blurInfo?.is_blurry === true;
+  const isComplete = Boolean(firstName.trim() && lastName.trim() && rollNumber.trim() && rollSignDate && ibpCard && !isImageBlurry);
   const today = new Date();
 
   // Validate credentials when all required fields are filled
@@ -488,45 +489,35 @@ export default function LawyerReg() {
             {blurInfo && blurInfo.is_blurry && (
               <View style={{
                 marginTop: 12,
-                backgroundColor: blurInfo.blur_score && blurInfo.blur_score < 50 ? '#FEE2E2' : '#FEF3C7',
+                backgroundColor: '#FEE2E2',
                 borderWidth: 1,
-                borderColor: blurInfo.blur_score && blurInfo.blur_score < 50 ? '#FCA5A5' : '#FCD34D',
+                borderColor: '#FCA5A5',
                 padding: 12,
                 borderRadius: 8,
                 flexDirection: 'row',
                 alignItems: 'flex-start',
               }}>
                 <MaterialIcons 
-                  name={blurInfo.blur_score && blurInfo.blur_score < 50 ? "error" : "warning"} 
+                  name="error" 
                   size={20} 
-                  color={blurInfo.blur_score && blurInfo.blur_score < 50 ? '#DC2626' : '#D97706'} 
+                  color="#DC2626" 
                   style={{ marginRight: 8, marginTop: 1 }}
                 />
                 <View style={{ flex: 1 }}>
                   <Text style={{ 
                     fontSize: 14, 
                     fontWeight: '600', 
-                    color: blurInfo.blur_score && blurInfo.blur_score < 50 ? '#991B1B' : '#92400E',
+                    color: '#991B1B',
                     marginBottom: 2
                   }}>
-                    {blurInfo.blur_score && blurInfo.blur_score < 50 ? 'Very Blurry Image' : 'Blurry Image'}
+                    Image Too Blurry
                   </Text>
                   <Text style={{ 
                     fontSize: 13, 
-                    color: blurInfo.blur_score && blurInfo.blur_score < 50 ? '#B91C1C' : '#B45309',
+                    color: '#B91C1C',
                     lineHeight: 18
                   }}>
-                    {blurInfo.blur_score && blurInfo.blur_score < 50 
-                      ? 'Image is very blurry and may be rejected. Please retake with better lighting and focus.'
-                      : 'Image appears blurry. Consider retaking for better clarity.'
-                    }
-                  </Text>
-                  <Text style={{ 
-                    fontSize: 11, 
-                    color: blurInfo.blur_score && blurInfo.blur_score < 50 ? '#B91C1C' : '#B45309',
-                    marginTop: 4
-                  }}>
-                    Blur Score: {blurInfo.blur_score?.toFixed(2)}
+                    Please upload a clearer image. Blurry images cannot be submitted.
                   </Text>
                 </View>
               </View>
