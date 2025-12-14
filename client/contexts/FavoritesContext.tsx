@@ -3,6 +3,7 @@ import { useAuth } from './AuthContext';
 import { NetworkConfig } from '@/utils/networkConfig';
 import { useToast } from '@/components/ui/toast';
 import { createSafeAreaToastRenderer } from '@/components/ui/SafeAreaToast';
+import { AppState, AppStateStatus } from 'react-native';
 
 export interface FavoritesContextType {
   favoriteTermIds: Set<string>;
@@ -120,6 +121,27 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
 
   useEffect(() => {
     loadFavorites();
+
+    // App state listener - refresh when app comes to foreground
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        console.log('📱 FavoritesContext: App came to foreground, refreshing favorite terms');
+        loadFavorites();
+      }
+    };
+
+    const appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
+
+    // Periodic refresh to prevent stale counts (every 2 minutes)
+    const periodicRefresh = setInterval(() => {
+      console.log("⏰ FavoritesContext: Periodic refresh to prevent stale favorite terms");
+      loadFavorites();
+    }, 2 * 60 * 1000); // 2 minutes
+
+    return () => {
+      appStateSubscription?.remove();
+      clearInterval(periodicRefresh);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.access_token]);
 

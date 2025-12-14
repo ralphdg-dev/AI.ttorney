@@ -86,3 +86,8 @@ class FileUploadResponse(BaseModel):
     file_path: Optional[str] = None
     message: str
     error: Optional[str] = None
+    # OCR extracted fields (for IBP card uploads)
+    extracted_first_name: Optional[str] = None
+    extracted_last_name: Optional[str] = None
+    extracted_roll_number: Optional[str] = None
+    extraction_confidence: Optional[str] = None  # low, medium, high

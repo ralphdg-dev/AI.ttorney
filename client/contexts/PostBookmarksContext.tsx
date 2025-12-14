@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { BookmarkService } from '../services/bookmarkService';
+import { AppState, AppStateStatus } from 'react-native';
 
 interface PostBookmarksContextType {
   bookmarkedPostIds: Set<string>;
@@ -76,7 +77,28 @@ export const PostBookmarksProvider: React.FC<PostBookmarksProviderProps> = ({ ch
 
   useEffect(() => {
     loadBookmarks();
-  }, [isAuthenticated, user?.id, loadBookmarks]);
+
+    // App state listener - refresh when app comes to foreground
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        console.log('📱 PostBookmarksContext: App came to foreground, refreshing post bookmarks');
+        loadBookmarks();
+      }
+    };
+
+    const appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
+
+    // Periodic refresh to prevent stale counts (every 2 minutes)
+    const periodicRefresh = setInterval(() => {
+      console.log("⏰ PostBookmarksContext: Periodic refresh to prevent stale post bookmarks");
+      loadBookmarks();
+    }, 2 * 60 * 1000); // 2 minutes
+
+    return () => {
+      appStateSubscription?.remove();
+      clearInterval(periodicRefresh);
+    };
+  }, [isAuthenticated, user?.id, session, loadBookmarks]);
 
   const value: PostBookmarksContextType = React.useMemo(() => ({
     bookmarkedPostIds,

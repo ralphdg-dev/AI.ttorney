@@ -117,6 +117,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   const { bookmarkedPostIds } = usePostBookmarks();
   const { consultationsCount } = useConsultations();
 
+  // Debug logging to track consultation count
+  console.log('🔍 AppSidebar: consultationsCount =', consultationsCount, typeof consultationsCount);
+
   const [showSignoutModal, setShowSignoutModal] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
@@ -197,9 +200,14 @@ const Sidebar: React.FC<SidebarProps> = ({
   const bookmarkedPostsCount = bookmarkedPostIds.size;
   const bookmarkedGuidesCount = bookmarkedGuideIds.size;
   
-  // FAANG OPTIMIZATION: Direct primitive access - O(1) constant time
-  // All data pre-loaded from contexts, zero API calls on sidebar open
-  // Instant badge updates with no network latency
+  // Debug logging to track all badge counts
+  console.log('🔍 AppSidebar: Badge counts:', {
+    favoriteTermsCount,
+    bookmarkedPostsCount,
+    bookmarkedGuidesCount,
+    consultationsCount
+  });
+  
   const badgeCounts = React.useMemo(() => ({
     favoriteTerms: favoriteTermsCount,
     bookmarkedPosts: bookmarkedPostsCount,
@@ -339,12 +347,21 @@ const Sidebar: React.FC<SidebarProps> = ({
             {item.label}
           </Text>
         </View>
-        {item.badge && item.badge > 0 && (
+        {/* Debug: Show consultation badge even when 0 to verify data flow */}
+        {item.id === "consultations" ? (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>
-              {item.badge > 99 ? "99+" : item.badge.toString()}
+              {(item.badge && item.badge > 99) ? "99+" : (item.badge || 0).toString()}
             </Text>
           </View>
+        ) : (
+          item.badge && item.badge > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {item.badge > 99 ? "99+" : item.badge.toString()}
+              </Text>
+            </View>
+          )
         )}
       </TouchableOpacity>
     );
@@ -689,8 +706,8 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 12,
-    color: "#FFFFFF",
-    ...GlobalStyles.textSemiBold,
+    color: "white",
+    fontWeight: "600",
   },
   divider: {
     height: 1,

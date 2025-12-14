@@ -8,8 +8,8 @@ import {
   TextInput,
   Modal,
   Alert,
-  Image,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { supabase } from "../../../lib/supabase";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -25,7 +25,6 @@ import tw from "tailwind-react-native-classnames";
 import Colors from "../../../constants/Colors";
 import { TimeSlot } from "../../../services/lawyerProfileServices";
 import TimeUtils from "../../../utils/timeUtils";
-import { Avatar, AvatarImage, AvatarFallbackText } from "../../../components/ui/avatar";
 import * as ImagePicker from 'expo-image-picker';
 
 interface ProfileData {
@@ -205,7 +204,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     } else {
       setDayTimeSlots({});
     }
-  }, [profileData]);
+  }, [profileData, isImagePickerActive]);
 
   const convertTimeTo24Hour = (time12h: string): string => {
     try {
@@ -504,14 +503,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const confirmSave = async () => {
     setIsSaving(true);
     try {
-      let profilePhotoUrl = profileData.avatar;
-
       // Upload photo if a new one was selected
       if (selectedImageUri) {
         try {
           const uploadedUrl = await uploadProfilePhoto(selectedImageUri);
+          
           if (uploadedUrl) {
-            profilePhotoUrl = uploadedUrl;
             
             // Update users table with new profile photo
             const { error: userUpdateError } = await supabase
@@ -795,7 +792,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
       onRequestClose={handleCancel}
     >
       <SafeAreaView style={tw`flex-1 bg-gray-50`}>
-        <View style={tw`bg-white px-4 py-3 border-b border-gray-200`}>
+        <View style={tw`px-4 py-3 bg-white border-b border-gray-200`}>
           <View style={tw`flex-row items-center justify-between`}>
             <TouchableOpacity onPress={handleCancel} disabled={isSaving}>
               <Text style={tw`text-base text-gray-600`}>Cancel</Text>
@@ -811,13 +808,13 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 { backgroundColor: isSaving ? "#9CA3AF" : Colors.primary.blue },
               ]}
             >
-              <Text style={tw`text-white font-medium text-sm`}>Save</Text>
+              <Text style={tw`text-sm font-medium text-white`}>Save</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         <ScrollView style={tw`flex-1 p-4`} showsVerticalScrollIndicator={false}>
-          <View style={tw`bg-white rounded-lg p-4 mb-4 items-center`}>
+          <View style={tw`items-center p-4 mb-4 bg-white rounded-lg`}>
             <View style={tw`relative mb-4`}>
               {(() => {
                 const hasImage = selectedImageUri || (editFormData.avatar && editFormData.avatar.trim());
@@ -836,7 +833,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 if (hasImage && !imageLoadError) {
                   return (
                     <View style={[
-                      tw`w-24 h-24 overflow-hidden rounded-full relative`,
+                      tw`relative w-24 h-24 overflow-hidden rounded-full`,
                       { backgroundColor: '#F3F4F6' }
                     ]}>
                       <Image
@@ -867,11 +864,11 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   return (
                     <View style={tw`relative`}>
                       <View style={[
-                        tw`w-24 h-24 rounded-full items-center justify-center`,
+                        tw`items-center justify-center w-24 h-24 rounded-full`,
                         { backgroundColor: '#023D7B' }
                       ]}>
                         <Text style={[
-                          tw`text-white text-2xl font-bold`,
+                          tw`text-2xl font-bold text-white`,
                           { textTransform: 'uppercase' }
                         ]}>
                           {initials}
@@ -891,7 +888,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
               })()}
               <TouchableOpacity
                 style={[
-                  tw`absolute -bottom-2 -right-2 w-8 h-8 rounded-full border-2 border-white flex items-center justify-center`,
+                  tw`absolute flex items-center justify-center w-8 h-8 border-2 border-white rounded-full -bottom-2 -right-2`,
                   { backgroundColor: Colors.primary.blue },
                 ]}
                 onPress={showImagePickerOptions}
@@ -900,40 +897,40 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 <Camera size={16} color="white" />
               </TouchableOpacity>
             </View>
-            <Text style={tw`text-sm text-gray-600 text-center`}>
+            <Text style={tw`text-sm text-center text-gray-600`}>
               Tap camera icon to change photo
             </Text>
           </View>
 
-          <View style={tw`bg-white rounded-lg p-4 mb-4`}>
-            <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>
+          <View style={tw`p-4 mb-4 bg-white rounded-lg`}>
+            <Text style={tw`mb-4 text-lg font-bold text-gray-900`}>
               Basic Information
             </Text>
 
             <View style={tw`mb-4`}>
-              <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>
+              <Text style={tw`mb-2 text-sm font-medium text-gray-700`}>
                 Full Name *
               </Text>
               <TextInput
-                style={tw`border border-gray-300 rounded-lg px-3 py-3 text-base text-gray-900`}
+                style={tw`px-3 py-3 text-base text-gray-900 border border-gray-300 rounded-lg`}
                 value={editFormData.name}
                 onChangeText={(value) => updateFormField("name", value)}
                 placeholder="Enter your full name"
                 editable={!isSaving}
               />
               {validationErrors.name && (
-                <Text style={tw`text-red-500 text-xs mt-1`}>
+                <Text style={tw`mt-1 text-xs text-red-500`}>
                   {validationErrors.name}
                 </Text>
               )}
             </View>
 
             <View style={tw`mb-4`}>
-              <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>
+              <Text style={tw`mb-2 text-sm font-medium text-gray-700`}>
                 Email Address *
               </Text>
               <TextInput
-                style={tw`border border-gray-300 rounded-lg px-3 py-3 text-base text-gray-900 bg-gray-200`}
+                style={tw`px-3 py-3 text-base text-gray-900 bg-gray-200 border border-gray-300 rounded-lg`}
                 value={editFormData.email}
                 onChangeText={(value) => updateFormField("email", value)}
                 placeholder="Enter your email address"
@@ -942,56 +939,66 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 editable={false}
               />
               {validationErrors.email && (
-                <Text style={tw`text-red-500 text-xs mt-1`}>
+                <Text style={tw`mt-1 text-xs text-red-500`}>
                   {validationErrors.email}
                 </Text>
               )}
             </View>
 
             <View style={tw`mb-4`}>
-              <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>
-                Phone Number
+              <Text style={tw`mb-2 text-sm font-medium text-gray-700`}>
+                Phone Number <Text style={tw`text-red-500`}>*</Text>
               </Text>
               <TextInput
-                style={tw`border border-gray-300 rounded-lg px-3 py-3 text-base text-gray-900`}
+                style={tw`px-3 py-3 text-base text-gray-900 border border-gray-300 rounded-lg`}
                 value={editFormData.phone}
                 onChangeText={(value) => updateFormField("phone", value)}
-                placeholder="Enter Phone Number"
+                placeholder="09123456789"
                 keyboardType="phone-pad"
                 maxLength={11}
                 editable={!isSaving}
               />
               {validationErrors.phone && (
-                <Text style={tw`text-red-500 text-xs mt-1`}>
+                <Text style={tw`mt-1 text-xs text-red-500`}>
                   {validationErrors.phone}
+                </Text>
+              )}
+              {!validationErrors.phone && (
+                <Text style={tw`mt-1 text-xs text-gray-500`}>
+                  Required for accepting consultations
                 </Text>
               )}
             </View>
 
             <View style={tw`mb-4`}>
-              <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>
-                Location *
+              <Text style={tw`mb-2 text-sm font-medium text-gray-700`}>
+                Location <Text style={tw`text-red-500`}>*</Text>
               </Text>
               <TextInput
-                style={tw`border border-gray-300 rounded-lg px-3 py-3 text-base text-gray-900`}
+                style={tw`px-3 py-3 text-base text-gray-900 border border-gray-300 rounded-lg`}
                 value={editFormData.location}
                 onChangeText={(value) => updateFormField("location", value)}
                 placeholder="Enter your location"
                 editable={!isSaving}
               />
               {validationErrors.location && (
-                <Text style={tw`text-red-500 text-xs mt-1`}>
+                <Text style={tw`mt-1 text-xs text-red-500`}>
                   {validationErrors.location}
+                </Text>
+              )}
+              {!validationErrors.location && (
+                <Text style={tw`mt-1 text-xs text-gray-500`}>
+                  Required for accepting consultations
                 </Text>
               )}
             </View>
 
             <View style={tw`mb-4`}>
-              <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>
-                Specializations *
+              <Text style={tw`mb-2 text-sm font-medium text-gray-700`}>
+                Specializations <Text style={tw`text-red-500`}>*</Text>
               </Text>
               <TouchableOpacity
-                style={tw`border border-gray-300 rounded-lg px-3 py-3 flex-row justify-between items-center`}
+                style={tw`flex-row items-center justify-between px-3 py-3 border border-gray-300 rounded-lg`}
                 onPress={() =>
                   setShowSpecializationDropdown(!showSpecializationDropdown)
                 }
@@ -1024,10 +1031,10 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     {filteredSpecializations.map((specialization) => (
                       <TouchableOpacity
                         key={specialization}
-                        style={tw`px-4 py-3 border-b border-gray-100 flex-row items-center justify-between`}
+                        style={tw`flex-row items-center justify-between px-4 py-3 border-b border-gray-100`}
                         onPress={() => toggleSpecialization(specialization)}
                       >
-                        <Text style={tw`text-base text-gray-900 flex-1`}>
+                        <Text style={tw`flex-1 text-base text-gray-900`}>
                           {specialization}
                         </Text>
                         {isSpecializationSelected(specialization) && (
@@ -1049,12 +1056,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   {/* Custom Specialization Input */}
                   {showCustomSpecializationInput && (
                     <View style={tw`p-3 border-t border-gray-200 bg-gray-50`}>
-                      <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>
+                      <Text style={tw`mb-2 text-sm font-medium text-gray-700`}>
                         Enter your specialization:
                       </Text>
                       <View style={tw`flex-row items-center`}>
                         <TextInput
-                          style={tw`flex-1 px-3 py-2 text-base text-gray-900 border border-gray-300 rounded-lg mr-2`}
+                          style={tw`flex-1 px-3 py-2 mr-2 text-base text-gray-900 border border-gray-300 rounded-lg`}
                           placeholder="e.g., Environmental Law, Tax Law, etc."
                           value={customSpecialization}
                           onChangeText={setCustomSpecialization}
@@ -1072,10 +1079,10 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                           onPress={addCustomSpecialization}
                           disabled={!customSpecialization.trim() || isSaving}
                         >
-                          <Text style={tw`text-white font-medium text-sm`}>Add</Text>
+                          <Text style={tw`text-sm font-medium text-white`}>Add</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                          style={tw`ml-2 px-3 py-2 rounded-lg border border-gray-300`}
+                          style={tw`px-3 py-2 ml-2 border border-gray-300 rounded-lg`}
                           onPress={() => {
                             setShowCustomSpecializationInput(false);
                             setCustomSpecialization("");
@@ -1088,7 +1095,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                           }}
                           disabled={isSaving}
                         >
-                          <Text style={tw`text-gray-600 font-medium text-sm`}>Cancel</Text>
+                          <Text style={tw`text-sm font-medium text-gray-600`}>Cancel</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -1097,18 +1104,23 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
               )}
 
               {validationErrors.specialization && (
-                <Text style={tw`text-red-500 text-xs mt-1`}>
+                <Text style={tw`mt-1 text-xs text-red-500`}>
                   {validationErrors.specialization}
+                </Text>
+              )}
+              {!validationErrors.specialization && (
+                <Text style={tw`mt-1 text-xs text-gray-500`}>
+                  Required for accepting consultations
                 </Text>
               )}
             </View>
 
             <View>
-              <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>
-                Bio *
+              <Text style={tw`mb-2 text-sm font-medium text-gray-700`}>
+                Bio <Text style={tw`text-red-500`}>*</Text>
               </Text>
               <TextInput
-                style={tw`border border-gray-300 rounded-lg px-3 py-3 text-base text-gray-900`}
+                style={tw`px-3 py-3 text-base text-gray-900 border border-gray-300 rounded-lg`}
                 value={editFormData.bio}
                 onChangeText={(value) => updateFormField("bio", value)}
                 placeholder="Tell clients about yourself and your experience"
@@ -1118,22 +1130,27 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 editable={!isSaving}
               />
               {validationErrors.bio && (
-                <Text style={tw`text-red-500 text-xs mt-1`}>
+                <Text style={tw`mt-1 text-xs text-red-500`}>
                   {validationErrors.bio}
+                </Text>
+              )}
+              {!validationErrors.bio && (
+                <Text style={tw`mt-1 text-xs text-gray-500`}>
+                  Required for accepting consultations
                 </Text>
               )}
             </View>
           </View>
 
           {/* Consultation Availability Section */}
-          <View style={tw`bg-white rounded-lg p-4 mb-4`}>
+          <View style={tw`p-4 mb-4 bg-white rounded-lg`}>
             <View style={tw`flex-row items-center justify-between mb-4`}>
               <Text style={tw`text-lg font-bold text-gray-900`}>
                 Consultation Availability
               </Text>
               <TouchableOpacity
                 style={[
-                  tw`px-3 py-2 rounded-lg flex-row items-center`,
+                  tw`flex-row items-center px-3 py-2 rounded-lg`,
                   {
                     backgroundColor: isEditingAvailability
                       ? "#FEE2E2"
@@ -1149,7 +1166,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 )}
                 <Text
                   style={[
-                    tw`text-sm font-medium ml-2`,
+                    tw`ml-2 text-sm font-medium`,
                     {
                       color: isEditingAvailability
                         ? "#DC2626"
@@ -1162,14 +1179,14 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
               </TouchableOpacity>
             </View>
 
-            <Text style={tw`text-sm text-gray-600 mb-4`}>
+            <Text style={tw`mb-4 text-sm text-gray-600`}>
               Select days and add available consultation hours. You can add
               multiple time slots for each day.
             </Text>
 
             {isEditingAvailability ? (
               <View>
-                <Text style={tw`text-sm font-medium text-gray-700 mb-3`}>
+                <Text style={tw`mb-3 text-sm font-medium text-gray-700`}>
                   Select Available Days:
                 </Text>
                 <View style={tw`flex-row flex-wrap mb-6`}>
@@ -1177,7 +1194,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     <TouchableOpacity
                       key={day}
                       style={[
-                        tw`mr-2 mb-2 px-3 py-2 rounded-lg border`,
+                        tw`px-3 py-2 mb-2 mr-2 border rounded-lg`,
                         selectedDays.includes(day)
                           ? {
                               backgroundColor: Colors.primary.blue,
@@ -1205,14 +1222,14 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 </View>
 
                 {selectedDays.map((day) => (
-                  <View key={day} style={tw`mb-6 p-4 bg-gray-50 rounded-lg`}>
-                    <Text style={tw`text-base font-medium text-gray-900 mb-3`}>
+                  <View key={day} style={tw`p-4 mb-6 rounded-lg bg-gray-50`}>
+                    <Text style={tw`mb-3 text-base font-medium text-gray-900`}>
                       {day}
                     </Text>
 
                     <View style={tw`mb-3`}>
                       <TouchableOpacity
-                        style={tw`border border-gray-300 rounded-lg px-3 py-2 bg-white flex-row justify-between items-center`}
+                        style={tw`flex-row items-center justify-between px-3 py-2 bg-white border border-gray-300 rounded-lg`}
                         onPress={() => toggleTimeDropdown(day)}
                       >
                         <Text style={tw`text-sm text-gray-900`}>
@@ -1223,7 +1240,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
                       {showTimeDropdown[day] && (
                         <View
-                          style={tw`mt-1 border border-gray-300 rounded-lg bg-white max-h-40`}
+                          style={tw`mt-1 bg-white border border-gray-300 rounded-lg max-h-40`}
                         >
                           <ScrollView 
                             style={tw`max-h-40`}
@@ -1247,7 +1264,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                               ))
                             ) : (
                               <View style={tw`px-3 py-4`}>
-                                <Text style={tw`text-sm text-gray-500 text-center`}>
+                                <Text style={tw`text-sm text-center text-gray-500`}>
                                   All time slots have been selected
                                 </Text>
                               </View>
@@ -1261,12 +1278,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                       {(dayTimeSlots[day] || []).map((time, index) => (
                         <View
                           key={`${day}-${time}-${index}`}
-                          style={tw`flex-row items-center mr-2 mb-2 px-3 py-1 bg-blue-100 rounded-lg`}
+                          style={tw`flex-row items-center px-3 py-1 mb-2 mr-2 bg-blue-100 rounded-lg`}
                         >
                           <Clock size={14} color={Colors.primary.blue} />
                           <Text
                             style={[
-                              tw`text-sm ml-1`,
+                              tw`ml-1 text-sm`,
                               { color: Colors.primary.blue },
                             ]}
                           >
@@ -1283,7 +1300,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     </View>
 
                     {(!dayTimeSlots[day] || dayTimeSlots[day].length === 0) && (
-                      <Text style={tw`text-xs text-gray-500 italic`}>
+                      <Text style={tw`text-xs italic text-gray-500`}>
                         No time slots added yet
                       </Text>
                     )}
@@ -1291,7 +1308,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 ))}
 
                 {selectedDays.length === 0 && (
-                  <View style={tw`p-4 bg-yellow-50 rounded-lg`}>
+                  <View style={tw`p-4 rounded-lg bg-yellow-50`}>
                     <Text style={tw`text-sm text-yellow-800`}>
                       Please select at least one day to set your availability.
                     </Text>
@@ -1302,14 +1319,14 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
               <View>
                 {selectedDays.length > 0 ? (
                   <View>
-                    <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>
+                    <Text style={tw`mb-2 text-sm font-medium text-gray-700`}>
                       Available Days:
                     </Text>
-                    <Text style={tw`text-sm text-gray-600 mb-4`}>
+                    <Text style={tw`mb-4 text-sm text-gray-600`}>
                       {selectedDays.join(", ")}
                     </Text>
 
-                    <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>
+                    <Text style={tw`mb-2 text-sm font-medium text-gray-700`}>
                       Time Slots:
                     </Text>
                     {selectedDays.map((day) => (
@@ -1321,12 +1338,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                           {(dayTimeSlots[day] || []).map((time, index) => (
                             <View
                               key={`${day}-view-${time}-${index}`}
-                              style={tw`flex-row items-center mr-2 mb-1 px-2 py-1 bg-blue-50 rounded`}
+                              style={tw`flex-row items-center px-2 py-1 mb-1 mr-2 rounded bg-blue-50`}
                             >
                               <Clock size={12} color={Colors.primary.blue} />
                               <Text
                                 style={[
-                                  tw`text-xs ml-1`,
+                                  tw`ml-1 text-xs`,
                                   { color: Colors.primary.blue },
                                 ]}
                               >
@@ -1336,7 +1353,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                           ))}
                           {(!dayTimeSlots[day] ||
                             dayTimeSlots[day].length === 0) && (
-                            <Text style={tw`text-xs text-gray-500 italic`}>
+                            <Text style={tw`text-xs italic text-gray-500`}>
                               No times set
                             </Text>
                           )}
@@ -1345,8 +1362,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     ))}
                   </View>
                 ) : (
-                  <View style={tw`p-4 bg-gray-50 rounded-lg`}>
-                    <Text style={tw`text-sm text-gray-600 text-center`}>
+                  <View style={tw`p-4 rounded-lg bg-gray-50`}>
+                    <Text style={tw`text-sm text-center text-gray-600`}>
                       No availability set. Click Edit to configure your
                       consultation hours.
                     </Text>
@@ -1356,8 +1373,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             )}
           </View>
 
-          <View style={tw`bg-blue-50 rounded-lg p-4 mb-4`}>
-            <Text style={tw`text-sm text-blue-800 font-medium mb-1`}>
+          <View style={tw`p-4 mb-4 rounded-lg bg-blue-50`}>
+            <Text style={tw`mb-1 text-sm font-medium text-blue-800`}>
               Professional Information
             </Text>
             <Text style={tw`text-sm text-blue-700`}>
@@ -1374,22 +1391,22 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
           onRequestClose={() => setShowConfirmModal(false)}
         >
           <View
-            style={tw`flex-1 justify-center items-center bg-black bg-opacity-50`}
+            style={tw`items-center justify-center flex-1 bg-black bg-opacity-50`}
           >
-            <View style={tw`bg-white p-6 rounded-lg w-80`}>
-              <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>
+            <View style={tw`p-6 bg-white rounded-lg w-80`}>
+              <Text style={tw`mb-4 text-lg font-bold text-gray-900`}>
                 Confirm Save
               </Text>
-              <Text style={tw`text-sm text-gray-700 mb-6`}>
+              <Text style={tw`mb-6 text-sm text-gray-700`}>
                 Are you sure you want to save these changes?
               </Text>
               <View style={tw`flex-row justify-end`}>
                 <TouchableOpacity
                   onPress={() => setShowConfirmModal(false)}
-                  style={tw`px-4 py-2 mr-2 rounded-lg bg-gray-200`}
+                  style={tw`px-4 py-2 mr-2 bg-gray-200 rounded-lg`}
                   disabled={isSaving}
                 >
-                  <Text style={tw`text-gray-700 font-medium`}>Cancel</Text>
+                  <Text style={tw`font-medium text-gray-700`}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={confirmSave}
@@ -1403,7 +1420,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   ]}
                   disabled={isSaving}
                 >
-                  <Text style={tw`text-white font-medium`}>
+                  <Text style={tw`font-medium text-white`}>
                     {isSaving ? "Saving..." : "Yes, Save"}
                   </Text>
                 </TouchableOpacity>

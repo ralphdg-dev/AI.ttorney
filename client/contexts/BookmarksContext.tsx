@@ -3,6 +3,7 @@ import { useToast } from '@/components/ui/toast';
 import { createSafeAreaToastRenderer } from '@/components/ui/SafeAreaToast';
 import { NetworkConfig } from '@/utils/networkConfig';
 import { useAuth } from './AuthContext';
+import { AppState, AppStateStatus } from 'react-native';
 
 interface BookmarksContextType {
   bookmarkedGuideIds: Set<string>;
@@ -118,6 +119,27 @@ export const BookmarksProvider: React.FC<BookmarksProviderProps> = ({ children }
 
   useEffect(() => {
     loadBookmarks();
+
+    // App state listener - refresh when app comes to foreground
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        console.log('📱 BookmarksContext: App came to foreground, refreshing guide bookmarks');
+        loadBookmarks();
+      }
+    };
+
+    const appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
+
+    // Periodic refresh to prevent stale counts (every 2 minutes)
+    const periodicRefresh = setInterval(() => {
+      console.log("⏰ BookmarksContext: Periodic refresh to prevent stale guide bookmarks");
+      loadBookmarks();
+    }, 2 * 60 * 1000); // 2 minutes
+
+    return () => {
+      appStateSubscription?.remove();
+      clearInterval(periodicRefresh);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.access_token]);
 

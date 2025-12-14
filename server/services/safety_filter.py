@@ -28,9 +28,7 @@ class SafetyFilter:
         "trial", "court", "judge", "lawyer", "attorney",
         "plaintiff", "defendant", "accused", "complainant",
         "evidence", "testimony", "witness", "case", "lawsuit",
-        "legal advice", "legal rights", "legal remedies", "criminal law",
-        "penalty", "penalties", "parusa", "ano ang parusa", "what is the penalty",
-        "criminal case", "criminal charge", "criminal offense",
+        "legal advice", "legal rights", "legal remedies",
         "demanda", "kaso", "batas", "korte", "abogado"
     ]
     
@@ -74,16 +72,8 @@ class SafetyFilter:
         r"(private|direct)\s+message\s+me",
         r"add\s+me\s+on\s+(snap|instagram|whatsapp|telegram)",
     ]
-    
-                      
-    ABUSE_KEYWORDS = [
-        "hit", "beat", "punch", "slap", "kick", "hurt",
-        "deserve", "punishment", "teach you a lesson",
-        "shut up", "stupid", "worthless", "useless",
-        "kill", "die", "death", "murder", "suicide",
-        "rape", "assault", "abuse", "molest", "harass",
-        "saktan", "suntukin", "sampalin", "patayin"
-    ]
+
+    ABUSE_KEYWORDS = []
     
                     
     THREAT_PATTERNS = [
@@ -106,25 +96,17 @@ class SafetyFilter:
         """
         Check if text appears to be a legitimate legal question.
         Returns True if legal context indicators are present.
+        
+        Enhanced with intent detection to distinguish educational inquiries
+        from actual threats or harmful intent.
         """
         text_lower = text.lower()
-        return any(
+        
+        # Check for legal context indicators
+        has_legal_context = any(
             indicator in text_lower
             for indicator in self.LEGAL_CONTEXT_INDICATORS
         )
-
-    def _is_educational_or_hypothetical_context(self, text: str) -> bool:
-        """Check if text appears to be academic, historical, news, or fictional context."""
-        text_lower = text.lower()
-        indicators = [
-            "history", "historical", "in history", "case study", "case studies",
-            "academic", "crim law", "criminal law discussion", "class discussion",
-            "for example if", "for instance if", "hypothetical", "hypothetically",
-            "imagine if", "imagine that", "let's say", "lets say",
-            "story", "fictional", "fiction", "novel", "movie", "film", "character",
-            "news", "news report", "reported that", "article said", "headline"
-        ]
-        return any(indicator in text_lower for indicator in indicators)
     
     def check_child_safety(self, text: str) -> Tuple[bool, List[str]]:
         """
