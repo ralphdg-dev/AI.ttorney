@@ -5,6 +5,7 @@ Extracts lawyer information (name, roll number) from IBP ID card images
 
 import logging
 import base64
+import asyncio
 from typing import Optional, Dict, Any
 from dataclasses import dataclass
 from services.client_cache import get_openai_client
@@ -48,13 +49,16 @@ async def extract_ibp_fields_from_bytes(content: bytes) -> IbpOcrResult:
         # Get OpenAI client
         client = get_openai_client()
         
-        # Use GPT-4 Vision to extract structured data
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": """You are an OCR assistant specialized in reading Philippine IBP (Integrated Bar of the Philippines) ID cards.
+        # Use GPT-4 Vision to extract structured data (run sync call in executor)
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """You are an OCR assistant specialized in reading Philippine IBP (Integrated Bar of the Philippines) ID cards.
 
 Extract the following information from the IBP card image:
 1. First Name (given name) - the lawyer's first/given name
@@ -76,26 +80,27 @@ Respond in this exact JSON format:
   "roll_number": "string or null",
   "confidence": "low|medium|high"
 }"""
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Please extract the lawyer's first name, last name, and roll number from this IBP ID card image."
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}",
-                                "detail": "high"
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Please extract the lawyer's first name, last name, and roll number from this IBP ID card image."
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{base64_image}",
+                                    "detail": "high"
+                                }
                             }
-                        }
-                    ]
-                }
-            ],
-            max_tokens=200,
-            temperature=0.1
+                        ]
+                    }
+                ],
+                max_tokens=200,
+                temperature=0.1
+            )
         )
         
         # Parse the response
