@@ -33,6 +33,7 @@ export default function LawyerReg() {
   const [ibpCard, setIbpCard] = useState<any | null>(null);
   const [ibpCardPath, setIbpCardPath] = useState<string>('');
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [blurInfo, setBlurInfo] = useState<{ is_blurry?: boolean; blur_score?: number } | null>(null);
   const isComplete = Boolean(firstName.trim() && lastName.trim() && rollNumber.trim() && rollSignDate && ibpCard);
   const today = new Date();
 
@@ -81,6 +82,13 @@ export default function LawyerReg() {
           
           if (uploadResult.success && uploadResult.file_path) {
             setIbpCardPath(uploadResult.file_path);
+            // Store blur detection info
+            if (uploadResult.is_blurry !== undefined || uploadResult.blur_score !== undefined) {
+              setBlurInfo({
+                is_blurry: uploadResult.is_blurry,
+                blur_score: uploadResult.blur_score
+              });
+            }
             setShowUploadOptions(false);
             
             // Auto-fill form fields from OCR extraction
@@ -141,6 +149,13 @@ export default function LawyerReg() {
           
           if (uploadResult.success && uploadResult.file_path) {
             setIbpCardPath(uploadResult.file_path);
+            // Store blur detection info
+            if (uploadResult.is_blurry !== undefined || uploadResult.blur_score !== undefined) {
+              setBlurInfo({
+                is_blurry: uploadResult.is_blurry,
+                blur_score: uploadResult.blur_score
+              });
+            }
             setShowUploadOptions(false);
             
             // Auto-fill form fields from OCR extraction
@@ -207,6 +222,13 @@ export default function LawyerReg() {
           
           if (uploadResult.success && uploadResult.file_path) {
             setIbpCardPath(uploadResult.file_path);
+            // Store blur detection info
+            if (uploadResult.is_blurry !== undefined || uploadResult.blur_score !== undefined) {
+              setBlurInfo({
+                is_blurry: uploadResult.is_blurry,
+                blur_score: uploadResult.blur_score
+              });
+            }
             setShowUploadOptions(false);
             
             // Auto-fill form fields from OCR extraction
@@ -276,6 +298,13 @@ export default function LawyerReg() {
           
           if (uploadResult.success && uploadResult.file_path) {
             setIbpCardPath(uploadResult.file_path);
+            // Store blur detection info
+            if (uploadResult.is_blurry !== undefined || uploadResult.blur_score !== undefined) {
+              setBlurInfo({
+                is_blurry: uploadResult.is_blurry,
+                blur_score: uploadResult.blur_score
+              });
+            }
             setShowUploadOptions(false);
             
             // Auto-fill form fields from OCR extraction
@@ -438,6 +467,7 @@ export default function LawyerReg() {
               <TouchableOpacity onPress={() => {
                 setIbpCard(null);
                 setIbpCardPath('');
+                setBlurInfo(null);
               }} style={{ padding: 6, borderWidth: 1, borderColor: '#FCA5A5', backgroundColor: '#FEF2F2', borderRadius: 8 }}>
                 <MaterialIcons name="delete" size={18} color="#DC2626" />
               </TouchableOpacity>
@@ -453,6 +483,54 @@ export default function LawyerReg() {
                 resizeMode="contain"
               />
             </View>
+
+            {/* Blur Warning */}
+            {blurInfo && blurInfo.is_blurry && (
+              <View style={{
+                marginTop: 12,
+                backgroundColor: blurInfo.blur_score && blurInfo.blur_score < 50 ? '#FEE2E2' : '#FEF3C7',
+                borderWidth: 1,
+                borderColor: blurInfo.blur_score && blurInfo.blur_score < 50 ? '#FCA5A5' : '#FCD34D',
+                padding: 12,
+                borderRadius: 8,
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+              }}>
+                <MaterialIcons 
+                  name={blurInfo.blur_score && blurInfo.blur_score < 50 ? "error" : "warning"} 
+                  size={20} 
+                  color={blurInfo.blur_score && blurInfo.blur_score < 50 ? '#DC2626' : '#D97706'} 
+                  style={{ marginRight: 8, marginTop: 1 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ 
+                    fontSize: 14, 
+                    fontWeight: '600', 
+                    color: blurInfo.blur_score && blurInfo.blur_score < 50 ? '#991B1B' : '#92400E',
+                    marginBottom: 2
+                  }}>
+                    {blurInfo.blur_score && blurInfo.blur_score < 50 ? 'Very Blurry Image' : 'Blurry Image'}
+                  </Text>
+                  <Text style={{ 
+                    fontSize: 13, 
+                    color: blurInfo.blur_score && blurInfo.blur_score < 50 ? '#B91C1C' : '#B45309',
+                    lineHeight: 18
+                  }}>
+                    {blurInfo.blur_score && blurInfo.blur_score < 50 
+                      ? 'Image is very blurry and may be rejected. Please retake with better lighting and focus.'
+                      : 'Image appears blurry. Consider retaking for better clarity.'
+                    }
+                  </Text>
+                  <Text style={{ 
+                    fontSize: 11, 
+                    color: blurInfo.blur_score && blurInfo.blur_score < 50 ? '#B91C1C' : '#B45309',
+                    marginTop: 4
+                  }}>
+                    Blur Score: {blurInfo.blur_score?.toFixed(2)}
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
         )}
 

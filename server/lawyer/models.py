@@ -91,3 +91,6 @@ class FileUploadResponse(BaseModel):
     extracted_last_name: Optional[str] = None
     extracted_roll_number: Optional[str] = None
     extraction_confidence: Optional[str] = None  # low, medium, high
+    # Image quality fields
+    is_blurry: Optional[bool] = None
+    blur_score: Optional[float] = None  # Laplacian variance score

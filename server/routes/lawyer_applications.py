@@ -11,6 +11,7 @@ from lawyer.service import LawyerApplicationService
 from services.storage_service import StorageService
 from services.ibp_ocr_service import extract_ibp_fields_from_bytes
 from middleware.auth import get_current_user, require_role
+from utils.blur_detector import BlurDetector
 from typing import Dict, Any, List
 from datetime import date
 import logging
@@ -36,8 +37,11 @@ async def upload_ibp_id_card(
                 detail="No file provided"
             )
         
-        # Read file content for OCR before uploading
+        # Read file content for OCR and blur detection before uploading
         file_content = await file.read()
+        
+        # Perform blur detection
+        is_blurry, blur_score = BlurDetector.detect_blur(file_content)
         
         # Reset file position for upload
         await file.seek(0)
@@ -59,11 +63,13 @@ async def upload_ibp_id_card(
         except Exception as ocr_error:
             logger.warning(f"IBP OCR failed (non-blocking): {ocr_error}")
         
-        # Build response with OCR data if available
+        # Build response with OCR and blur detection data
         response_data = {
             "success": True,
             "file_path": result["file_path"],
-            "message": result["message"]
+            "message": result["message"],
+            "is_blurry": is_blurry,
+            "blur_score": round(blur_score, 2)
         }
         
         if ocr_result:
