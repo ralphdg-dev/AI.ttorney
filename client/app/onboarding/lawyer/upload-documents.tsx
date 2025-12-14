@@ -13,6 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../../../constants/Colors';
 import { getContentBottomPadding } from '../../../constants/LayoutConstants';
 import { validateLawyerCredentials, ValidationResult } from '../../../utils/lawyerValidation';
+import DataPrivacyModal from '../../../components/common/DataPrivacyModal';
 
 export default function LawyerReg() {
   const insets = useSafeAreaInsets();
@@ -35,7 +36,10 @@ export default function LawyerReg() {
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [blurInfo, setBlurInfo] = useState<{ is_blurry?: boolean; blur_score?: number } | null>(null);
   const isImageBlurry = blurInfo?.is_blurry === true;
+  const [agreePrivacy, setAgreePrivacy] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const isComplete = Boolean(firstName.trim() && lastName.trim() && rollNumber.trim() && rollSignDate && ibpCard && !isImageBlurry);
+  const canContinue = isComplete && agreePrivacy;
   const today = new Date();
 
   // Validate credentials when all required fields are filled
@@ -692,6 +696,42 @@ export default function LawyerReg() {
           </View>
         )}
 
+        {/* Data Privacy Consent */}
+        <View style={{ marginTop: 8, marginBottom: 16 }}>
+          <TouchableOpacity
+            onPress={() => setAgreePrivacy((prev) => !prev)}
+            activeOpacity={0.85}
+            style={{ flexDirection: 'row', alignItems: 'flex-start' }}
+          >
+            <View
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: 4,
+                borderWidth: 2,
+                borderColor: agreePrivacy ? Colors.primary.blue : '#D1D5DB',
+                backgroundColor: agreePrivacy ? Colors.primary.blue : 'transparent',
+                marginRight: 12,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginTop: 2,
+              }}
+            >
+              {agreePrivacy && <MaterialIcons name="check" size={14} color="#fff" />}
+            </View>
+            <Text style={{ flex: 1, color: '#374151', lineHeight: 20 }}>
+              By checking this box, I consent to the collection and processing of my personal data in accordance with the{' '}
+              <Text
+                style={{ color: Colors.primary.blue, textDecorationLine: 'underline', fontWeight: '600' }}
+                onPress={() => setShowPrivacyModal(true)}
+              >
+                Data Privacy Act of 2012
+              </Text>
+              .
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Modal Date Picker: Custom calendar on web, native picker on mobile */}
         <Modal
           visible={showDatePicker}
@@ -952,11 +992,15 @@ export default function LawyerReg() {
       {/* Sticky footer next */}
       <StickyFooterButton
         title="Continue"
-        disabled={!isComplete}
+        disabled={!canContinue}
         bottomOffset={0}
         onPress={async () => {
           if (!firstName || !lastName || !rollNumber || !rollSignDate) {
             Alert.alert('Missing Information', 'Please fill in all required fields.');
+            return;
+          }
+          if (!agreePrivacy) {
+            Alert.alert('Consent Required', 'Please agree to the Data Privacy Act consent before continuing.');
             return;
           }
           // Combine first and last name
@@ -975,6 +1019,8 @@ export default function LawyerReg() {
           router.push('/onboarding/lawyer/lawyer-face-verification');
         }}
       />
+
+      <DataPrivacyModal visible={showPrivacyModal} onClose={() => setShowPrivacyModal(false)} />
     </SafeAreaView>
   );
 }
