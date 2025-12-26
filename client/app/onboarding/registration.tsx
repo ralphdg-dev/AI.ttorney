@@ -577,55 +577,57 @@ export default function UserRegistration() {
           )}
         </View>
 
-        {/* Terms of Service checkbox */}
-        <TouchableOpacity
-          onPress={() => setAgree(v => !v)}
-          className="flex-row items-start mb-2"
-          testID="terms-checkbox"
-        >
-          <View className={`w-5 h-5 border-2 rounded items-center justify-center mr-2 ${
-            agree ? 'bg-blue-600 border-blue-600' : 'bg-transparent border-gray-400'
-          }`}>
-            {agree && <Ionicons name="checkmark" size={12} color="#fff" />}
-          </View>
-          <Text className="text-gray-700" style={{ flex: 1 }}>
-            By continuing, you agree to our{" "}
-            <Text 
-              className="font-semibold text-blue-600 underline"
-              onPress={() => {
-                setShowTerms(true);
-              }}
-            >
-              Terms of Service
+        <View className="w-full space-y-3 mb-4">
+          {/* Terms of Service checkbox */}
+          <TouchableOpacity
+            onPress={() => setAgree(v => !v)}
+            className="flex-row items-start"
+            testID="terms-checkbox"
+          >
+            <View className={`w-5 h-5 border-2 rounded items-center justify-center mr-2 ${
+              agree ? 'bg-blue-600 border-blue-600' : 'bg-transparent border-gray-400'
+            }`}>
+              {agree && <Ionicons name="checkmark" size={12} color="#fff" />}
+            </View>
+            <Text className="text-gray-700" style={{ flex: 1, flexShrink: 1 }}>
+              By continuing, you agree to our{" "}
+              <Text 
+                className="font-semibold text-blue-600 underline"
+                onPress={() => {
+                  setShowTerms(true);
+                }}
+              >
+                Terms of Service
+              </Text>
+              <Text>.</Text>
             </Text>
-            <Text>.</Text>
-          </Text>
-        </TouchableOpacity>
+          </TouchableOpacity>
 
-        {/* Data Privacy Act checkbox */}
-        <TouchableOpacity
-          onPress={() => setAgreePrivacy(v => !v)}
-          className="flex-row items-start mb-4"
-          testID="privacy-checkbox"
-        >
-          <View className={`w-5 h-5 border-2 rounded items-center justify-center mr-2 ${
-            agreePrivacy ? 'bg-blue-600 border-blue-600' : 'bg-transparent border-gray-400'
-          }`}>
-            {agreePrivacy && <Ionicons name="checkmark" size={12} color="#fff" />}
-          </View>
-          <Text className="text-gray-700" style={{ flex: 1 }}>
-            I consent to the collection and use of my personal data in accordance with the{" "}
-            <Text
-              className="font-semibold text-blue-600 underline"
-              onPress={() => {
-                setShowPrivacy(true);
-              }}
-            >
-              Data Privacy Act of 2012
+          {/* Data Privacy Act checkbox */}
+          <TouchableOpacity
+            onPress={() => setAgreePrivacy(v => !v)}
+            className="flex-row items-start"
+            testID="privacy-checkbox"
+          >
+            <View className={`w-5 h-5 border-2 rounded items-center justify-center mr-2 ${
+              agreePrivacy ? 'bg-blue-600 border-blue-600' : 'bg-transparent border-gray-400'
+            }`}>
+              {agreePrivacy && <Ionicons name="checkmark" size={12} color="#fff" />}
+            </View>
+            <Text className="text-gray-700" style={{ flex: 1, flexShrink: 1 }}>
+              I consent to the collection and use of my personal data in accordance with the{" "}
+              <Text
+                className="font-semibold text-blue-600 underline"
+                onPress={() => {
+                  setShowPrivacy(true);
+                }}
+              >
+                Data Privacy Act of 2012
+              </Text>
+              <Text>.</Text>
             </Text>
-            <Text>.</Text>
-          </Text>
-        </TouchableOpacity>
+          </TouchableOpacity>
+        </View>
 
         {/* Primary Sign Up button */}
         <PrimaryButton
