@@ -17,7 +17,7 @@ export class NetworkConfig {
   private static readonly HEALTH_CHECK_INTERVAL = 300000; // 5 minutes - increased for better performance
   private static readonly CONNECTION_TIMEOUT = 2000; // 2 seconds - reduced for faster failure detection
   private static readonly DEFAULT_PORT = '8000';
-  private static readonly PRODUCTION_API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://aittorney-staging.up.railway.app';
+  private static readonly PRODUCTION_API_URL = process.env.EXPO_PUBLIC_API_URL || '';
   
   /**
    * Get API URL with environment-aware configuration
