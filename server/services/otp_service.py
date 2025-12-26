@@ -134,12 +134,20 @@ def get_otp_store():
 
 class OTPService:
     def __init__(self):
-        # Use consistent environment variable names
-        self.smtp_server = os.getenv("SMTP_HOST", "smtp.gmail.com")
+        # Support both legacy and current SMTP environment variable names
+        self.smtp_server = (
+            os.getenv("SMTP_HOST")
+            or os.getenv("SMTP_SERVER")
+            or "smtp.gmail.com"
+        )
         self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
-        self.smtp_username = os.getenv("SMTP_USER")
+        self.smtp_username = os.getenv("SMTP_USER") or os.getenv("SMTP_USERNAME")
         self.smtp_password = os.getenv("SMTP_PASSWORD")
-        self.from_email = os.getenv("EMAIL_FROM", "noreply@ai.ttorney.com")
+        self.from_email = (
+            os.getenv("FROM_EMAIL")
+            or os.getenv("EMAIL_FROM")
+            or "noreply@ai.ttorney.com"
+        )
         self.from_name = os.getenv("FROM_NAME", "AI.ttorney")
         
                                                                  
@@ -427,7 +435,9 @@ class OTPService:
                 logger.error(f"Invalid email format: {email}")
                 return {"success": False, "error": "Invalid email address format"}
                 
-            # Validate OTP type and prepare email content
+            # Validate OTP type and prepare email content.
+            # Note: otp_type here comes from OTP_TYPES[...]["email_template"],
+            # so expected values are: "verification", "password_reset", "email_change".
             if otp_type == "verification":
                 subject = "Verify Your AI.ttorney Account"
                 html_content = self.get_verification_email_template(otp_code, user_name)
@@ -438,7 +448,7 @@ class OTPService:
                 subject = "Verify Your New Email Address"
                 html_content = self.get_email_change_template(otp_code, user_name)
             else:
-                logger.error(f"Invalid OTP type: {otp_type}")
+                logger.error(f"Invalid OTP type/email template: {otp_type}")
                 return {"success": False, "error": "Invalid OTP type"}
             
             # Validate SMTP credentials

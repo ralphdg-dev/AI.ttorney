@@ -375,11 +375,11 @@ async def send_otp(request: Request, otp_request: SendOTPRequest):
             )
         
         if not result.get("success", False):
-            logger.error(f"❌ OTP sending failed: {result.get('error', 'Unknown error')}")
-            # Return a more user-friendly error message
-            error_message = "Failed to send verification code. Please try again."
-            if result.get('error', '') and "SMTP" in result.get('error', ''):
-                error_message = "Email service temporarily unavailable. Please try again later."
+            raw_error = result.get('error', 'Unknown error')
+            logger.error(f"❌ OTP sending failed: {raw_error}")
+            
+            # Surface the underlying error message so we can properly debug SMTP/OTP issues
+            error_message = raw_error or "Failed to send verification code. Please try again."
             
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
