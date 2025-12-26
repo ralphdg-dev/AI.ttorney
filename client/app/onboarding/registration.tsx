@@ -10,6 +10,7 @@ import { createSafeAreaToastRenderer } from "@/components/ui/SafeAreaToast";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../../constants/Colors';
 import TermsOfServiceModal from '../../components/common/TermsOfServiceModal';
+import DataPrivacyModal from '../../components/common/DataPrivacyModal';
 import { getContentBottomPadding, getSafeBottomPosition } from '../../constants/LayoutConstants';
 
 export default function UserRegistration() {
@@ -43,8 +44,10 @@ export default function UserRegistration() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agree, setAgree] = useState(false);
+  const [agreePrivacy, setAgreePrivacy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
   
   // Validation states
   const [emailError, setEmailError] = useState('');
@@ -270,6 +273,7 @@ export default function UserRegistration() {
     confirmPassword &&
     passwordsMatch && 
     agree && 
+    agreePrivacy && 
     !hasValidationErrors &&
     !validationLoading.email &&
     !validationLoading.username
@@ -287,6 +291,7 @@ export default function UserRegistration() {
       confirmPassword: !!confirmPassword,
       passwordsMatch,
       agree,
+      agreePrivacy,
       hasValidationErrors,
       emailError,
       usernameError,
@@ -572,26 +577,57 @@ export default function UserRegistration() {
           )}
         </View>
 
-        {/* Terms checkbox */}
-        <TouchableOpacity onPress={() => setAgree(v => !v)} className="flex-row items-center mb-4">
-          <View className={`w-5 h-5 border-2 rounded items-center justify-center mr-2 ${
-            agree ? 'bg-blue-600 border-blue-600' : 'bg-transparent border-gray-400'
-          }`}>
-            {agree && <Ionicons name="checkmark" size={12} color="#fff" />}
-          </View>
-          <Text className="text-gray-700">
-            By continuing, you agree to our{" "}
-            <Text 
-              className="font-semibold text-blue-600 underline"
-              onPress={() => {
-                setShowTerms(true);
-              }}
-            >
-              Terms of Service
+        <View className="w-full space-y-3 mb-4">
+          {/* Terms of Service checkbox */}
+          <TouchableOpacity
+            onPress={() => setAgree(v => !v)}
+            className="flex-row items-start"
+            testID="terms-checkbox"
+          >
+            <View className={`w-5 h-5 border-2 rounded items-center justify-center mr-2 ${
+              agree ? 'bg-blue-600 border-blue-600' : 'bg-transparent border-gray-400'
+            }`}>
+              {agree && <Ionicons name="checkmark" size={12} color="#fff" />}
+            </View>
+            <Text className="text-gray-700" style={{ flex: 1, flexShrink: 1 }}>
+              By continuing, you agree to our{" "}
+              <Text 
+                className="font-semibold text-blue-600 underline"
+                onPress={() => {
+                  setShowTerms(true);
+                }}
+              >
+                Terms of Service
+              </Text>
+              <Text>.</Text>
             </Text>
-            <Text>.</Text>
-          </Text>
-        </TouchableOpacity>
+          </TouchableOpacity>
+
+          {/* Data Privacy Act checkbox */}
+          <TouchableOpacity
+            onPress={() => setAgreePrivacy(v => !v)}
+            className="flex-row items-start"
+            testID="privacy-checkbox"
+          >
+            <View className={`w-5 h-5 border-2 rounded items-center justify-center mr-2 ${
+              agreePrivacy ? 'bg-blue-600 border-blue-600' : 'bg-transparent border-gray-400'
+            }`}>
+              {agreePrivacy && <Ionicons name="checkmark" size={12} color="#fff" />}
+            </View>
+            <Text className="text-gray-700" style={{ flex: 1, flexShrink: 1 }}>
+              I consent to the collection and use of my personal data in accordance with the{" "}
+              <Text
+                className="font-semibold text-blue-600 underline"
+                onPress={() => {
+                  setShowPrivacy(true);
+                }}
+              >
+                Data Privacy Act of 2012
+              </Text>
+              <Text>.</Text>
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Primary Sign Up button */}
         <PrimaryButton
@@ -752,6 +788,9 @@ export default function UserRegistration() {
 
       {/* Terms of Service Modal */}
       <TermsOfServiceModal visible={showTerms} onClose={() => setShowTerms(false)} />
+
+      {/* Data Privacy Act Modal */}
+      <DataPrivacyModal visible={showPrivacy} onClose={() => setShowPrivacy(false)} />
 
       {/* Date Picker Modal */}
       <Modal

@@ -6,6 +6,14 @@ interface FileUploadResponse {
   file_path?: string;
   message: string;
   error?: string;
+  // OCR extracted fields (for IBP card uploads)
+  extracted_first_name?: string;
+  extracted_last_name?: string;
+  extracted_roll_number?: string;
+  extraction_confidence?: string;
+  // Image quality fields
+  is_blurry?: boolean;
+  blur_score?: number; // Laplacian variance score
 }
 
 interface LawyerApplicationStatus {

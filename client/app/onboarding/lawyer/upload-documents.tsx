@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StatusBar, ScrollView, View, Text, TextInput, TouchableOpacity, Image, Alert, Modal, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -12,6 +12,8 @@ import { useAuth } from '../../../contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../../../constants/Colors';
 import { getContentBottomPadding } from '../../../constants/LayoutConstants';
+import { validateLawyerCredentials, ValidationResult } from '../../../utils/lawyerValidation';
+import DataPrivacyModal from '../../../components/common/DataPrivacyModal';
 
 export default function LawyerReg() {
   const insets = useSafeAreaInsets();
@@ -28,10 +30,31 @@ export default function LawyerReg() {
   const [showYearSelect, setShowYearSelect] = useState(false);
   const [showUploadOptions, setShowUploadOptions] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isExtractingOcr, setIsExtractingOcr] = useState(false);
   const [ibpCard, setIbpCard] = useState<any | null>(null);
   const [ibpCardPath, setIbpCardPath] = useState<string>('');
-  const isComplete = Boolean(firstName.trim() && lastName.trim() && rollNumber.trim() && rollSignDate && ibpCard);
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [blurInfo, setBlurInfo] = useState<{ is_blurry?: boolean; blur_score?: number } | null>(null);
+  const isImageBlurry = blurInfo?.is_blurry === true;
+  const [agreePrivacy, setAgreePrivacy] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const isComplete = Boolean(firstName.trim() && lastName.trim() && rollNumber.trim() && rollSignDate && ibpCard && !isImageBlurry);
+  const canContinue = isComplete && agreePrivacy;
   const today = new Date();
+
+  // Validate credentials when all required fields are filled
+  const validateCredentials = useCallback(() => {
+    if (firstName.trim() && lastName.trim() && rollNumber.trim() && rollSignDate) {
+      const result = validateLawyerCredentials(firstName, lastName, rollNumber, rollSignDate);
+      setValidationResult(result);
+    } else {
+      setValidationResult(null);
+    }
+  }, [firstName, lastName, rollNumber, rollSignDate]);
+
+  useEffect(() => {
+    validateCredentials();
+  }, [validateCredentials]);
 
   const handleBrowseFiles = async () => {
     if (Platform.OS === 'web') {
@@ -54,8 +77,9 @@ export default function LawyerReg() {
         const previewUrl = URL.createObjectURL(file);
         setIbpCard({ uri: previewUrl, name: file.name, size: file.size });
         
-        // Upload to backend
+        // Upload to backend and extract OCR
         setIsUploading(true);
+        setIsExtractingOcr(true);
         try {
           const uploadResult = await lawyerApplicationService.uploadIbpIdCard(file);
           
@@ -63,7 +87,25 @@ export default function LawyerReg() {
           
           if (uploadResult.success && uploadResult.file_path) {
             setIbpCardPath(uploadResult.file_path);
+            // Store blur detection info
+            if (uploadResult.is_blurry !== undefined || uploadResult.blur_score !== undefined) {
+              setBlurInfo({
+                is_blurry: uploadResult.is_blurry,
+                blur_score: uploadResult.blur_score
+              });
+            }
             setShowUploadOptions(false);
+            
+            // Auto-fill form fields from OCR extraction
+            if (uploadResult.extracted_first_name) {
+              setFirstName(uploadResult.extracted_first_name);
+            }
+            if (uploadResult.extracted_last_name) {
+              setLastName(uploadResult.extracted_last_name);
+            }
+            if (uploadResult.extracted_roll_number) {
+              setRollNumber(uploadResult.extracted_roll_number);
+            }
           } else {
             // Keep the preview but show warning - don't remove the image
             console.warn('Upload failed but keeping preview:', uploadResult.message);
@@ -75,6 +117,7 @@ export default function LawyerReg() {
           Alert.alert('Upload Warning', 'File selected but upload failed. You can continue and try again later.');
         } finally {
           setIsUploading(false);
+          setIsExtractingOcr(false);
         }
       };
       input.click();
@@ -97,8 +140,9 @@ export default function LawyerReg() {
         // Set preview immediately for better UX
         setIbpCard(asset);
         
-        // Upload to backend
+        // Upload to backend and extract OCR
         setIsUploading(true);
+        setIsExtractingOcr(true);
         try {
           const uploadResult = await lawyerApplicationService.uploadIbpIdCard({
             uri: asset.uri,
@@ -110,7 +154,25 @@ export default function LawyerReg() {
           
           if (uploadResult.success && uploadResult.file_path) {
             setIbpCardPath(uploadResult.file_path);
+            // Store blur detection info
+            if (uploadResult.is_blurry !== undefined || uploadResult.blur_score !== undefined) {
+              setBlurInfo({
+                is_blurry: uploadResult.is_blurry,
+                blur_score: uploadResult.blur_score
+              });
+            }
             setShowUploadOptions(false);
+            
+            // Auto-fill form fields from OCR extraction
+            if (uploadResult.extracted_first_name) {
+              setFirstName(uploadResult.extracted_first_name);
+            }
+            if (uploadResult.extracted_last_name) {
+              setLastName(uploadResult.extracted_last_name);
+            }
+            if (uploadResult.extracted_roll_number) {
+              setRollNumber(uploadResult.extracted_roll_number);
+            }
           } else {
             // Keep the preview but show warning - don't remove the image
             console.warn('Upload failed but keeping preview:', uploadResult.message);
@@ -122,6 +184,7 @@ export default function LawyerReg() {
           Alert.alert('Upload Warning', 'File selected but upload failed. You can continue and try again later.');
         } finally {
           setIsUploading(false);
+          setIsExtractingOcr(false);
         }
       }
     }
@@ -150,8 +213,9 @@ export default function LawyerReg() {
         // Set preview immediately for better UX
         setIbpCard({ uri: a.uri, name: a.fileName || 'photo.jpg', size: a.fileSize });
         
-        // Upload to backend
+        // Upload to backend and extract OCR
         setIsUploading(true);
+        setIsExtractingOcr(true);
         try {
           const uploadResult = await lawyerApplicationService.uploadIbpIdCard({
             uri: a.uri,
@@ -163,7 +227,25 @@ export default function LawyerReg() {
           
           if (uploadResult.success && uploadResult.file_path) {
             setIbpCardPath(uploadResult.file_path);
+            // Store blur detection info
+            if (uploadResult.is_blurry !== undefined || uploadResult.blur_score !== undefined) {
+              setBlurInfo({
+                is_blurry: uploadResult.is_blurry,
+                blur_score: uploadResult.blur_score
+              });
+            }
             setShowUploadOptions(false);
+            
+            // Auto-fill form fields from OCR extraction
+            if (uploadResult.extracted_first_name) {
+              setFirstName(uploadResult.extracted_first_name);
+            }
+            if (uploadResult.extracted_last_name) {
+              setLastName(uploadResult.extracted_last_name);
+            }
+            if (uploadResult.extracted_roll_number) {
+              setRollNumber(uploadResult.extracted_roll_number);
+            }
           } else {
             // Keep the preview but show warning - don't remove the image
             console.warn('Upload failed but keeping preview:', uploadResult.message);
@@ -175,6 +257,7 @@ export default function LawyerReg() {
           Alert.alert('Upload Warning', 'File selected but upload failed. You can continue and try again later.');
         } finally {
           setIsUploading(false);
+          setIsExtractingOcr(false);
         }
       }
     } finally {
@@ -206,8 +289,9 @@ export default function LawyerReg() {
         // Set preview immediately for better UX
         setIbpCard({ uri: a.uri, name: a.fileName || 'image.jpg', size: a.fileSize });
         
-        // Upload to backend
+        // Upload to backend and extract OCR
         setIsUploading(true);
+        setIsExtractingOcr(true);
         try {
           const uploadResult = await lawyerApplicationService.uploadIbpIdCard({
             uri: a.uri,
@@ -219,7 +303,25 @@ export default function LawyerReg() {
           
           if (uploadResult.success && uploadResult.file_path) {
             setIbpCardPath(uploadResult.file_path);
+            // Store blur detection info
+            if (uploadResult.is_blurry !== undefined || uploadResult.blur_score !== undefined) {
+              setBlurInfo({
+                is_blurry: uploadResult.is_blurry,
+                blur_score: uploadResult.blur_score
+              });
+            }
             setShowUploadOptions(false);
+            
+            // Auto-fill form fields from OCR extraction
+            if (uploadResult.extracted_first_name) {
+              setFirstName(uploadResult.extracted_first_name);
+            }
+            if (uploadResult.extracted_last_name) {
+              setLastName(uploadResult.extracted_last_name);
+            }
+            if (uploadResult.extracted_roll_number) {
+              setRollNumber(uploadResult.extracted_roll_number);
+            }
           } else {
             // Keep the preview but show warning - don't remove the image
             console.warn('Upload failed but keeping preview:', uploadResult.message);
@@ -231,6 +333,7 @@ export default function LawyerReg() {
           Alert.alert('Upload Warning', 'File selected but upload failed. You can continue and try again later.');
         } finally {
           setIsUploading(false);
+          setIsExtractingOcr(false);
         }
       }
     } finally {
@@ -258,7 +361,7 @@ export default function LawyerReg() {
       {/* Main Content */}
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: getContentBottomPadding(insets.bottom, 20) }}
+        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: getContentBottomPadding(insets.bottom, 80) }}
         keyboardShouldPersistTaps="handled"
       >
         {/* Logo */}
@@ -282,78 +385,246 @@ export default function LawyerReg() {
           </Text>
         </View>
 
+        {/* IBP Card - Upload First */}
+        <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827' }}>
+          IBP Card <Text style={{ color: '#ef4444' }}>*</Text>
+        </Text>
+        <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 2, marginBottom: 8 }}>
+          Upload your IBP card to auto-fill your name and roll number
+        </Text>
+
+        {!ibpCard && (
+          <TouchableOpacity
+            onPress={() => {
+              if (isUploading) return;
+              if (Platform.OS === 'web') {
+                handleBrowseFiles();
+              } else {
+                setShowUploadOptions(true);
+              }
+            }}
+            disabled={isUploading}
+            activeOpacity={isUploading ? 1 : 0.85}
+            style={{
+              width: '100%',
+              minHeight: 90,
+              borderWidth: 1.5,
+              borderColor: isUploading ? '#fbbf24' : '#D1D5DB',
+              borderRadius: 10,
+              backgroundColor: isUploading ? '#fef3c7' : '#F8FAFC',
+              justifyContent: 'center',
+              marginBottom: 16,
+              borderStyle: 'dashed',
+              padding: 12,
+              opacity: isUploading ? 0.7 : 1,
+            }}
+          >
+            {isUploading ? (
+              <View style={{ alignItems: 'center' }}>
+                <ActivityIndicator size="small" color="#f59e0b" />
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#92400e', marginTop: 8 }}>
+                  Uploading & Extracting...
+                </Text>
+                <Text style={{ fontSize: 13, color: '#92400e', marginTop: 4 }}>
+                  Please wait while we process your IBP card
+                </Text>
+              </View>
+            ) : (
+              <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                  <MaterialIcons name="cloud-upload" size={22} color="#6b7280" />
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#6b7280', marginLeft: 8 }}>
+                    Upload your IBP Card
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 13, color: '#6b7280', marginBottom: 2 }}>
+                  Formats: JPG, JPEG, PNG | Max size: 5MB
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+
+        {ibpCard && (
+          <View style={{ marginBottom: 16 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: '#E5E7EB',
+                backgroundColor: '#F3F4F6',
+                borderRadius: 10,
+                paddingHorizontal: 10,
+                paddingVertical: 8,
+              }}
+            >
+              <Image
+                source={{ uri: ibpCard.uri }}
+                style={{ width: 28, height: 28, borderRadius: 6, marginRight: 8 }}
+              />
+              <Text numberOfLines={1} style={{ flex: 1, color: '#374151' }}>
+                {ibpCard.name}
+              </Text>
+              <TouchableOpacity onPress={() => { if (Platform.OS === 'web') { handleBrowseFiles(); } else { setShowUploadOptions(true); } }} style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: 'white', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', marginRight: 8 }}>
+                <Text style={{ color: '#111827', fontWeight: '600' }}>Replace</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => {
+                setIbpCard(null);
+                setIbpCardPath('');
+                setBlurInfo(null);
+              }} style={{ padding: 6, borderWidth: 1, borderColor: '#FCA5A5', backgroundColor: '#FEF2F2', borderRadius: 8 }}>
+                <MaterialIcons name="delete" size={18} color="#DC2626" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ marginTop: 10, marginBottom: 6, color: '#6b7280', fontWeight: '700', letterSpacing: 0.5, fontSize: 12 }}>
+              PREVIEW
+            </Text>
+            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, overflow: 'hidden', backgroundColor: 'white' }}>
+              <Image
+                source={{ uri: ibpCard.uri }}
+                style={{ width: '100%', height: 180, backgroundColor: '#fff' }}
+                resizeMode="contain"
+              />
+            </View>
+
+            {/* Blur Warning */}
+            {blurInfo && blurInfo.is_blurry && (
+              <View style={{
+                marginTop: 12,
+                backgroundColor: '#FEE2E2',
+                borderWidth: 1,
+                borderColor: '#FCA5A5',
+                padding: 12,
+                borderRadius: 8,
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+              }}>
+                <MaterialIcons 
+                  name="error" 
+                  size={20} 
+                  color="#DC2626" 
+                  style={{ marginRight: 8, marginTop: 1 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ 
+                    fontSize: 14, 
+                    fontWeight: '600', 
+                    color: '#991B1B',
+                    marginBottom: 2
+                  }}>
+                    Image Too Blurry
+                  </Text>
+                  <Text style={{ 
+                    fontSize: 13, 
+                    color: '#B91C1C',
+                    lineHeight: 18
+                  }}>
+                    Please upload a clearer image. Blurry images cannot be submitted.
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
+
         {/* First Name */}
         <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 6 }}>
           First Name <Text style={{ color: '#ef4444' }}>*</Text>
         </Text>
-        <TextInput
-          style={{
-            width: '100%',
-            borderWidth: 1,
-            borderColor: '#e5e7eb',
-            borderRadius: 8,
-            padding: 12,
-            fontSize: 16,
-            backgroundColor: '#fafbfc',
-            color: '#111827',
-            marginBottom: 12,
-          }}
-          placeholder="Enter First Name"
-          placeholderTextColor="#9ca3af"
-          value={firstName}
-          onChangeText={setFirstName}
-          autoCapitalize="words"
-        />
+        <View style={{ position: 'relative', marginBottom: 12 }}>
+          <TextInput
+            style={{
+              width: '100%',
+              borderWidth: 1,
+              borderColor: isExtractingOcr ? '#3b82f6' : '#e5e7eb',
+              borderRadius: 8,
+              padding: 12,
+              paddingRight: isExtractingOcr ? 44 : 12,
+              fontSize: 16,
+              backgroundColor: isExtractingOcr ? '#eff6ff' : '#fafbfc',
+              color: '#111827',
+            }}
+            placeholder={isExtractingOcr ? "Extracting from IBP card..." : "Enter First Name"}
+            placeholderTextColor={isExtractingOcr ? '#3b82f6' : '#9ca3af'}
+            value={firstName}
+            onChangeText={setFirstName}
+            autoCapitalize="words"
+            editable={!isExtractingOcr}
+          />
+          {isExtractingOcr && (
+            <View style={{ position: 'absolute', right: 12, top: 12 }}>
+              <ActivityIndicator size="small" color="#3b82f6" />
+            </View>
+          )}
+        </View>
 
         {/* Last Name */}
         <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 6 }}>
           Last Name <Text style={{ color: '#ef4444' }}>*</Text>
         </Text>
-        <TextInput
-          style={{
-            width: '100%',
-            borderWidth: 1,
-            borderColor: '#e5e7eb',
-            borderRadius: 8,
-            padding: 12,
-            fontSize: 16,
-            backgroundColor: '#fafbfc',
-            color: '#111827',
-            marginBottom: 12,
-          }}
-          placeholder="Enter Last Name"
-          placeholderTextColor="#9ca3af"
-          value={lastName}
-          onChangeText={setLastName}
-          autoCapitalize="words"
-        />
+        <View style={{ position: 'relative', marginBottom: 12 }}>
+          <TextInput
+            style={{
+              width: '100%',
+              borderWidth: 1,
+              borderColor: isExtractingOcr ? '#3b82f6' : '#e5e7eb',
+              borderRadius: 8,
+              padding: 12,
+              paddingRight: isExtractingOcr ? 44 : 12,
+              fontSize: 16,
+              backgroundColor: isExtractingOcr ? '#eff6ff' : '#fafbfc',
+              color: '#111827',
+            }}
+            placeholder={isExtractingOcr ? "Extracting from IBP card..." : "Enter Last Name"}
+            placeholderTextColor={isExtractingOcr ? '#3b82f6' : '#9ca3af'}
+            value={lastName}
+            onChangeText={setLastName}
+            autoCapitalize="words"
+            editable={!isExtractingOcr}
+          />
+          {isExtractingOcr && (
+            <View style={{ position: 'absolute', right: 12, top: 12 }}>
+              <ActivityIndicator size="small" color="#3b82f6" />
+            </View>
+          )}
+        </View>
 
         {/* Roll Number */}
         <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 6 }}>
           Roll Number <Text style={{ color: '#ef4444' }}>*</Text>
         </Text>
-        <TextInput
-          style={{
-            width: '100%',
-            borderWidth: 1,
-            borderColor: '#e5e7eb',
-            borderRadius: 8,
-            padding: 12,
-            fontSize: 16,
-            backgroundColor: '#fafbfc',
-            color: '#111827',
-            marginBottom: 12,
-          }}
-          placeholder="Enter Roll Number"
-          placeholderTextColor="#9ca3af"
-          keyboardType="numeric"
-          inputMode="numeric"
-          value={rollNumber}
-          onChangeText={(t) => {
-            const digits = t.replace(/\D+/g, '');
-            setRollNumber(digits);
-          }}
-        />
+        <View style={{ position: 'relative', marginBottom: 12 }}>
+          <TextInput
+            style={{
+              width: '100%',
+              borderWidth: 1,
+              borderColor: isExtractingOcr ? '#3b82f6' : '#e5e7eb',
+              borderRadius: 8,
+              padding: 12,
+              paddingRight: isExtractingOcr ? 44 : 12,
+              fontSize: 16,
+              backgroundColor: isExtractingOcr ? '#eff6ff' : '#fafbfc',
+              color: '#111827',
+            }}
+            placeholder={isExtractingOcr ? "Extracting from IBP card..." : "Enter Roll Number"}
+            placeholderTextColor={isExtractingOcr ? '#3b82f6' : '#9ca3af'}
+            keyboardType="numeric"
+            inputMode="numeric"
+            value={rollNumber}
+            onChangeText={(t) => {
+              const digits = t.replace(/\D+/g, '');
+              setRollNumber(digits);
+            }}
+            editable={!isExtractingOcr}
+          />
+          {isExtractingOcr && (
+            <View style={{ position: 'absolute', right: 12, top: 12 }}>
+              <ActivityIndicator size="small" color="#3b82f6" />
+            </View>
+          )}
+        </View>
 
         {/* Roll Sign Date */}
         <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 6 }}>
@@ -386,6 +657,81 @@ export default function LawyerReg() {
             {rollSignDate ? formatDate(rollSignDate) : 'MM/DD/YYYY'}
           </Text>
         </TouchableOpacity>
+
+        {/* Validation Status - shows when all fields are filled */}
+        {validationResult && (
+          <View style={{
+            backgroundColor: validationResult.isMatch ? '#ECFDF5' : '#FEF2F2',
+            borderWidth: 1,
+            borderColor: validationResult.isMatch ? '#A7F3D0' : '#FECACA',
+            padding: 12,
+            borderRadius: 8,
+            marginBottom: 12,
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+          }}>
+            <MaterialIcons 
+              name={validationResult.isMatch ? "check-circle" : "error"} 
+              size={20} 
+              color={validationResult.isMatch ? '#059669' : '#DC2626'} 
+              style={{ marginRight: 8, marginTop: 1 }}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={{ 
+                fontSize: 14, 
+                fontWeight: '600', 
+                color: validationResult.isMatch ? '#065F46' : '#991B1B',
+                marginBottom: 2
+              }}>
+                {validationResult.isMatch ? 'Verified' : 'Not Verified'}
+              </Text>
+              <Text style={{ 
+                fontSize: 13, 
+                color: validationResult.isMatch ? '#047857' : '#B91C1C',
+                lineHeight: 18
+              }}>
+                {validationResult.message}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Data Privacy Consent */}
+        <View style={{ marginTop: 8, marginBottom: 16 }}>
+          <TouchableOpacity
+            onPress={() => setAgreePrivacy((prev) => !prev)}
+            activeOpacity={0.85}
+            style={{ flexDirection: 'row', alignItems: 'flex-start' }}
+          >
+            <View
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: 4,
+                borderWidth: 2,
+                borderColor: agreePrivacy ? Colors.primary.blue : '#D1D5DB',
+                backgroundColor: agreePrivacy ? Colors.primary.blue : 'transparent',
+                marginRight: 12,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginTop: 2,
+              }}
+            >
+              {agreePrivacy && <MaterialIcons name="check" size={14} color="#fff" />}
+            </View>
+            <Text style={{ flex: 1, color: '#374151', lineHeight: 20 }}>
+              By checking this box, I consent to the collection and processing of my personal data in accordance with the{' '}
+              <Text
+                style={{ color: Colors.primary.blue, textDecorationLine: 'underline', fontWeight: '600' }}
+                onPress={() => setShowPrivacyModal(true)}
+              >
+                Data Privacy Act of 2012
+              </Text>
+              .
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Modal Date Picker: Custom calendar on web, native picker on mobile */}
         <Modal
           visible={showDatePicker}
@@ -600,121 +946,6 @@ export default function LawyerReg() {
             </View>
           </View>
         </Modal>
-
-        {/* IBP Card */}
-        <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827' }}>
-          IBP Card <Text style={{ color: '#ef4444' }}>*</Text>
-        </Text>
-
-        {!ibpCard && (
-          <TouchableOpacity
-            onPress={() => {
-              if (isUploading) return; // Prevent multiple uploads
-              if (Platform.OS === 'web') {
-                handleBrowseFiles();
-              } else {
-                setShowUploadOptions(true);
-              }
-            }}
-            disabled={isUploading}
-            activeOpacity={isUploading ? 1 : 0.85}
-            style={{
-              width: '100%',
-              minHeight: 90,
-              borderWidth: 1.5,
-              borderColor: isUploading ? '#fbbf24' : '#D1D5DB',
-              borderRadius: 10,
-              backgroundColor: isUploading ? '#fef3c7' : '#F8FAFC',
-              justifyContent: 'center',
-              marginTop: 8,
-              borderStyle: 'dashed',
-              padding: 12,
-              opacity: isUploading ? 0.7 : 1,
-            }}
-          >
-            {isUploading ? (
-              <View style={{ alignItems: 'center' }}>
-                <ActivityIndicator size="small" color="#f59e0b" />
-                <Text style={{ fontSize: 16, fontWeight: '700', color: '#92400e', marginTop: 8 }}>
-                  Uploading...
-                </Text>
-                <Text style={{ fontSize: 13, color: '#92400e', marginTop: 4 }}>
-                  Please wait while we upload your file
-                </Text>
-              </View>
-            ) : (
-              <>
-                {/* Header Row */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                  <MaterialIcons name="cloud-upload" size={22} color="#6b7280" />
-                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#6b7280', marginLeft: 8 }}>
-                    Upload a file
-                  </Text>
-                </View>
-
-                {/* Details */}
-                <Text style={{ fontSize: 13, color: '#6b7280', marginBottom: 2 }}>
-                  Formats: JPG, JPEG, PNG
-                </Text>
-                <Text style={{ fontSize: 13, color: '#6b7280' }}>Max size: 5MB</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        )}
-
-        {/* File info + actions */}
-        {ibpCard && (
-          <View style={{ marginTop: 12 }}>
-            {/* File bar */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                borderWidth: 1,
-                borderColor: '#E5E7EB',
-                backgroundColor: '#F3F4F6',
-                borderRadius: 10,
-                paddingHorizontal: 10,
-                paddingVertical: 8,
-              }}
-            >
-              {/* Thumb */}
-              <Image
-                source={{ uri: ibpCard.uri }}
-                style={{ width: 28, height: 28, borderRadius: 6, marginRight: 8 }}
-              />
-              {/* Name */}
-              <Text numberOfLines={1} style={{ flex: 1, color: '#374151' }}>
-                {ibpCard.name}
-              </Text>
-              {/* Replace */}
-              <TouchableOpacity onPress={() => { if (Platform.OS === 'web') { handleBrowseFiles(); } else { setShowUploadOptions(true); } }} style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: 'white', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', marginRight: 8 }}>
-                <Text style={{ color: '#111827', fontWeight: '600' }}>Replace</Text>
-              </TouchableOpacity>
-              {/* Delete */}
-              <TouchableOpacity onPress={() => {
-                setIbpCard(null);
-                setIbpCardPath('');
-              }} style={{ padding: 6, borderWidth: 1, borderColor: '#FCA5A5', backgroundColor: '#FEF2F2', borderRadius: 8 }}>
-                <MaterialIcons name="delete" size={18} color="#DC2626" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Preview label */}
-            <Text style={{ marginTop: 14, marginBottom: 6, color: '#6b7280', fontWeight: '700', letterSpacing: 0.5 }}>
-              PREVIEW
-            </Text>
-
-            {/* Preview area */}
-            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, overflow: 'hidden', backgroundColor: 'white' }}>
-              <Image
-                source={{ uri: ibpCard.uri }}
-                style={{ width: '100%', height: 220, backgroundColor: '#fff' }}
-                resizeMode="contain"
-              />
-            </View>
-          </View>
-        )}
         
         {/* Mobile upload options modal */}
         <Modal
@@ -734,7 +965,6 @@ export default function LawyerReg() {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => {
-                  // Close modal first, then open picker after a short delay to avoid presentation conflict on native
                   setShowUploadOptions(false);
                   if (Platform.OS === 'web') {
                     handleBrowseFiles();
@@ -762,11 +992,15 @@ export default function LawyerReg() {
       {/* Sticky footer next */}
       <StickyFooterButton
         title="Continue"
-        disabled={!isComplete}
+        disabled={!canContinue}
         bottomOffset={0}
         onPress={async () => {
           if (!firstName || !lastName || !rollNumber || !rollSignDate) {
             Alert.alert('Missing Information', 'Please fill in all required fields.');
+            return;
+          }
+          if (!agreePrivacy) {
+            Alert.alert('Consent Required', 'Please agree to the Data Privacy Act consent before continuing.');
             return;
           }
           // Combine first and last name
@@ -785,6 +1019,8 @@ export default function LawyerReg() {
           router.push('/onboarding/lawyer/lawyer-face-verification');
         }}
       />
+
+      <DataPrivacyModal visible={showPrivacyModal} onClose={() => setShowPrivacyModal(false)} />
     </SafeAreaView>
   );
 }

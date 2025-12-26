@@ -70,7 +70,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       eas: {
         projectId: '3a516245-8faa-40f9-87b8-0d369afde669',
       },
-      apiUrl: process.env.EXPO_PUBLIC_API_URL || 'https://aittorney-staging.up.railway.app',
+      apiUrl: process.env.EXPO_PUBLIC_API_URL || '',
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://vmlbrckrlgwlobhnpstx.supabase.co',
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtbGJyY2tybGd3bG9iaG5wc3R4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4MDI5MDksImV4cCI6MjA2OTM3ODkwOX0.ucK9BXmRg7wYaamFBkTKWTkOavlp7SzNrZwDvNmKsK8',
       googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || 'AIzaSyD0OPK0U7WdEwlzNh7XKsYpYVMyHea-G80',

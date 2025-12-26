@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, StatusBar, Text, ScrollView, Alert } from 'react-native';
+import { View, StatusBar, Text, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Header from '../../../components/Header';
@@ -8,12 +8,16 @@ import { router } from 'expo-router';
 import Colors from '../../../constants/Colors';
 import { lawyerApplicationService } from '../../../services/lawyerApplicationService';
 import { getContentBottomPadding } from '../../../constants/LayoutConstants';
+import DataPrivacyModal from '../../../components/common/DataPrivacyModal';
 
 export default function LawyerTerms() {
   const insets = useSafeAreaInsets();
   const [enabled, setEnabled] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(5);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [agreePrivacy, setAgreePrivacy] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   useEffect(() => {
     let remaining = 5;
@@ -273,10 +277,76 @@ export default function LawyerTerms() {
           <Text style={{ fontSize: 14, color: '#4b5563', lineHeight: 20, marginBottom: 4 }}>
             For questions or clarifications, please contact:
           </Text>
-          <View style={{ backgroundColor: '#F9FAFB', padding: 12, borderRadius: 6, borderWidth: 1, borderColor: '#E5E7EB' }}>
+          <View style={{ backgroundColor: '#F9FAFB', padding: 12, borderRadius: 6, borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 24 }}>
             <Text style={{ fontSize: 13, color: '#4b5563' }}>
               Email: ai.ttorney@gmail.com
             </Text>
+          </View>
+
+          {/* Consent checkboxes */}
+          <View style={{ marginTop: 8 }}>
+            <TouchableOpacity
+              onPress={() => setAgreeTerms((prev) => !prev)}
+              style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 }}
+              activeOpacity={0.8}
+            >
+              <View
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 4,
+                  borderWidth: 2,
+                  borderColor: agreeTerms ? Colors.primary.blue : '#D1D5DB',
+                  backgroundColor: agreeTerms ? Colors.primary.blue : 'transparent',
+                  marginRight: 12,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginTop: 2,
+                }}
+              >
+                {agreeTerms && (
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>✓</Text>
+                )}
+              </View>
+              <Text style={{ flex: 1, color: '#374151', lineHeight: 20 }}>
+                I confirm that I have read and agree to the Terms of Use for Lawyer Users above.
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setAgreePrivacy((prev) => !prev)}
+              style={{ flexDirection: 'row', alignItems: 'flex-start' }}
+              activeOpacity={0.8}
+            >
+              <View
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 4,
+                  borderWidth: 2,
+                  borderColor: agreePrivacy ? Colors.primary.blue : '#D1D5DB',
+                  backgroundColor: agreePrivacy ? Colors.primary.blue : 'transparent',
+                  marginRight: 12,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginTop: 2,
+                }}
+              >
+                {agreePrivacy && (
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>✓</Text>
+                )}
+              </View>
+              <Text style={{ flex: 1, color: '#374151', lineHeight: 20 }}>
+                By checking this box, I consent to the collection and processing of my personal data in accordance with the{' '}
+                <Text
+                  style={{ color: Colors.primary.blue, textDecorationLine: 'underline', fontWeight: '600' }}
+                  onPress={() => setShowPrivacyModal(true)}
+                >
+                  Data Privacy Act of 2012
+                </Text>
+                .
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -285,10 +355,12 @@ export default function LawyerTerms() {
       {/* Sticky footer button */}
       <StickyFooterButton
         title={isSubmitting ? 'Submitting...' : (enabled ? 'Submit Documents' : `Submit Documents (${secondsLeft})`)}
-        disabled={!enabled || isSubmitting}
+        disabled={!enabled || isSubmitting || !agreeTerms || !agreePrivacy}
         bottomOffset={0}
         onPress={handleSubmitApplication}
       />
+
+      <DataPrivacyModal visible={showPrivacyModal} onClose={() => setShowPrivacyModal(false)} />
     </SafeAreaView>
   );
 }

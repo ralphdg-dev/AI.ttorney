@@ -22,6 +22,8 @@ limits==3.13.0
 openai==1.58.1
 qdrant-client==1.12.1
 numpy==2.2.1
+opencv-python-headless==4.10.0.84
+Pillow==11.0.0
 
 # Google Services (Latest)
 googlemaps==4.10.0
@@ -39,6 +41,6 @@ jinja2==3.1.5
 
 # ML Packages - Latest Stable (Large - 2-3GB, 10-15 min build time)
 guardrails-ai==0.6.7
-torch==2.5.1
+torch==2.9.1
 transformers==4.47.1
 peft==0.14.0
