@@ -588,7 +588,7 @@ export default function UserRegistration() {
           }`}>
             {agree && <Ionicons name="checkmark" size={12} color="#fff" />}
           </View>
-          <Text className="text-gray-700">
+          <Text className="text-gray-700" style={{ flex: 1 }}>
             By continuing, you agree to our{" "}
             <Text 
               className="font-semibold text-blue-600 underline"
@@ -613,8 +613,8 @@ export default function UserRegistration() {
           }`}>
             {agreePrivacy && <Ionicons name="checkmark" size={12} color="#fff" />}
           </View>
-          <Text className="text-gray-700">
-            By checking this box, I consent to the collection and processing of my personal data in accordance with the{" "}
+          <Text className="text-gray-700" style={{ flex: 1 }}>
+            I consent to the collection and use of my personal data in accordance with the{" "}
             <Text
               className="font-semibold text-blue-600 underline"
               onPress={() => {
