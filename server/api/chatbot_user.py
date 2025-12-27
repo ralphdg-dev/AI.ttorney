@@ -2315,6 +2315,11 @@ async def save_chat_interaction(
     - If session_id is provided but doesn't exist, create new one
     - Backend is source of truth for session existence
     """
+    # Bypass for DeepEval testing - skip saving for test users
+    if effective_user_id and effective_user_id.startswith("test_user"):
+        logger.info(f"🧪 Skipping chat history save for test user: {effective_user_id}")
+        return None, None, None
+    
     if not effective_user_id:
         logger.debug(f"No user_id available - skipping chat history save")
         return (None, None, None)

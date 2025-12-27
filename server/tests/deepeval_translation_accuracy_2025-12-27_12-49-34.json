@@ -1,0 +1,683 @@
+{
+  "evaluation_metadata": {
+    "timestamp": "2025-12-27T12:49:34.348790",
+    "framework": "DeepEval",
+    "custom_metric": "LegalTranslationAccuracyMetric",
+    "evaluation_model": "gpt-4o",
+    "threshold": 0.85,
+    "baseline_method": "professional_translator_review",
+    "baseline_accuracy": 100.0
+  },
+  "overall_results": {
+    "total_tests": 20,
+    "passed_tests": 18,
+    "failed_tests": 2,
+    "accuracy_rate": 90.0,
+    "average_score": 0.98125,
+    "baseline_difference": -10.0,
+    "assessment": "\u26a0\ufe0f  GOOD - Minor deviation from manual evaluation"
+  },
+  "category_performance": {
+    "Civil Law": {
+      "total": 4,
+      "passed": 3,
+      "accuracy": 75.0,
+      "average_score": 0.953125,
+      "min_score": 0.8125,
+      "max_score": 1.0
+    },
+    "Family Law": {
+      "total": 4,
+      "passed": 4,
+      "accuracy": 100.0,
+      "average_score": 1.0,
+      "min_score": 1.0,
+      "max_score": 1.0
+    },
+    "Criminal Law": {
+      "total": 4,
+      "passed": 4,
+      "accuracy": 100.0,
+      "average_score": 1.0,
+      "min_score": 1.0,
+      "max_score": 1.0
+    },
+    "Labor Law": {
+      "total": 4,
+      "passed": 4,
+      "accuracy": 100.0,
+      "average_score": 1.0,
+      "min_score": 1.0,
+      "max_score": 1.0
+    },
+    "Consumer Law": {
+      "total": 4,
+      "passed": 3,
+      "accuracy": 75.0,
+      "average_score": 0.953125,
+      "min_score": 0.8125,
+      "max_score": 1.0
+    }
+  },
+  "role_performance": {
+    "user": {
+      "total": 10,
+      "passed": 8,
+      "accuracy": 80.0,
+      "average_score": 0.9625,
+      "min_score": 0.8125,
+      "max_score": 1.0
+    },
+    "lawyer": {
+      "total": 10,
+      "passed": 10,
+      "accuracy": 100.0,
+      "average_score": 1.0,
+      "min_score": 1.0,
+      "max_score": 1.0
+    }
+  },
+  "detailed_results": [
+    {
+      "score": 1.0,
+      "passed": true,
+      "query_id": "user_civil_001",
+      "legal_category": "Civil Law",
+      "threshold": 0.85,
+      "breakdown": {
+        "meaning_preservation": {
+          "score": 1.0,
+          "justification": "The translation preserves the exact legal meaning of the source text. There are no additions, omissions, or distortions, and the core legal message is intact."
+        },
+        "legal_terminology": {
+          "score": 1.0,
+          "justification": "The legal term 'kontrata' is correctly used for 'contract,' and the translation accurately reflects the legal concept in the context of Civil Law.",
+          "incorrect_terms": []
+        },
+        "legal_consequences": {
+          "score": 1.0,
+          "justification": "The translation does not involve modal verbs that could affect legal obligations or recommendations. The distinction between rights and duties is not applicable in this context.",
+          "consequence_errors": []
+        },
+        "language_fidelity": {
+          "score": 1.0,
+          "justification": "The Filipino language used is natural and grammatically correct. The translation maintains an appropriate legal tone and the code-switching is suitable for the legal context."
+        }
+      },
+      "critical_errors": [],
+      "reasoning": "The translation is a perfect match to the reference translation, indicating that it meets professional standards. It accurately conveys the legal inquiry about the essential elements of a valid contract in the Philippines. The use of 'kontrata' for 'contract' is appropriate, and the translation maintains the integrity of the legal question without introducing any errors or ambiguities. There are no critical errors that could cause legal misunderstanding, as the translation is both linguistically and legally sound.",
+      "evaluation_method": "gpt-4o_judge"
+    },
+    {
+      "score": 0.8125,
+      "passed": false,
+      "query_id": "user_civil_002",
+      "legal_category": "Civil Law",
+      "threshold": 0.85,
+      "breakdown": {
+        "meaning_preservation": {
+          "score": 1.0,
+          "justification": "The translation accurately preserves the meaning of the source text. There are no additions, omissions, or distortions, and the core legal message is intact."
+        },
+        "legal_terminology": {
+          "score": 0.5,
+          "justification": "While the translation uses the English term 'written contracts,' which is acceptable in a bilingual legal context, it could have been translated to 'nakasulat na kontrata' for full adherence to Filipino legal terminology.",
+          "incorrect_terms": [
+            "written contracts"
+          ]
+        },
+        "legal_consequences": {
+          "score": 1.0,
+          "justification": "The translation correctly maintains the legal consequence of the inquiry about the prescriptive period. There are no modal verbs in the source text that could alter obligations or recommendations."
+        },
+        "language_fidelity": {
+          "score": 0.75,
+          "justification": "The translation is grammatically correct and maintains an appropriate legal tone. However, the use of 'written contracts' instead of a fully translated term slightly affects the natural flow of the Filipino language."
+        }
+      },
+      "critical_errors": [],
+      "reasoning": "The translation effectively conveys the legal inquiry about the prescriptive period for filing a case involving written contracts. The core meaning and legal consequences are preserved, ensuring no misunderstanding in legal obligations or rights. However, the use of 'written contracts' in English, while common in bilingual legal contexts, could have been translated to 'nakasulat na kontrata' to fully align with Filipino legal terminology. This choice slightly affects the language fidelity but does not constitute a critical error. Overall, the translation is accurate and reliable for legal purposes.",
+      "evaluation_method": "gpt-4o_judge"
+    },
+    {
+      "score": 1.0,
+      "passed": true,
+      "query_id": "user_family_001",
+      "legal_category": "Family Law",
+      "threshold": 0.85,
+      "breakdown": {
+        "meaning_preservation": {
+          "score": 1.0,
+          "justification": "The translation accurately preserves the meaning of the source text. There are no additions, omissions, or distortions, and the core legal message is intact."
+        },
+        "legal_terminology": {
+          "score": 1.0,
+          "justification": "The translation correctly uses the term 'legal separation' as it is commonly used in both English and Filipino legal contexts. The term 'grounds' is appropriately retained in English, which is standard practice in Filipino legal language.",
+          "incorrect_terms": []
+        },
+        "legal_consequences": {
+          "score": 1.0,
+          "justification": "The translation does not involve modal verbs that could alter legal obligations or recommendations. The rights and duties implied by the question are preserved accurately.",
+          "consequence_errors": []
+        },
+        "language_fidelity": {
+          "score": 1.0,
+          "justification": "The translation is natural and grammatically correct in Filipino. The use of English terms 'grounds' and 'legal separation' is appropriate and maintains the legal tone expected in such contexts."
+        }
+      },
+      "critical_errors": [],
+      "reasoning": "The translation is a perfect match to the reference translation and meets all evaluation criteria. It preserves the legal meaning without any distortion, uses correct legal terminology, maintains the intended legal consequences, and is linguistically appropriate for a legal context. There are no critical errors that could lead to legal misunderstandings. The use of English terms within the Filipino sentence is standard in legal discourse, ensuring clarity and precision.",
+      "evaluation_method": "gpt-4o_judge"
+    },
+    {
+      "score": 1.0,
+      "passed": true,
+      "query_id": "user_family_002",
+      "legal_category": "Family Law",
+      "threshold": 0.85,
+      "breakdown": {
+        "meaning_preservation": {
+          "score": 1.0,
+          "justification": "The translation preserves the exact legal meaning of the source text. There are no additions, omissions, or distortions, and the core legal message is intact."
+        },
+        "legal_terminology": {
+          "score": 1.0,
+          "justification": "The term 'child support' is retained in English, which is common in Filipino legal contexts, and the rest of the sentence is accurately translated. The translation aligns with the professional standard.",
+          "incorrect_terms": []
+        },
+        "legal_consequences": {
+          "score": 1.0,
+          "justification": "The translation accurately reflects the inquiry about the calculation of child support without altering any legal obligations or rights. There are no modal verbs in the source text that could affect legal consequences.",
+          "consequence_errors": []
+        },
+        "language_fidelity": {
+          "score": 1.0,
+          "justification": "The translation is natural and grammatically correct in Filipino. The use of 'child support' in English is appropriate for the legal context, and the tone is consistent with legal discourse."
+        }
+      },
+      "critical_errors": [],
+      "reasoning": "The translation is an exact match to the reference translation, which is of professional standard. It accurately conveys the legal inquiry about child support calculation in the Philippines without any loss of meaning or legal nuance. The use of English for 'child support' is standard practice in Filipino legal contexts, ensuring clarity and precision. There are no critical errors, and the translation maintains the appropriate legal tone and grammatical structure.",
+      "evaluation_method": "gpt-4o_judge"
+    },
+    {
+      "score": 1.0,
+      "passed": true,
+      "query_id": "user_criminal_001",
+      "legal_category": "Criminal Law",
+      "threshold": 0.85,
+      "breakdown": {
+        "meaning_preservation": {
+          "score": 1.0,
+          "justification": "The translation accurately preserves the meaning of the source text. The question about the difference between 'homicide' and 'murder' is clearly conveyed without any additions, omissions, or distortions."
+        },
+        "legal_terminology": {
+          "score": 1.0,
+          "justification": "The terms 'homicide' and 'murder' are retained in English, which is appropriate given that these terms are often used as-is in Filipino legal contexts. There are no incorrect terms in the translation.",
+          "incorrect_terms": []
+        },
+        "legal_consequences": {
+          "score": 1.0,
+          "justification": "There are no modal verbs or legal obligations in the source text that could affect legal consequences. The translation maintains the same neutral inquiry as the original.",
+          "consequence_errors": []
+        },
+        "language_fidelity": {
+          "score": 1.0,
+          "justification": "The translation is grammatically correct and uses appropriate language for a legal context. The code-switching is suitable as 'homicide' and 'murder' are often used in English in Filipino legal discussions."
+        }
+      },
+      "critical_errors": [],
+      "reasoning": "The translation is a perfect match to the source text and the reference translation. It accurately conveys the legal inquiry without any loss of meaning or legal nuance. The use of English terms 'homicide' and 'murder' is appropriate and reflects common practice in Filipino legal language, where certain legal terms are retained in English to preserve their specific legal meanings. There are no critical errors, and the translation maintains the integrity of the original question.",
+      "evaluation_method": "gpt-4o_judge"
+    },
+    {
+      "score": 1.0,
+      "passed": true,
+      "query_id": "user_criminal_002",
+      "legal_category": "Criminal Law",
+      "threshold": 0.85,
+      "breakdown": {
+        "meaning_preservation": {
+          "score": 1.0,
+          "justification": "The translation accurately preserves the meaning of the source text. The question about what constitutes self-defense in criminal cases is clearly conveyed without any additions, omissions, or distortions."
+        },
+        "legal_terminology": {
+          "score": 1.0,
+          "justification": "The translation correctly uses the term 'self-defense' and 'criminal cases,' which are appropriate in the context of criminal law. The use of English terms is acceptable in Filipino legal contexts, especially for terms that are commonly used in English.",
+          "incorrect_terms": []
+        },
+        "legal_consequences": {
+          "score": 1.0,
+          "justification": "There are no modal verbs in the source text that could affect legal consequences. The translation maintains the inquiry nature of the original text without implying any legal obligations or recommendations.",
+          "consequence_errors": []
+        },
+        "language_fidelity": {
+          "score": 1.0,
+          "justification": "The translation is grammatically correct and uses appropriate code-switching, which is common in Filipino legal contexts. The tone remains formal and suitable for a legal inquiry."
+        }
+      },
+      "critical_errors": [],
+      "reasoning": "The translation is a direct match to the reference translation, which is of professional standard. It accurately conveys the legal inquiry about self-defense in criminal cases without any loss of meaning or legal nuance. The use of English terms like 'self-defense' and 'criminal cases' is appropriate and reflects common practice in Filipino legal discourse, where certain legal terms are often retained in English. There are no critical errors that could lead to legal misunderstandings, and the translation maintains the formal tone required for legal texts.",
+      "evaluation_method": "gpt-4o_judge"
+    },
+    {
+      "score": 1.0,
+      "passed": true,
+      "query_id": "user_labor_001",
+      "legal_category": "Labor Law",
+      "threshold": 0.85,
+      "breakdown": {
+        "meaning_preservation": {
+          "score": 1.0,
+          "justification": "The translation preserves the exact legal meaning of the source text. There are no additions, omissions, or distortions, and the core legal message is intact."
+        },
+        "legal_terminology": {
+          "score": 1.0,
+          "justification": "The translation uses the same English legal terms as the source text, which is appropriate given the context. The term 'grounds' is retained in English, which is common in Filipino legal language, and 'termination of employment' is also accurately retained.",
+          "incorrect_terms": []
+        },
+        "legal_consequences": {
+          "score": 1.0,
+          "justification": "The translation does not involve modal verbs or distinctions between obligations and recommendations, so there are no errors in this aspect. The question format is preserved accurately.",
+          "consequence_errors": []
+        },
+        "language_fidelity": {
+          "score": 1.0,
+          "justification": "The translation is natural and grammatically correct in Filipino/Taglish. The use of English terms is appropriate for the legal context, and the tone is consistent with legal inquiry."
+        }
+      },
+      "critical_errors": [],
+      "reasoning": "The translation accurately reflects the source text in terms of meaning, legal terminology, and legal consequences. The use of English terms within the Filipino sentence is appropriate and common in legal contexts, especially for terms that are often used in English in Filipino legal discourse. There are no critical errors that could cause legal misunderstanding. The translation maintains the integrity of the original question, ensuring that the legal inquiry is clear and precise.",
+      "evaluation_method": "gpt-4o_judge"
+    },
+    {
+      "score": 1.0,
+      "passed": true,
+      "query_id": "user_labor_002",
+      "legal_category": "Labor Law",
+      "threshold": 0.85,
+      "breakdown": {
+        "meaning_preservation": {
+          "score": 1.0,
+          "justification": "The translation preserves the exact legal meaning of the source text. There are no additions, omissions, or distortions, and the core legal message is intact."
+        },
+        "legal_terminology": {
+          "score": 1.0,
+          "justification": "The translation correctly uses the term 'security of tenure' as it is a recognized legal concept in both English and Filipino labor law contexts. The translation does not require additional Filipino legal terms as the phrase is commonly used in its English form.",
+          "incorrect_terms": []
+        },
+        "legal_consequences": {
+          "score": 1.0,
+          "justification": "The translation does not involve modal verbs or any legal obligations vs recommendations, rights vs duties distinctions. Therefore, there are no errors in legal consequence accuracy.",
+          "consequence_errors": []
+        },
+        "language_fidelity": {
+          "score": 1.0,
+          "justification": "The translation is natural and grammatically correct in Filipino. The use of English terms like 'security of tenure' and 'Philippine labor law' is appropriate and common in legal contexts, maintaining the appropriate legal tone."
+        }
+      },
+      "critical_errors": [],
+      "reasoning": "The translation accurately reflects the source text without any loss of meaning or legal nuance. The use of English terms within the Filipino sentence is standard practice in legal contexts, especially for terms that are widely recognized and used in their English form. There are no critical errors that could cause legal misunderstanding, and the translation meets professional standards for legal translation in this context.",
+      "evaluation_method": "gpt-4o_judge"
+    },
+    {
+      "score": 1.0,
+      "passed": true,
+      "query_id": "user_consumer_001",
+      "legal_category": "Consumer Law",
+      "threshold": 0.85,
+      "breakdown": {
+        "meaning_preservation": {
+          "score": 1.0,
+          "justification": "The translation preserves the exact legal meaning of the source text. There are no additions, omissions, or distortions, and the core legal message is intact."
+        },
+        "legal_terminology": {
+          "score": 1.0,
+          "justification": "The translation correctly uses the term 'basic rights' and 'consumers,' which are appropriate in the context of consumer law. The terms are consistent with the reference translation.",
+          "incorrect_terms": []
+        },
+        "legal_consequences": {
+          "score": 1.0,
+          "justification": "The translation does not involve modal verbs or legal obligations that could alter legal consequences. The rights and duties are clearly stated without ambiguity.",
+          "consequence_errors": []
+        },
+        "language_fidelity": {
+          "score": 1.0,
+          "justification": "The translation uses natural and grammatically correct Filipino/Taglish. The code-switching is appropriate for the legal context, and it maintains the appropriate legal tone."
+        }
+      },
+      "critical_errors": [],
+      "reasoning": "The translation is a direct match to the reference translation, which is of professional standard. It accurately conveys the legal meaning, uses correct legal terminology, and maintains the intended legal consequences without introducing any errors. The language is appropriate for the legal context, and there are no critical errors that could lead to legal misunderstandings. The translation effectively communicates the basic rights of consumers in the Philippines, aligning perfectly with the source text.",
+      "evaluation_method": "gpt-4o_judge"
+    },
+    {
+      "score": 0.8125,
+      "passed": false,
+      "query_id": "user_consumer_002",
+      "legal_category": "Consumer Law",
+      "threshold": 0.85,
+      "breakdown": {
+        "meaning_preservation": {
+          "score": 1.0,
+          "justification": "The translation accurately preserves the meaning of the source text. There are no additions, omissions, or distortions, and the core legal message remains intact."
+        },
+        "legal_terminology": {
+          "score": 0.5,
+          "justification": "The translation uses 'defective product' instead of translating 'product' to 'bilihin'. While 'defective product' is commonly understood in Filipino, it does not fully utilize the available Filipino legal terminology.",
+          "incorrect_terms": [
+            "product"
+          ]
+        },
+        "legal_consequences": {
+          "score": 1.0,
+          "justification": "The translation correctly uses 'dapat', which aligns with the modal verb 'should' in the source text, preserving the legal obligation implied in the question."
+        },
+        "language_fidelity": {
+          "score": 0.75,
+          "justification": "The translation is grammatically correct and the code-switching is appropriate for the context. However, using more Filipino terms could enhance the legal tone."
+        }
+      },
+      "critical_errors": [],
+      "reasoning": "The translation effectively conveys the intended legal question without altering its meaning or legal implications. The use of 'defective product' is understandable in a bilingual context, but it misses an opportunity to fully utilize Filipino legal terminology, which could enhance clarity and adherence to local legal language standards. The translation maintains the legal obligation implied by 'should' through the use of 'dapat', ensuring that the legal consequence is accurately conveyed. While the language is natural and appropriate, a more consistent use of Filipino terms could improve the legal tone and fidelity. Overall, the translation is accurate and functional, with minor areas for improvement in terminology usage.",
+      "evaluation_method": "gpt-4o_judge"
+    },
+    {
+      "score": 1.0,
+      "passed": true,
+      "query_id": "lawyer_civil_001",
+      "legal_category": "Civil Law",
+      "threshold": 0.85,
+      "breakdown": {
+        "meaning_preservation": {
+          "score": 1.0,
+          "justification": "The translation preserves the exact legal meaning of the source text. There are no additions, omissions, or distortions, and the core legal message is intact."
+        },
+        "legal_terminology": {
+          "score": 1.0,
+          "justification": "The translation correctly uses the term 'valid contract,' which is a standard legal term in both English and Filipino legal contexts. The use of 'essential elements' is also appropriate and does not require translation into Filipino for clarity.",
+          "incorrect_terms": []
+        },
+        "legal_consequences": {
+          "score": 1.0,
+          "justification": "The translation does not involve modal verbs that could affect legal obligations or recommendations. The rights and duties are not altered in the translation.",
+          "consequence_errors": []
+        },
+        "language_fidelity": {
+          "score": 1.0,
+          "justification": "The translation is natural and grammatically correct in Filipino. The code-switching is appropriate for the legal context, maintaining the legal tone required."
+        }
+      },
+      "critical_errors": [],
+      "reasoning": "The translation is a direct match to the reference translation, which is of professional standard. It accurately conveys the legal meaning without any alterations or omissions. The legal terminology is correctly used, and the translation maintains the necessary legal tone and grammatical correctness. There are no critical errors that could lead to legal misunderstandings. The translation effectively communicates the query about the essential elements of a valid contract under Article 1490 of the Civil Code, which is crucial for legal clarity and precision.",
+      "evaluation_method": "gpt-4o_judge"
+    },
+    {
+      "score": 1.0,
+      "passed": true,
+      "query_id": "lawyer_civil_002",
+      "legal_category": "Civil Law",
+      "threshold": 0.85,
+      "breakdown": {
+        "meaning_preservation": {
+          "score": 1.0,
+          "justification": "The translation preserves the exact legal meaning of the source text. There are no additions, omissions, or distortions, and the core legal message is intact."
+        },
+        "legal_terminology": {
+          "score": 1.0,
+          "justification": "The legal terms are translated correctly. The term 'requisites' is appropriately used in both languages, and the reference to 'Article 1191 of the Civil Code' is accurately maintained.",
+          "incorrect_terms": []
+        },
+        "legal_consequences": {
+          "score": 1.0,
+          "justification": "The translation accurately reflects the legal consequences. There are no modal verbs in the source text that could alter obligations or recommendations, and the translation maintains the distinction between rights and duties as intended.",
+          "consequence_errors": []
+        },
+        "language_fidelity": {
+          "score": 1.0,
+          "justification": "The Filipino translation is natural and grammatically correct. The use of 'Diskusyunan' and 'sa ilalim ng' is appropriate for the legal context, and the tone is consistent with legal discourse."
+        }
+      },
+      "critical_errors": [],
+      "reasoning": "The translation is a perfect match to the source text, both in terms of meaning and legal terminology. It accurately conveys the legal requisites for rescission under Article 1191 of the Civil Code without any errors or omissions. The language used is appropriate for a legal context, and there are no critical errors that could lead to legal misunderstandings. The translation maintains the integrity of the original legal message, ensuring that the legal consequences and obligations are clearly and accurately communicated.",
+      "evaluation_method": "gpt-4o_judge"
+    },
+    {
+      "score": 1.0,
+      "passed": true,
+      "query_id": "lawyer_family_001",
+      "legal_category": "Family Law",
+      "threshold": 0.85,
+      "breakdown": {
+        "meaning_preservation": {
+          "score": 1.0,
+          "justification": "The translation preserves the exact legal meaning of the source text. There are no additions, omissions, or distortions, and the core legal message is intact."
+        },
+        "legal_terminology": {
+          "score": 1.0,
+          "justification": "The translation correctly uses the term 'psychological incapacity' as it is a specific legal term that does not have a direct Filipino equivalent. The use of 'guidelines' is also appropriate in this context.",
+          "incorrect_terms": []
+        },
+        "legal_consequences": {
+          "score": 1.0,
+          "justification": "The translation accurately reflects the legal obligations and guidelines as stated in the source text. There are no modal verbs in the source text that could alter the legal consequences, so no errors are present.",
+          "consequence_errors": []
+        },
+        "language_fidelity": {
+          "score": 1.0,
+          "justification": "The translation is natural and grammatically correct in Filipino/Taglish. The code-switching is appropriate for the legal context, and the tone is consistent with legal documentation."
+        }
+      },
+      "critical_errors": [],
+      "reasoning": "The translation is a precise and accurate reflection of the source text. It maintains the legal meaning, uses correct legal terminology, and preserves the legal consequences as intended. The language used is appropriate for a legal context, with correct grammar and natural flow. There are no critical errors that could lead to legal misunderstandings. The translation meets professional standards for legal translation in the context of Family Law.",
+      "evaluation_method": "gpt-4o_judge"
+    },
+    {
+      "score": 1.0,
+      "passed": true,
+      "query_id": "lawyer_family_002",
+      "legal_category": "Family Law",
+      "threshold": 0.85,
+      "breakdown": {
+        "meaning_preservation": {
+          "score": 1.0,
+          "justification": "The translation preserves the exact legal meaning of the source text. There are no additions, omissions, or distortions, and the core legal message is intact."
+        },
+        "legal_terminology": {
+          "score": 1.0,
+          "justification": "The legal terms are translated correctly. The term 'legal separation' is appropriately retained in English, which is common in Filipino legal texts. No incorrect terms are present.",
+          "incorrect_terms": []
+        },
+        "legal_consequences": {
+          "score": 1.0,
+          "justification": "The translation accurately reflects the legal consequences. There are no modal verbs in the source text that could alter obligations or recommendations, so no errors are present.",
+          "consequence_errors": []
+        },
+        "language_fidelity": {
+          "score": 1.0,
+          "justification": "The Filipino/Taglish used is natural and grammatically correct. The code-switching is appropriate for the legal context, and the translation maintains an appropriate legal tone."
+        }
+      },
+      "critical_errors": [],
+      "reasoning": "The translation is a perfect match to the reference translation, which is of professional standard. It accurately conveys the legal meaning, uses correct legal terminology, maintains the intended legal consequences, and is linguistically appropriate. There are no critical errors that could cause legal misunderstanding. The translation is suitable for legal purposes where accuracy is paramount.",
+      "evaluation_method": "gpt-4o_judge"
+    },
+    {
+      "score": 1.0,
+      "passed": true,
+      "query_id": "lawyer_criminal_001",
+      "legal_category": "Criminal Law",
+      "threshold": 0.85,
+      "breakdown": {
+        "meaning_preservation": {
+          "score": 1.0,
+          "justification": "The translation accurately preserves the meaning of the source text. There are no additions, omissions, or distortions, and the core legal message is intact."
+        },
+        "legal_terminology": {
+          "score": 1.0,
+          "justification": "The legal terms used in the translation are accurate. The terms 'homicide' and 'murder' are correctly retained in English, which is appropriate given their specific legal meanings.",
+          "incorrect_terms": []
+        },
+        "legal_consequences": {
+          "score": 1.0,
+          "justification": "The translation does not involve modal verbs or legal obligations that could alter the legal consequences. The question format does not require such distinctions.",
+          "consequence_errors": []
+        },
+        "language_fidelity": {
+          "score": 1.0,
+          "justification": "The translation uses natural and grammatically correct Filipino/Taglish. The code-switching is appropriate for the legal context, and the tone is suitably formal."
+        }
+      },
+      "critical_errors": [],
+      "reasoning": "The translation is a direct and accurate representation of the source text. It maintains the legal meaning and terminology without introducing any errors or ambiguities. The use of English terms for 'homicide' and 'murder' is appropriate, as these terms have specific legal definitions that are best retained in their original form to avoid misinterpretation. The translation is grammatically correct and maintains the formal tone required for legal documents. There are no critical errors that could lead to legal misunderstandings.",
+      "evaluation_method": "gpt-4o_judge"
+    },
+    {
+      "score": 1.0,
+      "passed": true,
+      "query_id": "lawyer_criminal_002",
+      "legal_category": "Criminal Law",
+      "threshold": 0.85,
+      "breakdown": {
+        "meaning_preservation": {
+          "score": 1.0,
+          "justification": "The translation preserves the exact legal meaning of the source text. There are no additions, omissions, or distortions, and the core legal message is intact."
+        },
+        "legal_terminology": {
+          "score": 1.0,
+          "justification": "The legal terms are correctly translated. The term 'conspiracy' is appropriately retained in English, which is common in Filipino legal texts. No incorrect terms are present.",
+          "incorrect_terms": []
+        },
+        "legal_consequences": {
+          "score": 1.0,
+          "justification": "There are no modal verbs in the text that could affect legal consequences. The translation maintains the distinction between legal obligations and recommendations, as well as rights and duties.",
+          "consequence_errors": []
+        },
+        "language_fidelity": {
+          "score": 1.0,
+          "justification": "The Filipino/Taglish used is natural and grammatically correct. The code-switching is appropriate for the legal context, and the translation maintains an appropriate legal tone."
+        }
+      },
+      "critical_errors": [],
+      "reasoning": "The translation is a direct and accurate rendering of the source text. It effectively maintains the legal meaning, uses correct legal terminology, and preserves the legal consequences as intended in the original. The language used is appropriate for a legal document, with correct grammar and suitable code-switching. There are no critical errors that could lead to legal misunderstandings. The translation meets professional standards for legal accuracy and clarity.",
+      "evaluation_method": "gpt-4o_judge"
+    },
+    {
+      "score": 1.0,
+      "passed": true,
+      "query_id": "lawyer_labor_001",
+      "legal_category": "Labor Law",
+      "threshold": 0.85,
+      "breakdown": {
+        "meaning_preservation": {
+          "score": 1.0,
+          "justification": "The translation accurately preserves the legal meaning of the source text. There are no additions, omissions, or distortions, and the core legal message is intact."
+        },
+        "legal_terminology": {
+          "score": 1.0,
+          "justification": "The translation correctly uses legal terms. The terms 'grounds,' 'termination of employment,' 'Article 297,' and 'Agabon v. NLRC jurisprudence' are appropriately retained in English, which is standard practice in Filipino legal texts.",
+          "incorrect_terms": []
+        },
+        "legal_consequences": {
+          "score": 1.0,
+          "justification": "The translation maintains the legal obligations and rights as expressed in the source text. There are no modal verbs in the source text that could alter legal consequences, so no errors are present.",
+          "consequence_errors": []
+        },
+        "language_fidelity": {
+          "score": 1.0,
+          "justification": "The translation is grammatically correct and uses appropriate code-switching, which is common in Filipino legal contexts. The tone remains formal and suitable for legal discourse."
+        }
+      },
+      "critical_errors": [],
+      "reasoning": "The translation is a direct match to the reference translation, which is of professional standard. It accurately conveys the legal meaning without any loss or distortion. The use of English terms for specific legal concepts is appropriate and reflects common practice in Filipino legal documents. There are no issues with legal terminology, consequences, or language fidelity. The translation is precise and maintains the integrity of the original legal text, making it suitable for legal purposes where accuracy is paramount.",
+      "evaluation_method": "gpt-4o_judge"
+    },
+    {
+      "score": 1.0,
+      "passed": true,
+      "query_id": "lawyer_labor_002",
+      "legal_category": "Labor Law",
+      "threshold": 0.85,
+      "breakdown": {
+        "meaning_preservation": {
+          "score": 1.0,
+          "justification": "The translation accurately preserves the meaning of the source text. There are no additions, omissions, or distortions, and the core legal message is intact."
+        },
+        "legal_terminology": {
+          "score": 1.0,
+          "justification": "The translation correctly uses the term 'security of tenure' as it is a recognized legal term in both English and Filipino legal contexts. No Filipino equivalents are necessary for this specific term, and the rest of the sentence does not require additional legal terminology.",
+          "incorrect_terms": []
+        },
+        "legal_consequences": {
+          "score": 1.0,
+          "justification": "The translation does not involve modal verbs or distinctions between obligations and recommendations. The legal consequence of explaining 'security of tenure' is preserved without alteration.",
+          "consequence_errors": []
+        },
+        "language_fidelity": {
+          "score": 1.0,
+          "justification": "The translation is grammatically correct and uses appropriate language for a legal context. The use of English terms like 'security of tenure' and 'jurisprudence' is acceptable and common in Filipino legal discourse."
+        }
+      },
+      "critical_errors": [],
+      "reasoning": "The translation is a direct and accurate rendering of the source text. It maintains the legal meaning, uses appropriate legal terminology, and preserves the intended legal consequences. The language is natural and appropriate for the legal context, with no grammatical errors or inappropriate code-switching. There are no critical errors that could lead to legal misunderstandings. The translation meets professional standards for legal translation in this context.",
+      "evaluation_method": "gpt-4o_judge"
+    },
+    {
+      "score": 1.0,
+      "passed": true,
+      "query_id": "lawyer_consumer_001",
+      "legal_category": "Consumer Law",
+      "threshold": 0.85,
+      "breakdown": {
+        "meaning_preservation": {
+          "score": 1.0,
+          "justification": "The translation preserves the exact legal meaning of the source text. There are no additions, omissions, or distortions, and the core legal message is intact."
+        },
+        "legal_terminology": {
+          "score": 1.0,
+          "justification": "The translation correctly uses the term 'consumers,' which is appropriate in this context. The translation does not require the use of other specific legal terms from the provided list, as the sentence is a general inquiry about consumer rights.",
+          "incorrect_terms": []
+        },
+        "legal_consequences": {
+          "score": 1.0,
+          "justification": "The translation does not involve modal verbs or specific legal obligations, recommendations, rights, or duties that could be misinterpreted. It is a straightforward inquiry about consumer rights."
+        },
+        "language_fidelity": {
+          "score": 1.0,
+          "justification": "The translation is natural and grammatically correct in Filipino/Taglish. The use of 'consumers' is appropriate and maintains the legal tone required for the context."
+        }
+      },
+      "critical_errors": [],
+      "reasoning": "The translation accurately reflects the source text without any loss of meaning or legal nuance. The use of 'consumers' is consistent with the legal context and does not require translation into Filipino, as it is commonly used in legal discourse in the Philippines. There are no modal verbs or complex legal obligations in the text that could lead to misinterpretation. The language is clear, precise, and maintains the appropriate legal tone. There are no critical errors that could cause legal misunderstanding, making the translation suitable for legal purposes.",
+      "evaluation_method": "gpt-4o_judge"
+    },
+    {
+      "score": 1.0,
+      "passed": true,
+      "query_id": "lawyer_consumer_002",
+      "legal_category": "Consumer Law",
+      "threshold": 0.85,
+      "breakdown": {
+        "meaning_preservation": {
+          "score": 1.0,
+          "justification": "The translation preserves the exact legal meaning of the source text. There are no additions, omissions, or distortions, and the core legal message is intact."
+        },
+        "legal_terminology": {
+          "score": 1.0,
+          "justification": "The translation correctly uses the term 'product liability' and 'doctrine of strict liability,' which are standard terms in both English and Filipino legal contexts. No incorrect terms are present.",
+          "incorrect_terms": []
+        },
+        "legal_consequences": {
+          "score": 1.0,
+          "justification": "The translation does not involve modal verbs or distinctions between obligations and recommendations, as it is a straightforward request for explanation. Therefore, there are no errors in legal consequence accuracy.",
+          "consequence_errors": []
+        },
+        "language_fidelity": {
+          "score": 1.0,
+          "justification": "The translation is natural and grammatically correct in Filipino. The use of English terms 'product liability' and 'doctrine of strict liability' is appropriate given their technical nature and common usage in legal contexts."
+        }
+      },
+      "critical_errors": [],
+      "reasoning": "The translation accurately reflects the source text in terms of meaning, legal terminology, and language fidelity. The use of English terms is justified due to their technical nature and common understanding in legal discourse. There are no critical errors that could lead to legal misunderstandings. The translation is precise and maintains the legal tone required for the context.",
+      "evaluation_method": "gpt-4o_judge"
+    }
+  ]
+}

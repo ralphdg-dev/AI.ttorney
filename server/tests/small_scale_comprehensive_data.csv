@@ -1,0 +1,51 @@
+Chatbot_Type,Domain,Query_ID,Question,Response_Time,Success_Status
+user,Civil Law,user_civil_001,"What are the essential elements of a valid contrac...",3.55,True
+user,Civil Law,user_civil_002,"How long is the prescriptive period for filing a c...",3.11,True
+user,Civil Law,user_civil_003,"What is the difference between ownership and posse...",2.17,True
+user,Civil Law,user_civil_004,"When can a contract be rescinded under Philippine ...",2.34,True
+user,Civil Law,user_civil_005,"What are the rights of a tenant in a lease agreeme...",2.13,True
+user,Criminal Law,user_criminal_001,"What is the difference between homicide and murder...",2.14,True
+user,Criminal Law,user_criminal_002,"What constitutes self-defense in criminal cases?...",2.27,True
+user,Criminal Law,user_criminal_003,"What is estafa and when does it occur?...",2.29,True
+user,Criminal Law,user_criminal_004,"What are the elements of libel under Philippine la...",2.23,True
+user,Criminal Law,user_criminal_005,"What is the penalty for theft under the Revised Pe...",2.10,True
+user,Family Law,user_family_001,"What are the grounds for legal separation in the P...",2.20,True
+user,Family Law,user_family_002,"How is child support calculated in the Philippines...",2.43,True
+user,Family Law,user_family_003,"What is psychological incapacity as a ground for n...",2.05,True
+user,Family Law,user_family_004,"Can grandparents file for visitation rights?...",2.34,True
+user,Family Law,user_family_005,"What are the requirements for legal adoption?...",2.26,True
+user,Labor Law,user_labor_001,"What are the grounds for termination of employment...",2.08,True
+user,Labor Law,user_labor_002,"What is security of tenure in Philippine labor law...",2.22,True
+user,Labor Law,user_labor_003,"How much is the minimum wage in the Philippines?...",2.15,True
+user,Labor Law,user_labor_004,"What are the benefits of regular employees?...",2.25,True
+user,Labor Law,user_labor_005,"What is illegal dismissal and what are the remedie...",2.37,True
+user,Consumer Law,user_consumer_001,"What are the basic rights of consumers in the Phil...",2.05,True
+user,Consumer Law,user_consumer_002,"What should I do if I bought a defective product?...",2.14,True
+user,Consumer Law,user_consumer_003,"What is false advertising and when is it illegal?...",2.12,True
+user,Consumer Law,user_consumer_004,"What warranties do consumers get when buying produ...",2.03,True
+user,Consumer Law,user_consumer_005,"How can I file a consumer complaint in the Philipp...",2.16,True
+lawyer,Civil Law,lawyer_civil_001,"Under Article 1490 of the Civil Code, what are the...",2.42,True
+lawyer,Civil Law,lawyer_civil_002,"Explain the doctrine of stare decisis in Philippin...",2.28,True
+lawyer,Civil Law,lawyer_civil_003,"Discuss the requisites for rescission under Articl...",2.29,True
+lawyer,Civil Law,lawyer_civil_004,"What are the prescriptive periods for actions invo...",2.10,True
+lawyer,Civil Law,lawyer_civil_005,"Discuss piercing the corporate veil doctrine and i...",2.36,True
+lawyer,Criminal Law,lawyer_criminal_001,"What are the elements of homicide under Article 24...",2.23,True
+lawyer,Criminal Law,lawyer_criminal_002,"Explain conspiracy under Article 8 of the Revised ...",2.21,True
+lawyer,Criminal Law,lawyer_criminal_003,"What are the qualifying circumstances in rape unde...",2.13,True
+lawyer,Criminal Law,lawyer_criminal_004,"Discuss impossible crime doctrine under Article 4(...",2.27,True
+lawyer,Criminal Law,lawyer_criminal_005,"What are the elements of estafa under Article 315 ...",2.35,True
+lawyer,Family Law,lawyer_family_001,"Under Article 36 of the Family Code, what are the ...",2.44,True
+lawyer,Family Law,lawyer_family_002,"What are the grounds for legal separation under Ar...",2.20,True
+lawyer,Family Law,lawyer_family_003,"Discuss legitime under Articles 887-904 and compul...",2.41,True
+lawyer,Family Law,lawyer_family_004,"What are the requirements for adoption under Artic...",2.20,True
+lawyer,Family Law,lawyer_family_005,"Explain parental authority under Articles 209-210 ...",2.23,True
+lawyer,Labor Law,lawyer_labor_001,"What are the grounds for termination of employment...",2.29,True
+lawyer,Labor Law,lawyer_labor_002,"Explain security of tenure under Article 294 and D...",2.22,True
+lawyer,Labor Law,lawyer_labor_003,"What are the requirements for valid suspension und...",2.28,True
+lawyer,Labor Law,lawyer_labor_004,"Discuss night shift differential under Article 86 ...",4.51,True
+lawyer,Labor Law,lawyer_labor_005,"What are the grounds for illegal dismissal and rem...",2.34,True
+lawyer,Consumer Law,lawyer_consumer_001,"What are the rights of consumers under RA 7394 and...",2.58,True
+lawyer,Consumer Law,lawyer_consumer_002,"Explain product liability under RA 7394 and the do...",2.15,True
+lawyer,Consumer Law,lawyer_consumer_003,"What are the prohibited acts under RA 7394 and dis...",2.34,True
+lawyer,Consumer Law,lawyer_consumer_004,"Discuss warranty under the Consumer Act and types ...",2.43,True
+lawyer,Consumer Law,lawyer_consumer_005,"What are the remedies available to consumers under...",2.29,True

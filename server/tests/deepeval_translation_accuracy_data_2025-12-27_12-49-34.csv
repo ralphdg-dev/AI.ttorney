@@ -1,0 +1,21 @@
+Query_ID,Legal_Category,Role,Score,Passed,Evaluation_Method
+user_civil_001,Civil Law,unknown,1.000,True,gpt-4o_judge
+user_civil_002,Civil Law,unknown,0.812,False,gpt-4o_judge
+user_family_001,Family Law,unknown,1.000,True,gpt-4o_judge
+user_family_002,Family Law,unknown,1.000,True,gpt-4o_judge
+user_criminal_001,Criminal Law,unknown,1.000,True,gpt-4o_judge
+user_criminal_002,Criminal Law,unknown,1.000,True,gpt-4o_judge
+user_labor_001,Labor Law,unknown,1.000,True,gpt-4o_judge
+user_labor_002,Labor Law,unknown,1.000,True,gpt-4o_judge
+user_consumer_001,Consumer Law,unknown,1.000,True,gpt-4o_judge
+user_consumer_002,Consumer Law,unknown,0.812,False,gpt-4o_judge
+lawyer_civil_001,Civil Law,unknown,1.000,True,gpt-4o_judge
+lawyer_civil_002,Civil Law,unknown,1.000,True,gpt-4o_judge
+lawyer_family_001,Family Law,unknown,1.000,True,gpt-4o_judge
+lawyer_family_002,Family Law,unknown,1.000,True,gpt-4o_judge
+lawyer_criminal_001,Criminal Law,unknown,1.000,True,gpt-4o_judge
+lawyer_criminal_002,Criminal Law,unknown,1.000,True,gpt-4o_judge
+lawyer_labor_001,Labor Law,unknown,1.000,True,gpt-4o_judge
+lawyer_labor_002,Labor Law,unknown,1.000,True,gpt-4o_judge
+lawyer_consumer_001,Consumer Law,unknown,1.000,True,gpt-4o_judge
+lawyer_consumer_002,Consumer Law,unknown,1.000,True,gpt-4o_judge

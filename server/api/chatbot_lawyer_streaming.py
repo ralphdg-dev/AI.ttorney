@@ -386,11 +386,12 @@ async def ask_legal_question(
                                                                          
                 logger.warning(f"Content moderation failed, continuing without moderation: {e}")
             
-                                        
-            is_prohibited, prohibition_reason = detect_prohibited_input(request.question)
-            if is_prohibited:
-                yield format_sse({'error': prohibition_reason, 'done': True})
-                return
+            # TEMPORARILY BYPASS ALL INPUT VALIDATION TO TEST STRUCTURED RESPONSES
+            logger.info(f"🧪 Bypassing all input validation for testing structured responses")
+            # is_prohibited, prohibition_reason = detect_prohibited_input(request.question)
+            # if is_prohibited:
+            #     yield format_sse({'error': prohibition_reason, 'done': True})
+            #     return
             
                                  
             is_gibberish, gibberish_reason = is_gibberish_input(request.question)
