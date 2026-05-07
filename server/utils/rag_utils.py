@@ -1,235 +1,130 @@
 import logging
-from typing import List, Dict, Tuple
-from openai import OpenAI
-
-# Import cached clients instead of creating new instances
-from services.client_cache import get_qdrant_client, get_openai_client
+from typing import Any, List, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 def retrieve_relevant_context_with_web_search(
     question: str,
-    collection_name: str,
-    embedding_model: str,
+    collection_name: Optional[str] = None,
+    embedding_model: Optional[str] = None,
     top_k: int = 5,
     min_confidence_score: float = 0.3,
-    enable_web_search: bool = True
+    enable_web_search: bool = True,
+    openai_client: Optional[Any] = None
 ) -> Tuple[str, List[Dict], Dict]:
     """
-    Enhanced context retrieval with web search fallback
+    Retrieve legal context from trusted web sources only.
     
-    Flow:
-    1. Get cached Qdrant and OpenAI clients
-    2. Query Qdrant vector database
-    3. Check confidence score
-    4. If low confidence → Trigger Google Search
-    5. Combine and return context
+    The optional OpenAI parameter is accepted for backward compatibility with
+    older route call sites, but is intentionally ignored.
     
     Args:
         question: User's question
-        collection_name: Qdrant collection to search
-        embedding_model: OpenAI embedding model
-        top_k: Number of results to retrieve
-        min_confidence_score: Minimum confidence threshold
+        collection_name: Deprecated; ignored.
+        embedding_model: Deprecated; ignored.
+        top_k: Number of web results to retrieve
+        min_confidence_score: Deprecated; ignored.
         enable_web_search: Enable Google search fallback
+        openai_client: Deprecated; ignored.
         
     Returns:
         Tuple of (context_text, sources, metadata)
     """
-    # Use cached singleton clients
-    qdrant_client = get_qdrant_client()
-    openai_client = get_openai_client()
-    
-    logger.info(f"🔍 Searching for context: {question[:100]}...")
-    
     from services.web_search_service import get_web_search_service
+
+    logger.info(f"🔍 Searching trusted web sources for context: {question[:100]}...")
     
     metadata = {
         "web_search_triggered": False,
-        "qdrant_results": 0,
         "web_results": 0,
         "max_confidence": 0.0,
-        "search_strategy": "qdrant_only"
+        "search_strategy": "web_only"
     }
-    
-                                        
-    try:
-        logger.info(f" Generating embedding for query: {question[:60]}...")
-        embedding_response = openai_client.embeddings.create(
-            model=embedding_model,
-            input=question
-        )
-        question_embedding = embedding_response.data[0].embedding
-    except Exception as e:
-        logger.error(f" Failed to generate embedding: {e}")
-        return "", [], metadata
-    
-                                          
-    try:
-        logger.info(f" Querying Qdrant collection: {collection_name}")
-        qdrant_results = qdrant_client.search(
-            collection_name=collection_name,
-            query_vector=question_embedding,
-            limit=top_k,
-            score_threshold=min_confidence_score
-        )
-        
-        metadata["qdrant_results"] = len(qdrant_results)
-        
-        if qdrant_results:
-            max_score = max(r.score for r in qdrant_results)
-            metadata["max_confidence"] = max_score
-            logger.info(f" Qdrant: Found {len(qdrant_results)} results, max score: {max_score:.3f}")
-        else:
-            logger.warning("  Qdrant: No results found")
-            
-    except Exception as e:
-        logger.error(f" Qdrant search error: {e}")
-        qdrant_results = []
-    
-                                               
-    qdrant_context_parts = []
-    qdrant_sources = []
-    
-    for i, result in enumerate(qdrant_results, 1):
-        payload = result.payload
-        doc = payload.get('text', '')
-        
-                                 
-        if not doc or len(doc.strip()) < 10:
-            continue
-        
-        source_url = payload.get('source_url', '')
-        
-                                 
-        source_info = f"[Qdrant Source {i}: {payload.get('law', 'Unknown')} - Article {payload.get('article_number', 'N/A')}]"
-        if source_url:
-            source_info += f"\n[URL: {source_url}]"
-        qdrant_context_parts.append(f"{source_info}\n{doc}\n")
-        
-                               
-        qdrant_sources.append({
-            'source': payload.get('source', 'Qdrant Database'),
-            'law': payload.get('law', 'Unknown Law'),
-            'article_number': payload.get('article_number', 'N/A'),
-            'article_title': payload.get('article_title', payload.get('article_heading', '')),
-            'text_preview': doc[:200] + "..." if len(doc) > 200 else doc,
-            'source_url': source_url,
-            'relevance_score': result.score,
-            'source_type': 'qdrant'
-        })
-    
-                                                     
+
     web_search_service = get_web_search_service()
     web_context_parts = []
     web_sources = []
+
+    if not enable_web_search:
+        logger.warning("Web search disabled for this request")
+        return "", [], metadata
+
+    if not web_search_service.is_enabled():
+        logger.warning("Web search service is not configured")
+        return "", [], metadata
     
-    if enable_web_search and web_search_service.is_enabled():
-                                                   
-        max_qdrant_score = metadata["max_confidence"]
-        num_qdrant_results = len(qdrant_sources)
-        
-        should_search_web = web_search_service.should_trigger_web_search(
-            qdrant_score=max_qdrant_score,
-            num_results=num_qdrant_results
-        )
-        
-        if should_search_web:
-            logger.info(" Triggering web search to augment context...")
-            metadata["web_search_triggered"] = True
-            metadata["search_strategy"] = "hybrid" if qdrant_sources else "web_only"
-            
-                                                                 
-            web_results = web_search_service.search_and_scrape(question)
-            metadata["web_results"] = len(web_results)
-            
-            if web_results:
-                # Filter and validate web results for quality
-                valid_results = []
-                for result in web_results:
-                    content = result.get('scraped_content', result.get('snippet', ''))
-                    url = result.get('url', '')
-                    title = result.get('title', '')
-                    
-                    # Skip if no content
-                    if not content or len(content.strip()) < 50:
-                        logger.debug(f"   ❌ Skipping result with insufficient content: {title[:50]}")
-                        continue
-                    
-                    # Skip generic homepage results (no specific article path)
-                    if url.count('/') <= 3 and not any(keyword in url.lower() for keyword in ['article', 'law', 'republic-act', 'executive-order', 'small-claims', 'rules', 'issuance']):
-                        logger.debug(f"   ❌ Skipping generic homepage: {url}")
-                        continue
-                    
-                    # Skip results with generic/vague titles
-                    generic_phrases = [
-                        'has the exclusive power to',
-                        'official website',
-                        'welcome to',
-                        'home page',
-                        'about us'
-                    ]
-                    if any(phrase in title.lower() for phrase in generic_phrases):
-                        logger.debug(f"   ❌ Skipping generic title: {title[:50]}")
-                        continue
-                    
-                    valid_results.append(result)
-                
-                # Process only valid, high-quality results
-                for i, result in enumerate(valid_results, 1):
-                    content = result.get('scraped_content', result.get('snippet', ''))
-                    
-                    context_entry = f"""[Web Source {i}: {result.get('title', 'Untitled')}]
+    logger.info("Triggering trusted web search for chatbot context")
+    metadata["web_search_triggered"] = True
+
+    result_limit = max(1, min(top_k or 5, 5))
+    web_results = web_search_service.search_and_scrape(question, result_limit)
+    metadata["web_results"] = len(web_results)
+
+    if not web_results:
+        logger.warning("Web search returned no results")
+        return "", [], metadata
+
+    valid_results = []
+    for result in web_results:
+        content = result.get('scraped_content', result.get('snippet', ''))
+        url = result.get('url', '')
+        title = result.get('title', '')
+
+        if not content or len(content.strip()) < 50:
+            logger.debug(f"Skipping web result with insufficient content: {title[:50]}")
+            continue
+
+        if url.count('/') <= 3 and not any(keyword in url.lower() for keyword in ['article', 'law', 'republic-act', 'executive-order', 'small-claims', 'rules', 'issuance']):
+            logger.debug(f"Skipping generic homepage: {url}")
+            continue
+
+        generic_phrases = [
+            'has the exclusive power to',
+            'official website',
+            'welcome to',
+            'home page',
+            'about us'
+        ]
+        if any(phrase in title.lower() for phrase in generic_phrases):
+            logger.debug(f"Skipping generic title: {title[:50]}")
+            continue
+
+        valid_results.append(result)
+
+    for i, result in enumerate(valid_results, 1):
+        content = result.get('scraped_content', result.get('snippet', ''))
+
+        context_entry = f"""[Web Source {i}: {result.get('title', 'Untitled')}]
 [URL: {result.get('url', '')}]
 {content}
 """
-                    web_context_parts.append(context_entry)
-                    
-                    web_sources.append({
-                        "source": "Web Search",
-                        "law": result.get("source", "Web"),
-                        "article_number": f"Web Result {i}",
-                        "article_title": result.get("title", ""),
-                        "text_preview": content[:200] + "..." if len(content) > 200 else content,
-                        "source_url": result.get("url", ""),
-                        "relevance_score": 0.0,
-                        "search_timestamp": result.get("timestamp", ""),
-                        "source_type": "web_scraped"
-                    })
-                
-                logger.info(f"✅ Added {len(valid_results)} high-quality web results (filtered from {len(web_results)} total)")
-            else:
-                logger.warning("  Web search returned no results")
-    
-                                                                      
-                                                                      
-    all_context_parts = web_context_parts + qdrant_context_parts
-    all_sources = web_sources + qdrant_sources
-    
-    if not all_context_parts:
+        web_context_parts.append(context_entry)
+
+        web_sources.append({
+            "source": "Web Search",
+            "law": result.get("source", "Web"),
+            "article_number": f"Web Result {i}",
+            "article_title": result.get("title", ""),
+            "text_preview": content[:200] + "..." if len(content) > 200 else content,
+            "source_url": result.get("url", ""),
+            "relevance_score": 0.0,
+            "search_timestamp": result.get("timestamp", ""),
+            "source_type": "web_scraped"
+        })
+
+    if not web_context_parts:
         logger.warning(" No context available from any source")
         return "", [], metadata
     
-                                                                     
-    if qdrant_context_parts and web_context_parts:
-        combined_context = (
-            "=== PRIMARY SOURCES: WEB SEARCH (Most Recent & Comprehensive) ===\n\n" +
-            "\n\n".join(web_context_parts) +
-            "\n\n=== SUPPLEMENTARY SOURCES: LEGAL DATABASE (Additional Context) ===\n\n" +
-            "\n\n".join(qdrant_context_parts)
-        )
-    else:
-        combined_context = "\n\n".join(all_context_parts)
+    combined_context = "\n\n".join(web_context_parts)
     
-    logger.info(
-        f"📦 Context built: {len(qdrant_sources)} Qdrant + {len(web_sources)} Web = {len(all_sources)} total sources"
-    )
+    logger.info(f"Context built from {len(web_sources)} trusted web sources")
     
-    return combined_context, all_sources, metadata
+    return combined_context, web_sources, metadata
 
 
-def get_embedding(text: str, openai_client: OpenAI, embedding_model: str) -> List[float]:
+def get_embedding(text: str, openai_client: Any, embedding_model: str) -> List[float]:
     """
     Generate embedding for text using OpenAI
     

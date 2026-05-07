@@ -3,6 +3,7 @@ from auth.models import UserSignUp, UserSignIn, OTPRequest, VerifyOTPRequest, OT
 from auth.service import AuthService, clear_auth_cache
 from services.otp_service import OTPService
 from middleware.auth import get_current_user
+from services.auth_resilient_wrapper import create_resilient_auth_service
 from pydantic import BaseModel
 from typing import Dict, Any
 import logging
@@ -16,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 auth_service = AuthService()
+# Create resilient wrapper for enterprise-grade error handling
+resilient_auth_service = create_resilient_auth_service(auth_service)
 otp_service = OTPService()
 
 # Test endpoint to verify bypassed token recognition
@@ -46,8 +49,11 @@ def rate_limit_auth(limit: str):
 @router.post("/signup", response_model=Dict[str, Any])
 @rate_limit_auth("10/minute")  # Increased for mobile network variability
 async def sign_up(request: Request, user_data: UserSignUp):
-    """Register a new user in both auth.users and public.users"""
-    result = await auth_service.sign_up(user_data)
+    """Register a new user in both auth.users and public.users with enterprise-grade resilience"""
+    logger.info(f"🚀 Processing signup request for: {user_data.email}")
+    
+    # Use resilient auth service with automatic fallback
+    result = await resilient_auth_service.sign_up_resilient(user_data)
     
     if not result["success"]:
         raise HTTPException(
@@ -58,8 +64,9 @@ async def sign_up(request: Request, user_data: UserSignUp):
     return {
         "message": "User registered successfully",
         "user": result["user"],
-        "session": result["session"],
-        "profile": result["profile"]
+        "session": result.get("session"),  # Handle missing session gracefully
+        "profile": result.get("profile", result.get("profile_created", False)),
+        "note": result.get("note", "User created successfully")
     }
 
 @router.post("/signin")

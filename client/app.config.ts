@@ -5,13 +5,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ...config,
     name: 'Ai.ttorney',
     slug: 'aittorney',
-    version: '1.0.0',
+    version: '1.0.1',
     orientation: 'portrait',
     icon: './assets/images/icon.png',
     scheme: 'ai-ttorney',
     userInterfaceStyle: 'automatic',
-    newArchEnabled: true,
+    newArchEnabled: false, // Disabled for Expo Go compatibility
     owner: 'j24a',
+    // platforms: ['android'], // Removed for Expo Go compatibility
     android: {
       package: 'com.j24a.aittorney',
       adaptiveIcon: {
@@ -38,11 +39,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           category: ['BROWSABLE', 'DEFAULT'],
         },
       ],
-    },
-    web: {
-      bundler: 'metro',
-      output: 'static',
-      favicon: './assets/images/favicon.png',
     },
     plugins: [
       'expo-router',

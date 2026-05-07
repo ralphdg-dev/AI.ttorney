@@ -260,13 +260,16 @@ class WebSearchService:
         """Check if web search is enabled"""
         return self.enabled
     
-    def should_trigger_web_search(self, qdrant_score: float, num_results: int) -> bool:
+    def should_trigger_web_search(self, prior_score: float = 0.0, num_results: int = 0) -> bool:
         """
-        Determine if web search should be triggered based on Qdrant results
+        Determine if web search should be triggered based on prior local results.
+
+        This is retained for backward compatibility. The chatbot now uses trusted
+        web search directly, so callers can simply search without checking this.
         
         Args:
-            qdrant_score: Highest relevance score from Qdrant
-            num_results: Number of results returned by Qdrant
+            prior_score: Deprecated local confidence score.
+            num_results: Deprecated local result count.
         
         Returns:
             bool: True if web search should be triggered
@@ -275,11 +278,11 @@ class WebSearchService:
                                        
                                                
         if num_results == 0:
-            logger.info(" Triggering web search: No Qdrant results")
+            logger.info(" Triggering web search: No prior local results")
             return True
         
-        if qdrant_score < WEB_SEARCH_CONFIDENCE_THRESHOLD:
-            logger.info(f" Triggering web search: Low confidence score ({qdrant_score:.3f} < {WEB_SEARCH_CONFIDENCE_THRESHOLD})")
+        if prior_score < WEB_SEARCH_CONFIDENCE_THRESHOLD:
+            logger.info(f" Triggering web search: Low confidence score ({prior_score:.3f} < {WEB_SEARCH_CONFIDENCE_THRESHOLD})")
             return True
         
         return False

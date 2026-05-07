@@ -20,7 +20,6 @@ limits==3.13.0
 
 # AI & ML Core (Latest)
 openai==1.58.1
-qdrant-client==1.12.1
 numpy==2.2.1
 opencv-python-headless==4.10.0.84
 Pillow==11.0.0

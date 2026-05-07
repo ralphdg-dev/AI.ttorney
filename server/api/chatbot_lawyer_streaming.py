@@ -12,7 +12,7 @@ from datetime import datetime
 
 from utils.sse_formatter import format_sse
 
-# Import everything from the old file including pre-initialized clients
+# Import shared chatbot helpers
 from api.chatbot_lawyer import (
     ChatRequest,
     get_optional_current_user,
@@ -21,7 +21,6 @@ from api.chatbot_lawyer import (
     CHAT_MODEL,
     TOP_K_RESULTS,
     openai_client,
-    qdrant_client,
     guardrails_instance,
     LAWYER_SYSTEM_PROMPT_ENGLISH,
     LAWYER_SYSTEM_PROMPT_TAGALOG,
@@ -513,10 +512,7 @@ async def ask_legal_question(
                 return
             
                                                       
-            from api.chatbot_lawyer import (
-                qdrant_client, openai_client, COLLECTION_NAME, 
-                EMBEDDING_MODEL, MIN_CONFIDENCE_SCORE
-            )
+            from api.chatbot_lawyer import openai_client, COLLECTION_NAME, EMBEDDING_MODEL, MIN_CONFIDENCE_SCORE
             
             context, sources, rag_metadata = retrieve_relevant_context_with_web_search(
                 question=request.question,
@@ -534,10 +530,10 @@ async def ask_legal_question(
                                                  
             if not sources or len(sources) == 0:
                 no_context_message = (
-                    "I apologize, but I don't have enough information in my database to answer this question accurately. "
+                    "I apologize, but I could not find enough reliable web sources to answer this question accurately. "
                     "I recommend consulting with a licensed Philippine lawyer for assistance."
                     if language == "english" else
-                    "Paumanhin po, pero wala akong sapat na impormasyon sa aking database para masagot ito nang tama. "
+                    "Paumanhin po, pero wala akong sapat na nahanap na mapagkakatiwalaang web sources para masagot ito nang tama. "
                     "Inirerekomenda ko pong kumonsulta sa lisensyadong abogado para sa tulong."
                 )
                 yield format_sse({'content': no_context_message, 'done': True})
@@ -580,7 +576,7 @@ Proceed with the analysis as mandated."""
                 user_message = f"""THE LEGAL QUERY IS AS FOLLOWS:
 {request.question}
 
-Note: No specific context was retrieved from the vector database. Proceed with the analysis based on general knowledge of controlling Philippine law, adhering strictly to the mandated 5-part format."""
+Note: No specific context was retrieved from trusted web sources. Proceed with the analysis based on general knowledge of controlling Philippine law, adhering strictly to the mandated 5-part format."""
             
             messages.append({"role": "user", "content": user_message})
             

@@ -6,8 +6,7 @@ const testServerConnection = async () => {
   try {
     const healthUrl = process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.replace('/api', '/health') : 'http://localhost:5001/health';
     const response = await fetch(healthUrl);
-    const data = await response.json();
-    return true;
+    return response.ok;
   } catch (error) {
     console.error("Server connection test failed:", error);
     return false;
@@ -71,8 +70,6 @@ class ForumManagementService {
       if (!response.ok) {
         throw new Error(data.error || "Failed to fetch forum posts");
       }
-
-      return data;
 
       // Validate that all returned posts have valid IDs
       if (data.data) {
@@ -151,7 +148,6 @@ class ForumManagementService {
         data = await response.json();
         } catch (jsonError) {
         console.error("Failed to parse JSON response:", jsonError);
-        const textResponse = await response.text();
         throw new Error(`Invalid JSON response: ${jsonError.message}`);
       }
 
@@ -533,4 +529,5 @@ class ForumManagementService {
   }
 }
 
-export default new ForumManagementService();
+const forumManagementService = new ForumManagementService();
+export default forumManagementService;

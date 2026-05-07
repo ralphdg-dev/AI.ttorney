@@ -102,7 +102,7 @@ async def get_all_glossary_terms():
             response = await client.get(
                 base_url,
                 params=params,
-                headers=supabase_service._get_headers()
+                headers=supabase_service._get_headers(use_service_key=True)
             )
             
             if response.status_code == 200:

@@ -37,57 +37,6 @@ import NotFound from './pages/NotFound';
 
 
 
-const LegalArticles = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">
-      Manage Legal Articles
-    </h1>
-    <p className="text-gray-600">Legal articles management coming soon...</p>
-  </div>
-);
-
-
-const OpenTickets = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Open Tickets</h1>
-    <p className="text-gray-600">Open tickets management coming soon...</p>
-  </div>
-);
-
-const AssignedTickets = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Assigned Tickets</h1>
-    <p className="text-gray-600">Assigned tickets management coming soon...</p>
-  </div>
-);
-
-const TicketHistory = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Ticket History</h1>
-    <p className="text-gray-600">Ticket history coming soon...</p>
-  </div>
-);
-
-const UserAnalytics = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">User Analytics</h1>
-    <p className="text-gray-600">User analytics coming soon...</p>
-  </div>
-);
-
-const ContentAnalytics = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Content Analytics</h1>
-    <p className="text-gray-600">Content analytics coming soon...</p>
-  </div>
-);
-
-const ForumAnalytics = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Forum Analytics</h1>
-    <p className="text-gray-600">Forum analytics coming soon...</p>
-  </div>
-);
 
 const App = () => {
   return (

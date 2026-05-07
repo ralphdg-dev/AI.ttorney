@@ -77,6 +77,11 @@ export class NetworkConfig {
         console.log(`🔍 DEBUG: Extracted IP from debuggerHost: ${ip}`);
         
         if (this.isValidIP(ip)) {
+          if (Platform.OS === 'android' && (ip === 'localhost' || ip === '127.0.0.1' || ip === '::1')) {
+            console.log('🤖 Android emulator detected, using host loopback 10.0.2.2');
+            return '10.0.2.2';
+          }
+
           // Check for CLAT46 translated addresses that React Native can't connect to
           if (ip === '192.0.0.2') {
             console.log(`⚠️ Detected CLAT46 address ${ip}, using platform-specific fallback`);
@@ -121,9 +126,9 @@ export class NetworkConfig {
     // Try multiple common network IPs for Android emulator/device access
     // These are ordered by likelihood of success
     const fallbackIPs = [
+      '10.0.2.2',     // Android Studio emulator host IP
       '172.20.10.2',  // Common WiFi network IP
       '192.168.1.100', // Common home network IP
-      '10.0.2.2',     // Android emulator host IP
       '192.168.0.100', // Alternative home network IP
       'localhost'     // Final fallback
     ];

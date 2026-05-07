@@ -10,14 +10,13 @@ from utils.sse_formatter import format_sse
 # Import timeout configuration
 from config.timeout_config import get_timeout
 
-# Import everything from the old file including pre-initialized clients
+# Import shared chatbot helpers
 from api.chatbot_user import (
     ChatRequest,
     get_optional_current_user,
     get_chat_history_service,
     ChatHistoryService,
     openai_client,
-    qdrant_client,
     is_simple_greeting,
     is_conversation_context_question,
     is_app_information_question,
@@ -389,7 +388,7 @@ async def ask_legal_question(
                     app_response = (
                         "Ako si **Ai.ttorney** - ang inyong AI legal assistant para sa Philippine law! 🏛⚖\n\n"
                         "**Ano ang Ai.ttorney?**\n"
-                        "Ako ay isang advanced na AI chatbot na specially designed para sa mga Pilipinong nangangailangan ng legal na tulong at impormasyon. Hindi ako abogado, pero may access ako sa comprehensive database ng Philippine laws.\n\n"
+                        "Ako ay isang advanced na AI chatbot na specially designed para sa mga Pilipinong nangangailangan ng legal na tulong at impormasyon. Hindi ako abogado, pero gumagamit ako ng trusted Philippine legal web sources.\n\n"
                         "**Mga Features ko:**\n"
                         "• **📚 Legal Knowledge Base** - May access ako sa Family Code, Labor Code, Revised Penal Code, at iba pang Philippine laws\n"
                         "• **🗣 Bilingual Support** - Makakausap ninyo ako sa English, Tagalog, o Taglish\n"
@@ -408,7 +407,7 @@ async def ask_legal_question(
                     app_response = (
                         "I'm **Ai.ttorney** - your AI legal assistant for Philippine law! 🏛⚖\n\n"
                         "**What is Ai.ttorney?**\n"
-                        "I'm an advanced AI chatbot specifically designed to help Filipinos who need legal information and guidance. While I'm not a lawyer, I have access to a comprehensive database of Philippine laws.\n\n"
+                        "I'm an advanced AI chatbot specifically designed to help Filipinos who need legal information and guidance. While I'm not a lawyer, I use trusted Philippine legal web sources.\n\n"
                         "**My Features:**\n"
                         "• **📚 Legal Knowledge Base** - I have access to the Family Code, Labor Code, Revised Penal Code, and other Philippine laws\n"
                         "• **🗣 Bilingual Support** - You can talk to me in English, Tagalog, or Taglish\n"
@@ -774,10 +773,7 @@ async def ask_legal_question(
                 search_query = normalize_emotional_query(request.question, language)
             
                                           
-            from api.chatbot_user import (
-                qdrant_client, COLLECTION_NAME, 
-                EMBEDDING_MODEL, MIN_CONFIDENCE_SCORE
-            )
+            from api.chatbot_user import COLLECTION_NAME, EMBEDDING_MODEL, MIN_CONFIDENCE_SCORE
             
             context, sources, rag_metadata = retrieve_relevant_context_with_web_search(
                 question=search_query,
@@ -793,7 +789,7 @@ async def ask_legal_question(
                 logger.info(f" Web search triggered (user streaming): {rag_metadata['search_strategy']}")
             
             if not sources:
-                no_context = "I apologize, but I don't have enough information in my database." if language == "english" else "Paumanhin po, pero wala akong sapat na impormasyon."
+                no_context = "I apologize, but I could not find enough reliable web sources." if language == "english" else "Paumanhin po, pero wala akong sapat na nahanap na mapagkakatiwalaang web sources."
                 yield format_sse({'content': no_context, 'done': True})
                 return
             

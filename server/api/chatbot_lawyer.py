@@ -11,7 +11,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import logging
 
 # Import cached clients instead of creating new instances
-from services.client_cache import get_qdrant_client, get_openai_client
+from services.client_cache import get_openai_client
 
 from config.timeout_config import get_timeout, create_httpx_timeout, get_timeout_bundle
 
@@ -70,19 +70,13 @@ async def get_optional_current_user(credentials: Optional[HTTPAuthorizationCrede
         return None
 
                                      
-COLLECTION_NAME = "legal_knowledge"
-QDRANT_URL = os.getenv("QDRANT_URL")
-QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-                                         
-if not QDRANT_URL or not QDRANT_API_KEY:
-    logger.error("QDRANT_URL and QDRANT_API_KEY must be set")
-    raise ValueError("Missing required Qdrant configuration")
 if not OPENAI_API_KEY:
     logger.error("OPENAI_API_KEY must be set")
     raise ValueError("Missing required OpenAI API key")
 
+COLLECTION_NAME = "trusted_web_sources"
 EMBEDDING_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-4o-mini"                                           
 TOP_K_RESULTS = 5                                         
@@ -215,18 +209,6 @@ HISTORICAL_KEYWORDS = [
     'revolution', 'rebolusyon', 'independence', 'kalayaan'
 ]
 
-                                              
-try:
-    # Use cached singleton client instead of creating new instance
-    qdrant_client = get_qdrant_client()
-                       
-    qdrant_client.get_collections()
-    logger.info(" Qdrant client initialized successfully")
-except Exception as e:
-    logger.error(f"Failed to initialize Qdrant client: {e}")
-    raise RuntimeError(f"Qdrant initialization failed: {e}")
-
-                                                                    
 if not OPENAI_API_KEY:
     logger.error("OPENAI_API_KEY is not set!")
 
@@ -681,7 +663,7 @@ Remember: Include legal terms that would appear in Philippine legal codes to imp
         response = openai_client.chat.completions.create(
             model=CHAT_MODEL,
             messages=[
-                {"role": "system", "content": "You are a legal query normalizer. Add legal terms to improve database search. Respond with ONLY the normalized question."},
+                {"role": "system", "content": "You are a legal query normalizer. Add legal terms to improve trusted web search. Respond with ONLY the normalized question."},
                 {"role": "user", "content": normalization_prompt}
             ],
             max_tokens=150,
@@ -1059,76 +1041,14 @@ def get_embedding(text: str) -> List[float]:
 
 def retrieve_relevant_context(question: str, top_k: int = TOP_K_RESULTS) -> tuple[str, List[Dict]]:
     """
-    Retrieve relevant legal context from Qdrant Cloud with source URLs
+    Retrieve relevant legal context from trusted web sources.
     Returns: (context_text, source_metadata)
     """
-                                
-    question_embedding = get_embedding(question)
-    
-                                                      
-    results = qdrant_client.search(
-        collection_name=COLLECTION_NAME,
-        query_vector=question_embedding,
-        limit=top_k,
-        score_threshold=MIN_CONFIDENCE_SCORE                                
+    context_text, sources, _ = retrieve_relevant_context_with_web_search(
+        question=question,
+        top_k=top_k,
+        enable_web_search=True
     )
-    
-                                  
-    logger.info(f"Search query: '{question[:50]}...' - Found {len(results)} results")
-    
-    if len(results) == 0:
-        logger.warning(f"No results found for query: {question[:100]}")
-        return "", []
-    
-                                         
-    if results:
-        logger.info(f"Top result score: {results[0].score:.4f}")
-    
-                                    
-    context_parts = []
-    sources = []
-    
-    for i, result in enumerate(results, 1):
-        payload = result.payload
-        doc = payload.get('text', '')
-        
-                                                  
-        if not doc or len(doc.strip()) < 10:
-            logger.debug(f"Skipping result {i}: No text content")
-            continue
-        
-                                                            
-        if result.score < MIN_CONFIDENCE_SCORE:
-            logger.debug(f"Skipping result {i}: Score {result.score:.4f} below threshold")
-            continue
-            
-        source_url = payload.get('source_url', '')
-        
-                                 
-        source_info = f"[Source {i}: {payload.get('law', 'Unknown')} - Article {payload.get('article_number', 'N/A')}]"
-        if source_url:
-            source_info += f"\n[URL: {source_url}]"
-        context_parts.append(f"{source_info}\n{doc}\n")
-        
-                                        
-        sources.append({
-            'source': payload.get('source', 'Unknown'),
-            'law': payload.get('law', 'Unknown Law'),
-            'article_number': payload.get('article_number', 'N/A'),
-            'article_title': payload.get('article_title', payload.get('article_heading', '')),
-            'text_preview': doc[:200] + "..." if len(doc) > 200 else doc,
-            'source_url': source_url,
-            'relevance_score': result.score
-        })
-    
-    logger.info(f"Built context from {len(sources)} valid sources")
-    
-                                                              
-    if not sources:
-        logger.warning("No valid sources after filtering")
-        return "", []
-    
-    context_text = "\n\n".join(context_parts)
     return context_text, sources
 
 
@@ -1280,7 +1200,7 @@ Proceed with the analysis as mandated."""
         user_message = f"""THE LEGAL QUERY IS AS FOLLOWS:
 {question}
 
-Note: No specific context was retrieved from the vector database. Proceed with the analysis based on general knowledge of controlling Philippine law, adhering strictly to the mandated 5-part format. If information is insufficient, state so within the 'LEGAL ANALYSIS' section."""
+Note: No specific context was retrieved from trusted web sources. Proceed with the analysis based on general knowledge of controlling Philippine law, adhering strictly to the mandated 5-part format. If information is insufficient, state so within the 'LEGAL ANALYSIS' section."""
     
     messages.append({"role": "user", "content": user_message})
     
@@ -2376,7 +2296,6 @@ async def ask_legal_question_legacy(
                                                                         
         context, sources, rag_metadata = retrieve_relevant_context_with_web_search(
             question=request.question,
-            qdrant_client=qdrant_client,
             openai_client=openai_client,
             collection_name=COLLECTION_NAME,
             embedding_model=EMBEDDING_MODEL,
@@ -2387,22 +2306,22 @@ async def ask_legal_question_legacy(
         
                           
         if rag_metadata.get("web_search_triggered"):
-            logger.info(f" Web search triggered: {rag_metadata['search_strategy']} - Qdrant: {rag_metadata['qdrant_results']}, Web: {rag_metadata['web_results']}")
+            logger.info(f" Web search triggered: {rag_metadata['search_strategy']} - Web: {rag_metadata['web_results']}")
         
                                              
         if not sources or len(sources) == 0:
                                        
             no_context_message = (
-                "I apologize, but I don't have enough information in my database to answer this question accurately. "
+                "I apologize, but I could not find enough reliable web sources to answer this question accurately. "
                 "I recommend consulting with a licensed Philippine lawyer for assistance."
                 if language == "english" else
-                "Paumanhin po, pero wala akong sapat na impormasyon sa aking database para masagot ito nang tama. "
+                "Paumanhin po, pero wala akong sapat na nahanap na mapagkakatiwalaang web sources para masagot ito nang tama. "
                 "Inirerekomenda ko pong kumonsulta sa lisensyadong abogado para sa tulong."
             )
             
             return create_chat_response(
                 answer=no_context_message,
-                simplified_summary="No relevant legal information found in database",
+                simplified_summary="No relevant legal information found in trusted web sources",
             )
         
                                                                                          
@@ -2627,8 +2546,9 @@ async def ask_legal_question_legacy(
 async def health_check():
     """Check if the chatbot service for legal practitioners is running"""
     try:
-        collection_info = qdrant_client.get_collection(collection_name=COLLECTION_NAME)
-        count = collection_info.points_count
+        from services.web_search_service import TRUSTED_DOMAINS, get_web_search_service
+
+        web_search_service = get_web_search_service()
         
                                  
         guardrails_status = {
@@ -2651,11 +2571,11 @@ async def health_check():
         return {
             "status": "healthy",
             "service": "Ai.ttorney Legal Practice API - Practitioner Module",
-            "description": "Advanced RAG endpoint for statutory analysis and jurisprudential research.",
-            "database": "Qdrant Cloud",
-            "documents": count,
+            "description": "Advanced web-grounded endpoint for statutory analysis and jurisprudential research.",
+            "knowledge_source": "Trusted web search",
+            "web_search_enabled": web_search_service.is_enabled(),
+            "trusted_domains": sorted(TRUSTED_DOMAINS),
             "model": CHAT_MODEL,
-            "embedding_model": EMBEDDING_MODEL,
             "languages": ["English", "Tagalog", "Taglish"],
             "features": [
                 "Doctrinal analysis and synthesis",
